@@ -2,7 +2,6 @@
 
 This package provides access to receive market data from [dxFeed](https://www.dxfeed.com/) services.
 
-
 ## Install
 
 ```bash
@@ -11,7 +10,7 @@ npm install @dxfeed/dxlink-websocket-client
 
 ## Usage
 
-Import library
+Import library into your project.
 
 ```typescript
 import { DXLinkWebSocket } from '@dxfeed/dxlink-websocket-client'
@@ -19,7 +18,7 @@ import { DXLinkWebSocket } from '@dxfeed/dxlink-websocket-client'
 
 ### Create client
 
-Create instance of the client
+Create instance of the client with url.
 
 ```typescript
 const client = await DXLinkWebSocket.newClient({
@@ -27,21 +26,21 @@ const client = await DXLinkWebSocket.newClient({
 })
 ```
 
-Provide auth token if required
+Provide auth token if required by the server.
 
-```typescript 
+```typescript
 client.auth(token)
 ```
 
 ### Channels
 
-Create Feed channel with delivery contract
+Create Feed channel with delivery contract `AUTO`.
 
 ```typescript
 const channel = await client.openFeedChannel('AUTO')
 ```
 
-Configure channel
+Configure created channel.
 
 ```typescript
 channel.setup({
@@ -54,28 +53,28 @@ channel.setup({
 })
 ```
 
-Add subscription
+Add subscription to the channel.
 
 ```typescript
 const sub1 = {
   type: 'Quote',
-  symbol: 'AAPL'
+  symbol: 'AAPL',
 }
 
 channel.subscription({
-  add: [sub1]
+  add: [sub1],
 })
 ```
 
-Remove subscription
+Remove subscription from the channel.
 
 ```typescript
 channel.subscription({
-  remove: [sub1]
+  remove: [sub1],
 })
 ```
 
-Receive data
+Receive data from the channel.
 
 ```typescript
 channel.data.subscribe((events) => {
