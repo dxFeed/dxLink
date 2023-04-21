@@ -1,0 +1,19 @@
+{
+  "name": "@dxfeed/dxlink",
+  "version": "1.0.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dxFeed/dxLink.git"
+  },
+  "author": "Dmitry Petrov <dvpetrov.main@gmail.com>",
+  "license": "MPL-2.0",
+  "bugs": {
+    "url": "https://github.com/dxFeed/dxLink/issues"
+  },
+  "homepage": "https://github.com/dxFeed/dxLink#readme",
+  "workspaces": [
+    "dxlink-websocket-client",
+    "dxlink-debug-console"
+  ]
+}
