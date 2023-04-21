@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "target": "ES2020",
+    "types": ["node"],
+    "module": "ESNext",
+    "strict": true,
+    "strictNullChecks": true,
+    "skipLibCheck": false,
+    "skipDefaultLibCheck": false,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "allowJs": false,
+    "declaration": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
