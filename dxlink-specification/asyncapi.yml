@@ -97,7 +97,7 @@ info:
     {
       "type": "CHANNEL_REQUEST",
       "channel": 0,
-      "service": "FEED"
+      "service": "FEED",
       "parameters": {
         "contract": "AUTO"
       }
@@ -309,25 +309,25 @@ channels:
     subscribe:
       message:
         oneOf:
-          - $ref: '#/components/messages/ErrorMessage'
-          - $ref: '#/components/messages/SetupMessage'
-          - $ref: '#/components/messages/KeepaliveMessage'
-          - $ref: '#/components/messages/AuthStateMessage'
-          - $ref: '#/components/messages/ChannelOpenedMessage'
-          - $ref: '#/components/messages/ChannelClosedMessage'
-          - $ref: '#/components/messages/FeedConfigMessage'
-          - $ref: '#/components/messages/FeedDataMessage'
+          - $ref: "#/components/messages/ErrorMessage"
+          - $ref: "#/components/messages/SetupMessage"
+          - $ref: "#/components/messages/KeepaliveMessage"
+          - $ref: "#/components/messages/AuthStateMessage"
+          - $ref: "#/components/messages/ChannelOpenedMessage"
+          - $ref: "#/components/messages/ChannelClosedMessage"
+          - $ref: "#/components/messages/FeedConfigMessage"
+          - $ref: "#/components/messages/FeedDataMessage"
     publish:
       message:
         oneOf:
-          - $ref: '#/components/messages/ErrorMessage'
-          - $ref: '#/components/messages/SetupMessage'
-          - $ref: '#/components/messages/AuthMessage'
-          - $ref: '#/components/messages/KeepaliveMessage'
-          - $ref: '#/components/messages/ChannelRequestMessage'
-          - $ref: '#/components/messages/ChannelCancelMessage'
-          - $ref: '#/components/messages/FeedSetupMessage'
-          - $ref: '#/components/messages/FeedSubscriptionMessage'
+          - $ref: "#/components/messages/ErrorMessage"
+          - $ref: "#/components/messages/SetupMessage"
+          - $ref: "#/components/messages/AuthMessage"
+          - $ref: "#/components/messages/KeepaliveMessage"
+          - $ref: "#/components/messages/ChannelRequestMessage"
+          - $ref: "#/components/messages/ChannelCancelMessage"
+          - $ref: "#/components/messages/FeedSetupMessage"
+          - $ref: "#/components/messages/FeedSubscriptionMessage"
 
 components:
   messages:
@@ -337,7 +337,7 @@ components:
         Receiving an error message does not require any action and is for informational purposes only.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -367,18 +367,18 @@ components:
         - summary: Timeout error
           payload:
             {
-              'channel': 0,
-              'type': 'ERROR',
-              'error': 'TIMEOUT',
-              'message': 'The timeout has been reached. The message was last received 60 seconds ago.',
+              "channel": 0,
+              "type": "ERROR",
+              "error": "TIMEOUT",
+              "message": "The timeout has been reached. The message was last received 60 seconds ago.",
             }
         - summary: Invalid message error
           payload:
             {
-              'channel': 0,
-              'type': 'ERROR',
-              'error': 'INVALID_MESSAGE',
-              'message': 'The message is not valid JSON.',
+              "channel": 0,
+              "type": "ERROR",
+              "error": "INVALID_MESSAGE",
+              "message": "The message is not valid JSON.",
             }
 
     SetupMessage:
@@ -387,7 +387,7 @@ components:
         The first message the client must send to the server after a successful connection.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               channel:
@@ -403,26 +403,26 @@ components:
               version:
                 description: Protocol version.
                 type: string
-                example: '0.1-js/1.0.0'
+                example: "0.1-js/1.0.0"
             required: [channel, type, version]
       examples:
         - summary: Client setup message.
           payload:
             {
-              'channel': 0,
-              'type': 'SETUP',
-              'keepaliveTimeout': 60,
-              'acceptKeepaliveTimeout': 60,
-              'version': '0.1-js/1.0.0',
+              "channel": 0,
+              "type": "SETUP",
+              "keepaliveTimeout": 60,
+              "acceptKeepaliveTimeout": 60,
+              "version": "0.1-js/1.0.0",
             }
         - summary: Server setup message.
           payload:
             {
-              'channel': 0,
-              'type': 'SETUP',
-              'keepaliveTimeout': 60,
-              'acceptKeepaliveTimeout': 60,
-              'version': '0.1-123-123',
+              "channel": 0,
+              "type": "SETUP",
+              "keepaliveTimeout": 60,
+              "acceptKeepaliveTimeout": 60,
+              "version": "0.1-123-123",
             }
 
     KeepaliveMessage:
@@ -432,7 +432,7 @@ components:
         The server must send any messages to the client at least once before the timeout is reached (see `SETUP` message). Otherwise, the client should close the connection.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               channel:
@@ -442,7 +442,7 @@ components:
             required: [channel, type]
       examples:
         - summary: Keepalive message
-          payload: { 'channel': 0, 'type': 'KEEPALIVE' }
+          payload: { "channel": 0, "type": "KEEPALIVE" }
 
     AuthMessage:
       summary: Allows the client to authorize.
@@ -451,7 +451,7 @@ components:
         The server will notify with the `AUTH_STATE` message or close the connection if the authorization is unsuccessful.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               channel:
@@ -464,7 +464,7 @@ components:
             required: [channel, type, token]
       examples:
         - summary: Authorization
-          payload: { 'channel': 0, 'type': 'AUTH', 'token': 'token#123' }
+          payload: { "channel": 0, "type": "AUTH", "token": "token#123" }
 
     AuthStateMessage:
       summary: Notification of authorization state.
@@ -473,7 +473,7 @@ components:
         The server will send this message with an `AUTHORIZED state` to notify that authorization was successful or not required.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               channel:
@@ -492,9 +492,10 @@ components:
             required: [channel, type, state]
       examples:
         - summary: Authorization successful.
-          payload: { 'channel': 0, 'type': 'AUTH_STATE', 'state': 'AUTHORIZED' }
+          payload: { "channel": 0, "type": "AUTH_STATE", "state": "AUTHORIZED" }
         - summary: Authorization required.
-          payload: { 'channel': 0, 'type': 'AUTH_STATE', 'state': 'UNAUTHORIZED' }
+          payload:
+            { "channel": 0, "type": "AUTH_STATE", "state": "UNAUTHORIZED" }
 
     ChannelRequestMessage:
       summary: Allows the client to request the channel.
@@ -503,7 +504,7 @@ components:
         The server will notify the client with the `CHANNEL_OPENED` message.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -518,17 +519,17 @@ components:
                 type: object
                 properties:
                   contract:
-                    $ref: '#/components/schemas/FeedContract'
+                    $ref: "#/components/schemas/FeedContract"
                 required: [contract]
             required: [channel, type, service, parameters]
       examples:
         - summary: Feed channel request with AUTO contract.
           payload:
             {
-              'channel': 1,
-              'type': 'CHANNEL_OPEN',
-              'service': 'FEED',
-              'parameters': { 'contract': 'AUTO' },
+              "channel": 1,
+              "type": "CHANNEL_OPEN",
+              "service": "FEED",
+              "parameters": { "contract": "AUTO" },
             }
 
     ChannelOpenedMessage:
@@ -537,19 +538,19 @@ components:
         The server will send this message to the client after the `CHANNEL_REQUEST` message is received.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
                 const: CHANNEL_OPENED
               service:
-                const: 'FEED'
+                const: "FEED"
               parameters:
                 description: Parameters of operated channel.
                 type: object
                 properties:
                   contract:
-                    $ref: '#/components/schemas/FeedContract'
+                    $ref: "#/components/schemas/FeedContract"
                   subFormat:
                     const: LIST
                 required: [contract]
@@ -558,10 +559,10 @@ components:
         - summary: Feed channel opened with AUTO contract.
           payload:
             {
-              'channel': 1,
-              'type': 'CHANNEL_OPENED',
-              'service': 'FEED',
-              'parameters': { 'contract': 'AUTO' },
+              "channel": 1,
+              "type": "CHANNEL_OPENED",
+              "service": "FEED",
+              "parameters": { "contract": "AUTO" },
             }
 
     ChannelClosedMessage:
@@ -570,7 +571,7 @@ components:
         The server will send this message to the client after the `CHANNEL_CANCEL` message is received or if the server decides to close the channel.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -578,7 +579,7 @@ components:
             required: [channel, type]
       examples:
         - summary: Channel closed
-          payload: { 'channel': 1, 'type': 'CHANNEL_CLOSED' }
+          payload: { "channel": 1, "type": "CHANNEL_CLOSED" }
 
     ChannelCancelMessage:
       summary: Allows the client to cancel channel requests.
@@ -587,7 +588,7 @@ components:
         Once the client has sent this message, the client can forget about the channel.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -595,7 +596,7 @@ components:
             required: [channel, type]
       examples:
         - summary: Close channel
-          payload: { 'channel': 1, 'type': 'CHANNEL_CANCEL' }
+          payload: { "channel": 1, "type": "CHANNEL_CANCEL" }
 
     FeedSetupMessage:
       summary: Allows the client to configure the `FEED` service.
@@ -604,7 +605,7 @@ components:
         The server will notify the client of the application with the `FEED_CONFIG` message.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -613,31 +614,38 @@ components:
                 description: Desired aggregation period of events (in seconds).
                 type: number
               acceptEventFields:
-                $ref: '#/components/schemas/FeedEventFields'
+                $ref: "#/components/schemas/FeedEventFields"
               acceptDataFormat:
-                $ref: '#/components/schemas/FeedDataFormat'
+                $ref: "#/components/schemas/FeedDataFormat"
             required: [channel, type]
       examples:
         - summary: Feed setup compact format with fields.
           payload:
             {
-              'channel': 1,
-              'type': 'FEED_SETUP',
-              'acceptAggregationPeriod': 1,
-              'acceptEventFields':
+              "channel": 1,
+              "type": "FEED_SETUP",
+              "acceptAggregationPeriod": 1,
+              "acceptEventFields":
                 {
-                  'Quote':
-                    ['eventType', 'eventSymbol', 'bidPrice', 'askPrice', 'bidSize', 'askSize'],
+                  "Quote":
+                    [
+                      "eventType",
+                      "eventSymbol",
+                      "bidPrice",
+                      "askPrice",
+                      "bidSize",
+                      "askSize",
+                    ],
                 },
-              'acceptDataFormat': 'COMPACT',
+              "acceptDataFormat": "COMPACT",
             }
         - summary: Feed setup full format.
           payload:
             {
-              'channel': 1,
-              'type': 'FEED_SETUP',
-              'acceptAggregationPeriod': 1,
-              'acceptDataFormat': 'FULL',
+              "channel": 1,
+              "type": "FEED_SETUP",
+              "acceptAggregationPeriod": 1,
+              "acceptDataFormat": "FULL",
             }
 
     FeedConfigMessage:
@@ -648,7 +656,7 @@ components:
         Parameters are lazy therefore the server may not send the notification immediately, but before the first `FEED_DATA` is sent.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -656,23 +664,30 @@ components:
               aggregationPeriod:
                 type: number
               dataFormat:
-                $ref: '#/components/schemas/FeedDataFormat'
+                $ref: "#/components/schemas/FeedDataFormat"
               eventFields:
-                $ref: '#/components/schemas/FeedEventFields'
+                $ref: "#/components/schemas/FeedEventFields"
             required: [channel, type, aggregationPeriod, dataFormat]
       examples:
         - summary: Feed config.
           payload:
             {
-              'channel': 1,
-              'type': 'FEED_CONFIG',
-              'aggregationPeriod': 1,
-              'eventFields':
+              "channel": 1,
+              "type": "FEED_CONFIG",
+              "aggregationPeriod": 1,
+              "eventFields":
                 {
-                  'Quote':
-                    ['eventType', 'eventSymbol', 'bidPrice', 'askPrice', 'bidSize', 'askSize'],
+                  "Quote":
+                    [
+                      "eventType",
+                      "eventSymbol",
+                      "bidPrice",
+                      "askPrice",
+                      "bidSize",
+                      "askSize",
+                    ],
                 },
-              'dataFormat': 'COMPACT',
+              "dataFormat": "COMPACT",
             }
 
     FeedSubscriptionMessage:
@@ -681,7 +696,7 @@ components:
         The client can send this message to the server after opening a channel with the `FEED` service.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -691,13 +706,13 @@ components:
                 type: array
                 minItems: 1
                 items:
-                  $ref: '#/components/schemas/FeedSubscription'
+                  $ref: "#/components/schemas/FeedSubscription"
               remove:
                 description: Operation to remove subscription objects.
                 type: array
                 minItems: 1
                 items:
-                  $ref: '#/components/schemas/FeedSubscription'
+                  $ref: "#/components/schemas/FeedSubscription"
               reset:
                 description: Remove all subscription objects when it's `true`.
                 type: boolean
@@ -706,19 +721,19 @@ components:
         - summary: Feed add subscription.
           payload:
             {
-              'channel': 1,
-              'type': 'FEED_SUBSCRIPTION',
-              'add': [{ 'type': 'Quote', 'symbol': 'AAPL' }],
+              "channel": 1,
+              "type": "FEED_SUBSCRIPTION",
+              "add": [{ "type": "Quote", "symbol": "AAPL" }],
             }
         - summary: Feed remove subscription.
           payload:
             {
-              'channel': 1,
-              'type': 'FEED_SUBSCRIPTION',
-              'remove': [{ 'type': 'Quote', 'symbol': 'AAPL' }],
+              "channel": 1,
+              "type": "FEED_SUBSCRIPTION",
+              "remove": [{ "type": "Quote", "symbol": "AAPL" }],
             }
         - summary: Feed reset subscription
-          payload: { 'channel': 1, 'type': 'FEED_SUBSCRIPTION', 'reset': true }
+          payload: { "channel": 1, "type": "FEED_SUBSCRIPTION", "reset": true }
 
     FeedDataMessage:
       summary: Contains the data of subscribed market events.
@@ -727,7 +742,7 @@ components:
         The server will send data in the format that was described in the `FEED_CONFIG` message.
       payload:
         allOf:
-          - $ref: '#/components/schemas/Message'
+          - $ref: "#/components/schemas/Message"
           - type: object
             properties:
               type:
@@ -740,20 +755,20 @@ components:
                       Empty fields are omitted from the json.
                     type: array
                     items:
-                      - $ref: '#/components/schemas/FeedEvent'
+                      - $ref: "#/components/schemas/FeedEvent"
                     examples:
                       - [
                           {
-                            'eventSymbol': 'AAPL',
-                            'eventType': 'Quote',
-                            'askPrice': 123,
-                            'bidPrice': 123,
+                            "eventSymbol": "AAPL",
+                            "eventType": "Quote",
+                            "askPrice": 123,
+                            "bidPrice": 123,
                           },
                           {
-                            'eventSymbol': 'AAPL',
-                            'eventType': 'Quote',
-                            'askPrice': 321,
-                            'bidPrice': 321,
+                            "eventSymbol": "AAPL",
+                            "eventType": "Quote",
+                            "askPrice": 321,
+                            "bidPrice": 321,
                           },
                         ]
                   - description: |
@@ -772,35 +787,54 @@ components:
                               - type: number
                     examples:
                       - [
-                          'Quote',
-                          ['AAPL', 'Quote', 123, 123, 'AMZN', 'Quote', 321, 321],
-                          'Trade',
-                          ['AAPL', 'Trade', 321, 22, 'AMZN', 'Trade', 123, 11],
+                          "Quote",
+                          [
+                            "AAPL",
+                            "Quote",
+                            123,
+                            123,
+                            "AMZN",
+                            "Quote",
+                            321,
+                            321,
+                          ],
+                          "Trade",
+                          ["AAPL", "Trade", 321, 22, "AMZN", "Trade", 123, 11],
                         ]
             required: [channel, type, data]
       examples:
         - summary: Feed data full format.
           payload:
             {
-              'channel': 1,
-              'type': 'FEED_DATA',
-              'data':
+              "channel": 1,
+              "type": "FEED_DATA",
+              "data":
                 [
-                  { 'eventSymbol': 'AAPL', 'eventType': 'Quote', 'askPrice': 123, 'bidPrice': 123 },
-                  { 'eventSymbol': 'AAPL', 'eventType': 'Quote', 'askPrice': 321, 'bidPrice': 321 },
+                  {
+                    "eventSymbol": "AAPL",
+                    "eventType": "Quote",
+                    "askPrice": 123,
+                    "bidPrice": 123,
+                  },
+                  {
+                    "eventSymbol": "AAPL",
+                    "eventType": "Quote",
+                    "askPrice": 321,
+                    "bidPrice": 321,
+                  },
                 ],
             }
         - summary: Feed data compact format.
           payload:
             {
-              'channel': 1,
-              'type': 'FEED_DATA',
-              'data':
+              "channel": 1,
+              "type": "FEED_DATA",
+              "data":
                 [
-                  'Quote',
-                  ['AAPL', 'Quote', 123, 123, 'AMZN', 'Quote', 321, 321],
-                  'Trade',
-                  ['AAPL', 'Trade', 321, 22, 'AMZN', 'Trade', 123, 11],
+                  "Quote",
+                  ["AAPL", "Quote", 123, 123, "AMZN", "Quote", 321, 321],
+                  "Trade",
+                  ["AAPL", "Trade", 321, 22, "AMZN", "Trade", 123, 11],
                 ],
             }
   schemas:
@@ -812,7 +846,7 @@ components:
         type:
           description: Message type discriminator.
           type: string
-          example: 'MESSAGE_TYPE'
+          example: "MESSAGE_TYPE"
         channel:
           description: Identifies within which channel the communication is occurring.
           type: number
@@ -843,13 +877,14 @@ components:
       propertyNames:
         description: Event type.
         type: string
-        examples: ['Quote', 'Trade', 'Candle']
+        examples: ["Quote", "Trade", "Candle"]
       additionalProperties:
         description: Array of event fields.
         type: array
         items:
           description: Event field name.
-          examples: ['eventSymbol', 'eventType', 'eventTime', 'askPrice', 'bidPrice']
+          examples:
+            ["eventSymbol", "eventType", "eventTime", "askPrice", "bidPrice"]
           type: string
         minItems: 1
 
@@ -859,7 +894,7 @@ components:
         - `FULL` - key-value objects (with field names)
         - `COMPACT` - value only arrays (without field names)
       type: string
-      string: ['FULL', 'COMPACT']
+      string: ["FULL", "COMPACT"]
 
     FeedSymbol:
       description: |
@@ -867,13 +902,13 @@ components:
         - `*` - wildcard (all symbols) subscription (for `STREAM` and `AUTO` contracts only)
         - `symbol` - one symbol
       type: string
-      examples: ['AAPL', 'AMZN']
+      examples: ["AAPL", "AMZN"]
 
     FeedSubscription:
       oneOf:
-        - $ref: '#/components/schemas/FeedRegularSubscription'
-        - $ref: '#/components/schemas/FeedOrderBookSubscription'
-        - $ref: '#/components/schemas/FeedTimeSeriesSubscription'
+        - $ref: "#/components/schemas/FeedRegularSubscription"
+        - $ref: "#/components/schemas/FeedOrderBookSubscription"
+        - $ref: "#/components/schemas/FeedTimeSeriesSubscription"
 
     FeedRegularSubscription:
       description: This type of subscription object is used in a channel with `TICKER`, `STREAM`, or `AUTO` contract.
@@ -881,30 +916,30 @@ components:
       properties:
         type:
           description: Type of market data event.
-          examples: ['Quote', 'Trade', 'Candle']
+          examples: ["Quote", "Trade", "Candle"]
           type: string
         symbol:
-          $ref: '#/components/schemas/FeedSymbol'
+          $ref: "#/components/schemas/FeedSymbol"
       required: [type, symbol]
-      example: { 'type': 'Quote', 'symbol': 'AAPL' }
+      example: { "type": "Quote", "symbol": "AAPL" }
 
     FeedOrderBookSubscription:
       description: This type of subscription object is used in a channel with `HISTORY` or `AUTO` contract.
       allOf:
-        - $ref: '#/components/schemas/FeedRegularSubscription'
+        - $ref: "#/components/schemas/FeedRegularSubscription"
         - type: object
           properties:
             source:
               description: Source of the feed. Possible values [here](https://kb.dxfeed.com/en/data-model/qd-model-of-market-events.html#order-x).
               type: string
-              examples: ['NTV', 'ntv', 'DEFAULT']
+              examples: ["NTV", "ntv", "DEFAULT"]
           required: [type, symbol, source]
-          example: { 'type': 'Quote', 'symbol': 'AAPL', 'source': 'NTV' }
+          example: { "type": "Quote", "symbol": "AAPL", "source": "NTV" }
 
     FeedTimeSeriesSubscription:
       description: This type of subscription object is used in a channel with `HISTORY` or `AUTO` contract.
       allOf:
-        - $ref: '#/components/schemas/FeedRegularSubscription'
+        - $ref: "#/components/schemas/FeedRegularSubscription"
         - type: object
           properties:
             fromTime:
@@ -916,27 +951,32 @@ components:
               type: number
               example: 1610000000000
           required: [type, symbol, fromTime]
-          example: { 'type': 'Candle', 'symbol': 'AAPL{=d}', 'fromTime': 1610000000000 }
+          example:
+            {
+              "type": "Candle",
+              "symbol": "AAPL{=d}",
+              "fromTime": 1610000000000,
+            }
 
     FeedEvent:
       oneOf:
-        - $ref: '#/components/schemas/QuoteEvent'
-        - $ref: '#/components/schemas/ProfileEvent'
-        - $ref: '#/components/schemas/TradeEvent'
-        - $ref: '#/components/schemas/TradeETHEvent'
-        - $ref: '#/components/schemas/CandleEvent'
-        - $ref: '#/components/schemas/SummaryEvent'
-        - $ref: '#/components/schemas/TimeAndSaleEvent'
-        - $ref: '#/components/schemas/GreeksEvent'
-        - $ref: '#/components/schemas/TheoPriceEvent'
-        - $ref: '#/components/schemas/UnderlyingEvent'
-        - $ref: '#/components/schemas/OptionSaleEvent'
-        - $ref: '#/components/schemas/SeriesEvent'
-        - $ref: '#/components/schemas/OrderEvent'
-        - $ref: '#/components/schemas/SpreadOrderEvent'
-        - $ref: '#/components/schemas/AnalyticOrderEvent'
-        - $ref: '#/components/schemas/ConfigurationEvent'
-        - $ref: '#/components/schemas/MessageEvent'
+        - $ref: "#/components/schemas/QuoteEvent"
+        - $ref: "#/components/schemas/ProfileEvent"
+        - $ref: "#/components/schemas/TradeEvent"
+        - $ref: "#/components/schemas/TradeETHEvent"
+        - $ref: "#/components/schemas/CandleEvent"
+        - $ref: "#/components/schemas/SummaryEvent"
+        - $ref: "#/components/schemas/TimeAndSaleEvent"
+        - $ref: "#/components/schemas/GreeksEvent"
+        - $ref: "#/components/schemas/TheoPriceEvent"
+        - $ref: "#/components/schemas/UnderlyingEvent"
+        - $ref: "#/components/schemas/OptionSaleEvent"
+        - $ref: "#/components/schemas/SeriesEvent"
+        - $ref: "#/components/schemas/OrderEvent"
+        - $ref: "#/components/schemas/SpreadOrderEvent"
+        - $ref: "#/components/schemas/AnalyticOrderEvent"
+        - $ref: "#/components/schemas/ConfigurationEvent"
+        - $ref: "#/components/schemas/MessageEvent"
       discriminator: eventType
 
     MessageEvent:
