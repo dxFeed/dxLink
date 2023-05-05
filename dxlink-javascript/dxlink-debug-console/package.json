@@ -10,7 +10,7 @@
   "private": true,
   "dependencies": {
     "@asyncapi/react-component": "1.0.0-next.47",
-    "@dxfeed/ui-kit": "^2.7.0",
+    "@dxfeed/ui-kit": "2.7.0",
     "@dxfeed/dxlink-websocket-client": "*",
     "@frp-ts/core": "^1.0.0-beta.3",
     "@frp-ts/react": "^1.0.0-beta.3",
