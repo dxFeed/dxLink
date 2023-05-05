@@ -219,10 +219,16 @@ export const newClient = async ({
   const keepaliveAction = new Subject()
   const clientMaintance = keepaliveAction.pipe(
     startWith(1),
-    switchMap(() =>
-      interval(keepaliveInterval * 1000).pipe(
-        tap(() => connection.send({ type: 'KEEPALIVE', channel: 0 }))
-      )
+    switchMap(
+      () =>
+        new Observable(() => {
+          const intervalId = setInterval(
+            () => connection.send({ type: 'KEEPALIVE', channel: 0 }),
+            keepaliveInterval * 1000
+          )
+
+          return () => clearInterval(intervalId)
+        })
     )
   )
   const send = (message: Message) => {
