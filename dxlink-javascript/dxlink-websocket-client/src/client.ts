@@ -4,7 +4,6 @@ import {
   distinctUntilChanged,
   filter,
   firstValueFrom,
-  interval,
   map,
   merge,
   mergeWith,
