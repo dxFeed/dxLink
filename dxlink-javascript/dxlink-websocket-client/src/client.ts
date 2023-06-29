@@ -35,6 +35,7 @@ import {
   ErrorType,
 } from './protocol'
 import { VERSION } from './version'
+import { newDefaultScheduler, Scheduler } from './scheduler'
 
 export interface ConnectionState {
   status: ConnectionStatus
@@ -76,6 +77,7 @@ export interface ClientOptions {
   keepaliveTimeout?: number
   acceptKeepaliveTimeout?: number
   getAuthToken?: () => Promise<string>
+  scheduler?: Scheduler
 }
 
 export const DEFAULT_KEEPALIVE_TIMEOUT = 60
@@ -85,6 +87,7 @@ export const newClient = async ({
   keepaliveTimeout = DEFAULT_KEEPALIVE_TIMEOUT,
   acceptKeepaliveTimeout = DEFAULT_KEEPALIVE_TIMEOUT,
   keepaliveInterval = keepaliveTimeout / 2,
+  scheduler = newDefaultScheduler(),
 }: ClientOptions): Promise<Client> => {
   // Constants
   const actionTimeout = (keepaliveTimeout / 2) * 1000
@@ -189,12 +192,41 @@ export const newClient = async ({
   )
 
   // Connection maintenance
+  // Client keepalive sending
+  let lastSentMessageTime = Date.now()
+  const keepaliveAction = new Subject()
+  const clientMaintance = keepaliveAction.pipe(
+    startWith(1),
+    switchMap(
+      () =>
+        new Observable(() =>
+          scheduler.scheduleInterval(() => {
+            lastSentMessageTime = Date.now()
+            connection.send({ type: 'KEEPALIVE', channel: 0 })
+          }, keepaliveInterval * 1000)
+        )
+    )
+  )
+  const send = (message: Message) => {
+    lastSentMessageTime = Date.now()
+    connection.send(message)
+    keepaliveAction.next(1)
+  }
+
   // Server keepalive validation
   const serverMaintance = serverSetup.pipe(
     switchMap((setupMessage) => {
       const keepaliveTimeout = setupMessage.keepaliveTimeout ?? DEFAULT_KEEPALIVE_TIMEOUT
 
       return connection.message.pipe(
+        tap(() => {
+          const currentTime = Date.now()
+
+          // If scheduled keepalive is not sent in time, send keepalive
+          if (currentTime - lastSentMessageTime >= keepaliveInterval * 1000) {
+            send({ type: 'KEEPALIVE', channel: 0 })
+          }
+        }),
         timeout({
           each: keepaliveTimeout * 1000,
           meta: `Server keepalive timeout exceeded: ${keepaliveTimeout} seconds`,
@@ -213,27 +245,6 @@ export const newClient = async ({
       return NEVER
     })
   )
-
-  // Client keepalive sending
-  const keepaliveAction = new Subject()
-  const clientMaintance = keepaliveAction.pipe(
-    startWith(1),
-    switchMap(
-      () =>
-        new Observable(() => {
-          const intervalId = setInterval(
-            () => connection.send({ type: 'KEEPALIVE', channel: 0 }),
-            keepaliveInterval * 1000
-          )
-
-          return () => clearInterval(intervalId)
-        })
-    )
-  )
-  const send = (message: Message) => {
-    connection.send(message)
-    keepaliveAction.next(1)
-  }
 
   // Authentication
   const authStateMesage = connectionInbound.pipe(
