@@ -1,5 +1,5 @@
-import path from 'path'
-import HtmlWebpackPlugin from 'html-webpack-plugin'
+const path = require('path')
+const HtmlWebpackPlugin = require('html-webpack-plugin')
 
 const SELF = path.resolve(__dirname)
 
@@ -33,7 +33,7 @@ const config = {
             loader: 'ts-loader',
             options: {
               transpileOnly: true,
-              configFile: path.resolve(SELF, './tsconfig.demo.json'),
+              configFile: path.resolve(SELF, './tsconfig.json'),
             },
           },
         ],
@@ -47,5 +47,4 @@ const config = {
   },
 }
 
-// eslint-disable-next-line import/no-default-export
-export default config
+module.exports = config
