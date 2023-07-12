@@ -140,8 +140,8 @@ export function FeedSubscription({ onAction, contract }: FeedSubscriptionProps) 
                 }}
               />
               <HelperMessage state="normal">
-                <a href="https://www.unixtimestamp.com/" target="_blank" rel="noreferrer">
-                  Unix timestamp converter
+                <a href="https://currentmillis.com/" target="_blank" rel="noreferrer">
+                  Milliseconds since epoch
                 </a>
               </HelperMessage>
             </ParamTextField>
