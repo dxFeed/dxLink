@@ -352,7 +352,7 @@ components:
                   - BAD_ACTION - the server has detected a protocol violation in the previously received message(s).
                   - UNKNOWN - an error occurred that does not fit into any of the previously described types.
                 type: string
-                string:
+                enum:
                   - UNSUPPORTED_PROTOCOL
                   - TIMEOUT
                   - UNAUTHORIZED
@@ -486,7 +486,7 @@ components:
                   - `AUTHORIZED` - authorization is successful
                   - `UNAUTHORIZED` - authorization failed
                 type: string
-                string:
+                enum:
                   - AUTHORIZED
                   - UNAUTHORIZED
             required: [channel, type, state]
@@ -513,7 +513,8 @@ components:
                 description: |
                   Operated service. Possible values:
                   - `FEED` - the feed service offers the ability to receive real-time updates about the trading information such as quotes, last traded price, volumes, and others.
-                const: FEED
+                enum:
+                  - FEED
               parameters:
                 description: Parameters of the operated service.
                 type: object
@@ -865,7 +866,7 @@ components:
           - `TICKER` - for `Quote` event type and others
           - `STREAM` - for `Order` event type and others
       type: string
-      string:
+      enum:
         - HISTORY
         - TICKER
         - STREAM
@@ -894,7 +895,9 @@ components:
         - `FULL` - key-value objects (with field names)
         - `COMPACT` - value only arrays (without field names)
       type: string
-      string: ["FULL", "COMPACT"]
+      enum:
+        - FULL
+        - COMPACT
 
     FeedSymbol:
       description: |
