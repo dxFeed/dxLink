@@ -131,8 +131,8 @@ class DXLinkChannelImpl implements DXLinkChannel, ChannelMessageHandler {
   }
 }
 
-export class DXLinkChannelManager implements ChannelMessageHandler {
-  channels: Record<number, DXLinkChannel & ChannelMessageHandler> = {}
+export class ChannelManager implements ChannelMessageHandler {
+  channels: Record<number, ChannelMessageHandler> = {}
 
   private nextChannelId = 1
 

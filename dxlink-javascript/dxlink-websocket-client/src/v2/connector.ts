@@ -1,54 +1,11 @@
 import { VERSION } from '../version'
 import { AuthManager } from './auth'
-import { DXLinkChannelManager } from './channels'
+import { ChannelManager } from './channels'
 import { ConnectionManager } from './connection'
 import { ClientConnector, DXLinkWebSocketConnection } from './core'
-import { ChannelMessageHandler, ConnectionMessageHandler, TransportHandler } from './handler'
 import { KeepaliveManager } from './keepalive'
-import {
-  Message,
-  isChannelLifecycleMessage,
-  isChannelPayloadMessage,
-  isConnectionMessage,
-} from './messages'
-import { WebSocketTransport, TransportConnection } from './transport'
-
-class DXLinkTransportHandler implements TransportHandler {
-  constructor(
-    private readonly connection: TransportConnection,
-    private readonly connectionMessageHandler: ConnectionMessageHandler,
-    private readonly channelMessageHandler: ChannelMessageHandler
-  ) {}
-
-  handleMessage(message: Message): void {
-    if (isConnectionMessage(message)) {
-      return this.connectionMessageHandler.handleMessage(message)
-    }
-    if (isChannelLifecycleMessage(message)) {
-      return this.channelMessageHandler.handleLifecycle(message)
-    }
-    if (isChannelPayloadMessage(message)) {
-      return this.channelMessageHandler.handleChannelPayload(message)
-    }
-
-    this.connection.send({
-      type: 'ERROR',
-      channel: 0,
-      error: 'INVALID_MESSAGE',
-      message: 'Unknown message type ' + message.type + ' received',
-    })
-
-    console.warn('Unknown message', message)
-  }
-
-  handleError(error: Error): void {
-    console.error('Transport error', error)
-  }
-
-  handleClose(): void {
-    this.connectionMessageHandler.handleClose()
-  }
-}
+import { Multiplexer } from './multiplexer'
+import { WebSocketTransport } from './transport'
 
 export interface DXLinkWebSocketConnectorConfig {
   url: string
@@ -59,6 +16,8 @@ export interface DXLinkWebSocketConnectorConfig {
 
 export const DEFAULT_KEEPALIVE_TIMEOUT = 60
 
+export const PROTOCOL_VERSION = '0.1'
+
 export class DXLinkWebSocketConnector implements ClientConnector {
   constructor(private readonly config: DXLinkWebSocketConnectorConfig) {}
 
@@ -68,7 +27,7 @@ export class DXLinkWebSocketConnector implements ClientConnector {
       channel: 0,
       keepaliveTimeout: this.config.keepaliveTimeout ?? DEFAULT_KEEPALIVE_TIMEOUT,
       acceptKeepaliveTimeout: this.config.acceptKeepaliveTimeout ?? DEFAULT_KEEPALIVE_TIMEOUT,
-      version: `0.1-${VERSION}`,
+      version: `${PROTOCOL_VERSION}-${VERSION}`,
     } as const
     const keepaliveInterval = clientSetup.keepaliveTimeout / 2
     const actionTimeout = clientSetup.keepaliveTimeout / 2
@@ -92,18 +51,15 @@ export class DXLinkWebSocketConnector implements ClientConnector {
         authManager
       )
 
-      const channelManager = new DXLinkChannelManager(transportConnection)
+      const channelManager = new ChannelManager(transportConnection)
 
-      const handler = new DXLinkTransportHandler(
-        transportConnection,
-        connectionManager,
-        channelManager
-      )
-      transportConnection.registerHandler(handler)
+      const multiplexer = new Multiplexer(transportConnection, connectionManager, channelManager)
+      transportConnection.registerHandler(multiplexer)
 
       // Send setup message to initiate the connection
       transportConnection.send(clientSetup)
 
+      // Await for setup message from server
       const serverSetup = await connectionManager.whenReady(actionTimeout * 1000)
 
       // Await for auth state from server
@@ -117,14 +73,15 @@ export class DXLinkWebSocketConnector implements ClientConnector {
         removeLifecycleHandler: connectionManager.removeLifecycleHandler,
 
         auth: authManager.auth,
+        getAuthState: authManager.getAuthState,
         openChannel: channelManager.openChannel,
       }
 
       return connection
-    } catch (e) {
+    } catch (error) {
       transportConnection.close()
 
-      throw e
+      throw error
     }
   }
 }

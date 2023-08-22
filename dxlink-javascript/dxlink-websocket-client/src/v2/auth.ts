@@ -13,6 +13,12 @@ export class AuthManager implements AuthHandler {
 
   constructor(private readonly connection: TransportConnection) {}
 
+  handleError(error: string): void {
+    for (const handler of this.handlers) {
+      handler('UNAUTHORIZED', error)
+    }
+  }
+
   handleAuthState(state: AuthState) {
     for (const handler of this.handlers) {
       handler(state)
@@ -54,27 +60,36 @@ export class AuthManager implements AuthHandler {
   }
 
   auth = (token: string): Promise<void> => {
+    const promise = new Promise<void>((resolve, reject) => {
+      let handler = (state: AuthState, reason: string) => {
+        if (this.currentState !== undefined) {
+          if (state === 'AUTHORIZED') {
+            resolve()
+          } else {
+            reject(new Error('Unauhorized: ' + reason ?? 'Unknown reason'))
+          }
+
+          this.handlers.delete(handler)
+        }
+      }
+      this.handlers.add(handler)
+    })
+
     this.connection.send({
       type: 'AUTH',
       channel: 0,
       token,
     })
 
-    return new Promise((resolve, reject) => {
-      let handler = (state: AuthState) => {
-        resolve()
+    return promise
+  }
 
-        if (this.currentState !== undefined) {
-          if (state === 'AUTHORIZED') {
-            resolve()
-          } else {
-            reject()
-          }
-        }
-        this.handlers.delete(handler)
-      }
-      this.handlers.add(handler)
-    })
+  getAuthState = (): AuthState => {
+    if (this.currentState === undefined) {
+      throw new Error('Auth init phase not completed')
+    }
+
+    return this.currentState
   }
 
   addHandler(handler: AuthStateHandler) {

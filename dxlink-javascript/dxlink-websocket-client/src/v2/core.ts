@@ -77,11 +77,11 @@ export interface ClientConnector {
 }
 
 export interface ConnectionLifecycleHandler {
-  handleClose(): void
+  handleClose?(): void
 
-  handleError(error: DXLinkError): void
+  handleError?(error: DXLinkError): void
 
-  handleAuthState(state: AuthState): void
+  handleAuthState?(state: AuthState): void
 }
 
 export interface DXLinkWebSocketConnection {
@@ -104,6 +104,11 @@ export interface DXLinkWebSocketConnection {
    * @param token The authentication token.
    */
   auth(token: string): Promise<void>
+
+  /**
+   * Get the current authentication state.
+   */
+  getAuthState(): AuthState
 
   /**
    * Open a two-way channel to the dxLink service.

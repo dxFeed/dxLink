@@ -1,5 +1,5 @@
 import { AuthManager } from './auth'
-import { ConnectionLifecycleHandler } from './core'
+import { ConnectionLifecycleHandler, DXLinkError } from './core'
 import { ConnectionMessageHandler } from './handler'
 import { KeepaliveManager } from './keepalive'
 import { ConnectionMessage, ErrorMessage, SetupMessage } from './messages'
@@ -9,9 +9,7 @@ export class ConnectionManager implements ConnectionMessageHandler {
   private serverSetupHandler: ((message: SetupMessage) => void) | undefined
   private timeoutId: any
 
-  private serverSetupMessage: SetupMessage | undefined
-
-  private lastError: ErrorMessage | undefined
+  private lastError: DXLinkError | undefined
 
   private handlers = new Set<ConnectionLifecycleHandler>()
 
@@ -22,7 +20,7 @@ export class ConnectionManager implements ConnectionMessageHandler {
   ) {
     this.authManager.addHandler((state) => {
       for (const handler of this.handlers) {
-        handler.handleAuthState(state)
+        handler.handleAuthState?.(state)
       }
     })
   }
@@ -32,8 +30,6 @@ export class ConnectionManager implements ConnectionMessageHandler {
 
     switch (message.type) {
       case 'SETUP': {
-        this.serverSetupMessage = message
-
         if (message.keepaliveTimeout !== undefined) {
           this.keepaliveManager.setKeepaliveTimeout(message.keepaliveTimeout)
         }
@@ -44,19 +40,7 @@ export class ConnectionManager implements ConnectionMessageHandler {
         break
       }
       case 'ERROR': {
-        this.lastError = message
-
-        if (this.handlers.size === 0) {
-          console.error('Unhandled error', message)
-          break
-        }
-
-        for (const handler of this.handlers) {
-          handler.handleError({
-            type: message.error,
-            message: message.message,
-          })
-        }
+        this.publishError({ type: message.error, message: message.message })
         break
       }
       case 'AUTH_STATE': {
@@ -69,12 +53,37 @@ export class ConnectionManager implements ConnectionMessageHandler {
     }
   }
 
+  private publishError = (error: DXLinkError) => {
+    this.lastError = error
+
+    if (error.type === 'UNAUTHORIZED') {
+      this.authManager.handleError(error.message)
+      return
+    }
+
+    if (this.handlers.size === 0) {
+      console.error('Unhandled error', error)
+      return
+    }
+
+    for (const handler of this.handlers) {
+      handler.handleError?.(error)
+    }
+  }
+
+  handleError = (error: Error) => {
+    this.publishError({
+      type: 'UNKNOWN',
+      message: error.message,
+    })
+  }
+
   handleClose = () => {
     this.keepaliveManager.handleClose()
     this.authManager.handleClose()
 
     for (const handler of this.handlers) {
-      handler.handleClose()
+      handler.handleClose?.()
     }
 
     this.handlers.clear()
@@ -86,13 +95,28 @@ export class ConnectionManager implements ConnectionMessageHandler {
 
   whenReady = (timeout: number): Promise<SetupMessage> => {
     return new Promise((resolve, reject) => {
-      this.serverSetupHandler = (setupMessage) => {
+      const handler: ConnectionLifecycleHandler = {
+        handleError: (error) => {
+          resetHandlers()
+          reject(new Error(`${error.type}: ${error.message}`))
+        },
+      }
+
+      const resetHandlers = () => {
         this.serverSetupHandler = undefined
+        this.handlers.delete(handler)
+      }
+
+      this.handlers.add(handler)
+
+      this.serverSetupHandler = (setupMessage) => {
+        resetHandlers()
 
         resolve(setupMessage)
       }
 
       this.timeoutId = setTimeout(() => {
+        resetHandlers()
         reject(new Error('Timeout waiting for server setup message'))
       }, timeout)
     })

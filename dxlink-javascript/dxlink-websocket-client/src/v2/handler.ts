@@ -29,7 +29,9 @@ export interface TransportHandler {
 }
 
 export interface AuthHandler {
-  handleAuthState(state: AuthState): void
+  handleError(error: string): void
+
+  handleAuthState(state: AuthState, reason?: string): void
 
   handleClose(): void
 }
