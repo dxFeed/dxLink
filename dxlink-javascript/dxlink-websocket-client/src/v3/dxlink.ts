@@ -2,8 +2,8 @@ import { Closable } from './common'
 import { ErrorType } from './messages'
 
 export interface DXLinkError {
-  type: ErrorType
-  message: string
+  readonly type: ErrorType
+  readonly message: string
 }
 
 export enum DXLinkConnectionStatus {
@@ -26,31 +26,35 @@ export enum DXLinkConnectionStatus {
 }
 
 export interface DXLinkConnectionState {
-  status: DXLinkConnectionStatus
-  protocolVersion: string
-  clientVersion: string
-  serverVersion: string
-  clientKeepaliveTimeout: number
-  serverKeepaliveTimeout: number
+  readonly status: DXLinkConnectionStatus
+  readonly protocolVersion: string
+  readonly clientVersion: string
+  readonly serverVersion?: string
+  readonly clientKeepaliveTimeout?: number
+  readonly serverKeepaliveTimeout?: number
 }
 
 export type DXLinkConnectionStateChangeListener = (
-  prev: DXLinkConnectionStatus,
-  state: DXLinkConnectionStatus
+  state: DXLinkConnectionState,
+  prev: DXLinkConnectionState
 ) => void
 
 export enum DXLinkAuthState {
   /**
-   * User is unauthorized on the remote endpoint or
+   * User is unauthorized on the remote endpoint.
    */
   UNAUTHORIZED = 'UNAUTHORIZED',
   /**
-   *
+   * User in the process of authorization, but not yet authorized.
    */
-  AUTHROIZED = 'AUTHROIZED',
+  AUTHORIZING = 'AUTHORIZING',
+  /**
+   * User is authorized on the remote endpoint and can use it.
+   */
+  AUTHORIZED = 'AUTHORIZED',
 }
 
-export type DXLinkAuthStateChangeListener = (state: DXLinkAuthState) => void
+export type DXLinkAuthStateChangeListener = (state: DXLinkAuthState, prev: DXLinkAuthState) => void
 
 export interface DXLinkChannelMessage {
   readonly type: string
@@ -105,7 +109,7 @@ export interface DXLinkChannel extends Closable {
 }
 
 export interface DXLinkWebSocketClient extends Closable {
-  connect(): Promise<void>
+  connect(url: string): Promise<void>
   disconnect(): void
 
   getConnectionState(): DXLinkConnectionState
