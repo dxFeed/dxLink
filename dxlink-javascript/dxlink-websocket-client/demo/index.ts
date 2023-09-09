@@ -1,5 +1,6 @@
 import { DXLinkWebSocket } from '../src'
 import { DXLinkWebSocketConnectorConfig, DXLinkWebSocketConnector, DXLinkError } from '../src/v2'
+import { DXLinkWebSocket as DXLInkWebSocketV3 } from '../src/v3'
 
 async function start() {
   console.log('Start')
@@ -94,4 +95,14 @@ async function startV2() {
   })
 }
 
-startV2().catch((error) => console.error('Start error', error))
+async function startV3() {
+  const client = new DXLInkWebSocketV3()
+
+  await client.connect('wss://demo.dxfeed.com/dxlink-ws')
+
+  // ...
+}
+
+// startV2().catch((error) => console.error('Start error', error))
+
+startV3().catch((error) => console.error('Start error', error))
