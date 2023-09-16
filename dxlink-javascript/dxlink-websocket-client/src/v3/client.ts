@@ -41,6 +41,10 @@ const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
 export class DXLinkWebSocket implements DXLinkWebSocketClient {
   private readonly config: DXLinkWebSocketConfig
 
+  private readonly logger: DXLinkLogger
+
+  private readonly scheduler = new Scheduler()
+
   private connector: WebSocketConnector | undefined
 
   private connectionState: DXLinkConnectionState = DXLinkConnectionState.NOT_CONNECTED
@@ -48,6 +52,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
   private authState: DXLinkAuthState = DXLinkAuthState.UNAUTHORIZED
 
+  // Listeners
   private readonly connectionStateChangeListeners = new Set<DXLinkConnectionStateChangeListener>()
   private readonly errorListeners = new Set<DXLinkErrorListener>()
   private readonly authStateChangeListeners = new Set<DXLinkAuthStateChangeListener>()
@@ -57,21 +62,24 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
    * This value is used to determine if authorization is required or optional or not defined yet.
    */
   private isFirstAuthState = true
+  /**
+   * Last setted auth token that will be sent to server after connection is established or re-established.
+   */
   private lastSettedAuthToken: string | undefined
 
+  // Stats for keepalive
   // TODO: mb move to connector
   private lastReceivedMillis = 0
   private lastSentMillis = 0
 
-  // Count of reconnect attempts since last successful connection
+  /**
+   * Count of reconnect attempts since last successful connection.
+   */
   private reconnectAttempts = 0
 
+  // Channels
   private globalChannelId = 1
   private readonly channels = new Map<number, Channel>()
-
-  private readonly logger: DXLinkLogger
-
-  private readonly scheduler = new Scheduler()
 
   constructor(config?: Partial<DXLinkWebSocketConfig>) {
     this.config = {
@@ -83,7 +91,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
       ...config,
     }
 
-    this.logger = new Logger('DXLinkWebSocket', this.config.logLevel)
+    this.logger = new Logger('DXLinkWebSocketClient', this.config.logLevel)
   }
 
   connect = async (url: string): Promise<void> => {
