@@ -21,6 +21,7 @@ import {
 import { WebSocketConnector } from './connector'
 import { Channel } from './channel'
 import { DXLinkLogLevel, DXLinkLogger, Logger } from './logger'
+import { Scheduler } from './scheduler'
 
 export interface DXLinkWebSocketConfig {
   readonly keepaliveInterval: number
@@ -51,8 +52,6 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
   private readonly errorListeners = new Set<DXLinkErrorListener>()
   private readonly authStateChangeListeners = new Set<DXLinkAuthStateChangeListener>()
 
-  private timeoutIds: Record<string, any> = {}
-
   /**
    * Authorization type that was determined by server behavior during setup phase.
    * This value is used to determine if authorization is required or optional or not defined yet.
@@ -71,6 +70,8 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
   private readonly channels = new Map<number, Channel>()
 
   private readonly logger: DXLinkLogger
+
+  private readonly scheduler = new Scheduler()
 
   constructor(config?: Partial<DXLinkWebSocketConfig>) {
     this.config = {
@@ -127,9 +128,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     this.connector.stop()
 
     // Clear all timeouts
-    for (const key of Object.keys(this.timeoutIds)) {
-      this.cancelSchedule(key)
-    }
+    this.scheduler.clear()
 
     // Set initial state
     this.connectionDetails = DEFAULT_CONNECTION_DETAILS
@@ -141,15 +140,15 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
     this.setConnectionState(DXLinkConnectionState.CONNECTING)
 
-    this.schedule(
-      'RECONNECT',
+    this.scheduler.schedule(
       () => {
         if (this.connector === undefined) return
 
         // Start new connection attempt
         this.connector.start()
       },
-      this.reconnectAttempts * 1000
+      this.reconnectAttempts * 1000,
+      'RECONNECT'
     )
   }
 
@@ -159,9 +158,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     this.connector?.stop()
     this.connector = undefined
 
-    for (const key of Object.keys(this.timeoutIds)) {
-      this.cancelSchedule(key)
-    }
+    this.scheduler.clear()
 
     // Set initial state
     this.connectionDetails = DEFAULT_CONNECTION_DETAILS
@@ -319,7 +316,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
   private processSetupMessage = (serverSetup: SetupMessage): void => {
     // Clear setup timeout check from connect method
-    this.cancelSchedule('SETUP_TIMEOUT')
+    this.scheduler.cancel('SETUP_TIMEOUT')
 
     // Mark connection as connected after first setup message and subsequent ones
     if (
@@ -343,7 +340,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
     // Connection maintance: Setup keepalive timeout check
     const timeoutMills = (serverSetup.keepaliveTimeout ?? 60) * 1000
-    this.schedule('TIMEOUT', () => this.timeoutCheck(timeoutMills), timeoutMills)
+    this.scheduler.schedule(() => this.timeoutCheck(timeoutMills), timeoutMills, 'TIMEOUT')
   }
 
   private publishError = (error: DXLinkError): void => {
@@ -363,7 +360,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
   private processAuthStateMessage = ({ state }: AuthStateMessage): void => {
     // Clear auth state timeout check
-    this.cancelSchedule('AUTH_STATE_TIMEOUT')
+    this.scheduler.cancel('AUTH_STATE_TIMEOUT')
 
     // Ignore first auth state message because it is sent during connection setup
     if (this.isFirstAuthState) {
@@ -406,8 +403,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     }
 
     // Setup timeout check
-    this.schedule(
-      'SETUP_TIMEOUT',
+    this.scheduler.schedule(
       () => {
         const errorMessage: ErrorMessage = {
           type: 'ERROR',
@@ -425,13 +421,13 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
         this.disconnect()
       },
-      this.config.actionTimeout * 1000
+      this.config.actionTimeout * 1000,
+      'SETUP_TIMEOUT'
     )
 
     this.sendMessage(setupMessage)
 
-    this.schedule(
-      'AUTH_STATE_TIMEOUT',
+    this.scheduler.schedule(
       () => {
         const errorMessage: ErrorMessage = {
           type: 'ERROR',
@@ -449,7 +445,8 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
         this.disconnect()
       },
-      this.config.actionTimeout * 1000
+      this.config.actionTimeout * 1000,
+      'AUTH_STATE_TIMEOUT'
     )
 
     if (this.lastSettedAuthToken !== undefined) {
@@ -493,12 +490,11 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     }
 
     const nextTimeout = Math.max(200, timeoutMills - noKeepaliveDuration)
-    this.schedule('TIMEOUT', () => this.timeoutCheck(timeoutMills), nextTimeout)
+    this.scheduler.schedule(() => this.timeoutCheck(timeoutMills), nextTimeout, 'TIMEOUT')
   }
 
   private scheduleKeepalive = () => {
-    this.schedule(
-      'KEEPALIVE',
+    this.scheduler.schedule(
       () => {
         this.sendMessage({
           type: 'KEEPALIVE',
@@ -507,19 +503,8 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
         this.scheduleKeepalive()
       },
-      this.config.keepaliveInterval * 1000
+      this.config.keepaliveInterval * 1000,
+      'KEEPALIVE'
     )
-  }
-
-  private schedule = (key: string, callback: () => void, timeout: number) => {
-    this.cancelSchedule(key)
-    this.timeoutIds[key] = setTimeout(callback, timeout)
-  }
-
-  private cancelSchedule = (key: string) => {
-    if (this.timeoutIds[key] !== undefined) {
-      clearTimeout(this.timeoutIds[key])
-      delete this.timeoutIds[key]
-    }
   }
 }
