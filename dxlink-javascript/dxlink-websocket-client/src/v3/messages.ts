@@ -112,18 +112,16 @@ export type ChannelLifecycleMessage =
   | ChannelRequestMessage
   | ChannelCancelMessage
 
-export const isChannelLifecycleMessage = (message: Message): message is ChannelOpenedMessage =>
-  message.channel !== 0 &&
-  (message.type === 'CHANNEL_OPENED' ||
-    message.type === 'CHANNEL_CLOSED' ||
-    message.type === 'ERROR' ||
-    message.type === 'CHANNEL_REQUEST' ||
-    message.type === 'CHANNEL_CANCEL')
+export type ChannelMessage = ChannelLifecycleMessage | ChannelPayloadMessage
 
-export const isChannelPayloadMessage = (message: Message): message is ChannelPayloadMessage =>
-  message.channel !== 0 &&
-  message.type !== 'CHANNEL_OPENED' &&
-  message.type !== 'CHANNEL_CLOSED' &&
-  message.type !== 'ERROR' &&
-  message.type !== 'CHANNEL_REQUEST' &&
-  message.type !== 'CHANNEL_CANCEL'
+export const isChannelMessage = (message: Message): message is ChannelMessage =>
+  message.channel !== 0
+
+export const isChannelLifecycleMessage = (
+  message: ChannelMessage
+): message is ChannelLifecycleMessage =>
+  message.type === 'CHANNEL_OPENED' ||
+  message.type === 'CHANNEL_CLOSED' ||
+  message.type === 'ERROR' ||
+  message.type === 'CHANNEL_REQUEST' ||
+  message.type === 'CHANNEL_CANCEL'

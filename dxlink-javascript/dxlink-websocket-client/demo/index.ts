@@ -100,6 +100,40 @@ async function startV3() {
 
   await client.connect('wss://demo.dxfeed.com/dxlink-ws')
 
+  client.addErrorListener((error) => {
+    console.error('Client error', error)
+  })
+
+  const channel = client.openChannel('FEED', { contract: 'TICKER' })
+
+  channel.addMessageListener((message) => {
+    console.log('Channel message', message)
+  })
+
+  channel.addStatusListener((status) => {
+    console.log('Channel status', status)
+    if (status === 'OPENED') {
+      channel.send({
+        type: 'FEED_SETUP',
+        acceptAggregationPeriod: 0,
+        acceptDataFormat: 'COMPACT',
+      })
+
+      channel.send({
+        type: 'FEED_SUBSCRIPTION',
+        add: [{ type: 'Quote', symbol: 'AAPL' }],
+      })
+    }
+  })
+
+  // await client.connect('wss://demo.dxfeed.com/dxlink-ws')
+
+  // await client.connect('wss://demo.dxfeed.com/dxlink-ws')
+
+  // client.connect('wss://demo.dxfeed.com/dxlink-ws')
+
+  // await client.connect('wss://demo.dxfeed.com/dxlink-ws')
+
   // ...
 }
 
