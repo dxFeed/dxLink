@@ -1,4 +1,3 @@
-import { Closable } from './common'
 import { ErrorType } from './messages'
 
 export interface DXLinkError {
@@ -6,7 +5,7 @@ export interface DXLinkError {
   readonly message: string
 }
 
-export enum DXLinkConnectionStatus {
+export enum DXLinkConnectionState {
   /**
    * Client was created and not connected to remote endpoint.
    */
@@ -19,14 +18,9 @@ export enum DXLinkConnectionStatus {
    * The connection to remote endpoint is established.
    */
   CONNECTED = 'CONNECTED',
-  /**
-   * Endpoint was closed by {@link DXLinkWebSocketClient.close} and cannot be used anymore.
-   */
-  CLOSED = 'CLOSED',
 }
 
-export interface DXLinkConnectionState {
-  readonly status: DXLinkConnectionStatus
+export interface DXLinkConnectionDetails {
   readonly protocolVersion: string
   readonly clientVersion: string
   readonly serverVersion?: string
@@ -85,7 +79,7 @@ export enum DXLinkChannelStatus {
 /**
  * Isolated channel to service withing single {@link DXLinkWebSocketClient} connection to remote endpoint.
  */
-export interface DXLinkChannel extends Closable {
+export interface DXLinkChannel {
   readonly id: number
   readonly service: string
   readonly parameters: Record<string, unknown>
@@ -106,11 +100,15 @@ export interface DXLinkChannel extends Closable {
    * Send an error to the channel.
    */
   error(error: DXLinkError): void
+
+  close(): void
 }
 
-export interface DXLinkWebSocketClient extends Closable {
+export interface DXLinkWebSocketClient {
   connect(url: string): Promise<void>
   disconnect(): void
+
+  getConnectionDetails(): DXLinkConnectionDetails
 
   getConnectionState(): DXLinkConnectionState
   addConnectionStateChangeListener(listener: DXLinkConnectionStateChangeListener): void

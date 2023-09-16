@@ -25,7 +25,7 @@ export class WebSocketTransportConnection {
 
   close(): void {
     if (this.done) {
-      throw new Error('Connection already closed')
+      return
     }
 
     this.ws.removeEventListener('close', this.handleClosed)
@@ -35,8 +35,6 @@ export class WebSocketTransportConnection {
     this.done = true
 
     this.ws.close()
-
-    this.processor.processClose()
   }
 
   private handleClosed = (ev: CloseEvent) => {
@@ -78,27 +76,42 @@ export class WebSocketTransportConnection {
 }
 
 export class WebSocketTransport {
-  static connect = (url: string, processor: TransportProcessor) =>
-    new Promise<WebSocketTransportConnection>((resolve, reject) => {
-      const ws = new WebSocket(url)
+  static connect = async (url: string, processor: TransportProcessor) => {
+    const ws = new WebSocket(url)
 
-      const openListener = () => {
-        ws.removeEventListener('open', openListener)
-        ws.removeEventListener('error', errorListener)
+    await awaitWebSocketConnect(ws)
 
-        const connection = new WebSocketTransportConnection(ws, processor)
-
-        resolve(connection)
-      }
-
-      const errorListener = (ev: Event) => {
-        ws.removeEventListener('open', openListener)
-        ws.removeEventListener('error', errorListener)
-
-        reject(ev instanceof ErrorEvent ? ev.error : new Error(String(ev)))
-      }
-
-      ws.addEventListener('open', openListener)
-      ws.addEventListener('error', errorListener)
-    })
+    return new WebSocketTransportConnection(ws, processor)
+  }
 }
+
+export const awaitWebSocketConnect = async (webSocket: WebSocket) =>
+  await new Promise<WebSocket>((resolve, reject) => {
+    const openListener = () => {
+      webSocket.removeEventListener('open', openListener)
+      webSocket.removeEventListener('error', errorListener)
+      webSocket.removeEventListener('close', closeListener)
+
+      resolve(webSocket)
+    }
+
+    const errorListener = (ev: Event) => {
+      webSocket.removeEventListener('open', openListener)
+      webSocket.removeEventListener('error', errorListener)
+      webSocket.removeEventListener('close', closeListener)
+
+      reject(ev instanceof ErrorEvent ? ev.error : new Error(String(ev)))
+    }
+
+    const closeListener = () => {
+      webSocket.removeEventListener('open', openListener)
+      webSocket.removeEventListener('error', errorListener)
+      webSocket.removeEventListener('close', closeListener)
+
+      reject(new Error('Connection closed unexpectedly'))
+    }
+
+    webSocket.addEventListener('open', openListener)
+    webSocket.addEventListener('error', errorListener)
+    webSocket.addEventListener('close', closeListener)
+  })

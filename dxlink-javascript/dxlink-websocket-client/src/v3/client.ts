@@ -1,16 +1,21 @@
 import {
   DXLinkAuthState,
   DXLinkAuthStateChangeListener,
-  DXLinkChannel,
-  DXLinkConnectionState,
-  DXLinkConnectionStateChangeListener,
-  DXLinkConnectionStatus,
   DXLinkErrorListener,
   DXLinkWebSocketClient,
   DXLinkError,
+  DXLinkConnectionDetails,
+  DXLinkConnectionStateChangeListener,
+  DXLinkConnectionState,
 } from './dxlink'
-import { WebSocketTransport, WebSocketTransportConnection } from './connection'
-import { Message, SetupMessage, isConnectionMessage, AuthStateMessage } from './messages'
+import {
+  Message,
+  SetupMessage,
+  isConnectionMessage,
+  AuthStateMessage,
+  ErrorMessage,
+} from './messages'
+import { WebSocketConnector } from './connector'
 
 export interface DXLinkWebSocketConfig {
   readonly keepaliveInterval: number
@@ -21,17 +26,19 @@ export interface DXLinkWebSocketConfig {
 
 export const PROTOCOL_VERSION = '0.1'
 
-const NOT_CONNECTED_STATE: DXLinkConnectionState = {
-  status: DXLinkConnectionStatus.NOT_CONNECTED,
+const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
   protocolVersion: PROTOCOL_VERSION,
   clientVersion: '0.0.0',
 }
 
 export class DXLinkWebSocket implements DXLinkWebSocketClient {
   private readonly config: DXLinkWebSocketConfig
-  private connection: WebSocketTransportConnection | undefined
 
-  private connectionState: DXLinkConnectionState
+  private connector: WebSocketConnector | undefined
+
+  private connectionState: DXLinkConnectionState = DXLinkConnectionState.NOT_CONNECTED
+  private connectionDetails: DXLinkConnectionDetails = DEFAULT_CONNECTION_DETAILS
+
   private authState: DXLinkAuthState = DXLinkAuthState.UNAUTHORIZED
 
   private readonly connectionStateChangeListeners = new Set<DXLinkConnectionStateChangeListener>()
@@ -42,15 +49,9 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
   private lastSettedAuthToken: string | undefined
 
+  // TODO: mb move to connector
   private lastReceivedMillis = 0
   private lastSentMillis = 0
-
-  private onInitSetupMessage: ((message: SetupMessage) => void) | undefined
-  private onInitAuthStateMessage: ((message: AuthStateMessage) => void) | undefined
-  private onInitError: ((message: DXLinkError) => void) | undefined
-  private onInitConnectionCancel: (() => void) | undefined
-
-  private readonly channels = new Map<number, {}>()
 
   constructor(config?: Partial<DXLinkWebSocketConfig>) {
     this.config = {
@@ -60,157 +61,57 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
       actionTimeout: 10,
       ...config,
     }
-    this.connectionState = NOT_CONNECTED_STATE
   }
 
   connect = async (url: string): Promise<void> => {
-    if (this.connectionState.status !== DXLinkConnectionStatus.NOT_CONNECTED) {
-      this.disconnect()
-    }
+    this.disconnect()
 
-    this.setConnectionState({
-      ...this.connectionState,
-      status: DXLinkConnectionStatus.CONNECTING,
+    this.setConnectionState(DXLinkConnectionState.CONNECTING)
+
+    this.connector = new WebSocketConnector(url)
+    this.connector.start()
+
+    this.connector.setOpenListener(this.processTransportOpen)
+    this.connector.setMessageListener(this.processMessage)
+    this.connector.setCloseListener(this.processTransportClose)
+
+    return new Promise((resolve, reject) => {
+      const listener: DXLinkConnectionStateChangeListener = (state) => {
+        this.removeConnectionStateChangeListener(listener)
+
+        if (state === DXLinkConnectionState.CONNECTED) {
+          resolve()
+        } else if (state === DXLinkConnectionState.NOT_CONNECTED) {
+          reject(new Error('Connection failed'))
+        }
+      }
+
+      this.addConnectionStateChangeListener(listener)
     })
-
-    try {
-      let connectionCanceled = false
-      this.onInitConnectionCancel = () => {
-        connectionCanceled = true
-      }
-      this.connection = await WebSocketTransport.connect(url, {
-        processMessage: this.processMessage,
-        processError: this.processTransportError,
-        processClose: this.processTransportClose,
-      }).then((connection) => {
-        if (connectionCanceled) {
-          connection.close()
-          throw new Error('Connection canceled')
-        }
-
-        return connection
-      })
-      this.onInitConnectionCancel = undefined
-
-      const setupMessage: SetupMessage = {
-        type: 'SETUP',
-        channel: 0,
-        version: `${this.connectionState.protocolVersion}-${this.connectionState.clientVersion}`,
-        keepaliveTimeout: this.config.keepaliveTimeout,
-        acceptKeepaliveTimeout: this.config.acceptKeepaliveTimeout,
-      }
-
-      this.sendMessage(setupMessage)
-
-      // Await for setup message from server
-      const serverSetup = await new Promise<SetupMessage>((resolve, reject) => {
-        this.onInitSetupMessage = resolve
-        this.onInitError = (error: DXLinkError) => {
-          reject(new Error(error.message))
-        }
-        this.onInitConnectionCancel = () => {
-          reject(new Error('Connection canceled'))
-        }
-
-        this.timeoutIds['SETUP'] = setTimeout(
-          () => reject(new Error('Timeout on setup message')),
-          this.config.actionTimeout * 1000
-        )
-      })
-      this.onInitSetupMessage = undefined
-      this.onInitError = undefined
-      this.onInitConnectionCancel = undefined
-      this.clearTimeout('SETUP')
-
-      // Await for first auth state from server
-      await new Promise<AuthStateMessage>((resolve, reject) => {
-        this.onInitAuthStateMessage = resolve
-        this.onInitError = (error: DXLinkError) => {
-          reject(new Error(error.message))
-        }
-        this.onInitConnectionCancel = () => {
-          reject(new Error('Connection canceled'))
-        }
-
-        this.timeoutIds['AUTH_STATE'] = setTimeout(
-          () => reject(new Error('Timeout on auth state')),
-          this.config.actionTimeout * 1000
-        )
-      })
-      this.onInitAuthStateMessage = undefined
-      this.onInitError = undefined
-      this.onInitConnectionCancel = undefined
-      this.clearTimeout('AUTH_STATE')
-
-      // Send auth message if token was setted before connection was established
-      if (this.lastSettedAuthToken !== undefined) {
-        this.sendAuthMessage(this.lastSettedAuthToken)
-
-        // Await for auth state from server
-        await new Promise<void>((resolve, reject) => {
-          this.onInitAuthStateMessage = (message) => {
-            if (message.state === 'AUTHORIZED') {
-              return resolve()
-            }
-
-            reject(new Error('Authorization failed'))
-          }
-          // Reject promise if 'UNAUTHORIZED' error received
-          this.onInitError = (error: DXLinkError) => {
-            if (error.type === 'UNAUTHORIZED') {
-              reject(new Error(error.message))
-            }
-          }
-          this.onInitConnectionCancel = () => {
-            reject(new Error('Connection canceled'))
-          }
-          // Throw error if auth state is not received in time
-          this.timeoutIds['AUTH_STATE'] = setTimeout(
-            () => reject(new Error('Timeout on auth state')),
-            this.config.actionTimeout * 1000
-          )
-        })
-        this.onInitAuthStateMessage = undefined
-        this.onInitError = undefined
-        this.onInitConnectionCancel = undefined
-        this.clearTimeout('AUTH_STATE')
-      }
-
-      this.setConnectionState({
-        ...this.connectionState,
-        status: DXLinkConnectionStatus.CONNECTED,
-        serverVersion: serverSetup.version,
-        clientKeepaliveTimeout: setupMessage.keepaliveTimeout,
-        serverKeepaliveTimeout: serverSetup.keepaliveTimeout,
-      })
-    } catch (error) {
-      this.disconnect()
-
-      throw error
-    } finally {
-      // Clear all at the end
-      this.onInitSetupMessage = undefined
-      this.onInitAuthStateMessage = undefined
-      this.onInitConnectionCancel = undefined
-      this.onInitError = undefined
-      this.clearTimeout('SETUP')
-      this.clearTimeout('AUTH_STATE')
-    }
   }
 
   disconnect = () => {
+    if (this.connectionState === DXLinkConnectionState.NOT_CONNECTED) return
+
     console.debug('Disconnecting...')
 
-    // Cancel connection if it is not established yet
-    if (this.onInitConnectionCancel) {
-      return this.onInitConnectionCancel()
+    this.connector?.stop()
+    this.connector = undefined
+
+    for (const key of Object.keys(this.timeoutIds)) {
+      this.clearTimeout(key)
     }
 
-    this.connection?.close()
+    // Set initial state
+    this.connectionDetails = DEFAULT_CONNECTION_DETAILS
+    this.setConnectionState(DXLinkConnectionState.NOT_CONNECTED)
+    this.setAuthState(DXLinkAuthState.UNAUTHORIZED)
+    this.lastReceivedMillis = 0
+    this.lastSentMillis = 0
   }
 
+  getConnectionDetails = () => this.connectionDetails
   getConnectionState = () => this.connectionState
-
   addConnectionStateChangeListener = (listener: DXLinkConnectionStateChangeListener) =>
     this.connectionStateChangeListeners.add(listener)
   removeConnectionStateChangeListener = (listener: DXLinkConnectionStateChangeListener) =>
@@ -220,13 +121,12 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     console.debug('Setting auth token', token)
     this.lastSettedAuthToken = token
 
-    if (this.connectionState.status === DXLinkConnectionStatus.CONNECTED) {
+    if (this.connectionState === DXLinkConnectionState.CONNECTED) {
       this.sendAuthMessage(token)
     }
   }
 
   getAuthState = (): DXLinkAuthState => this.authState
-
   addAuthStateChangeListener = (listener: DXLinkAuthStateChangeListener) =>
     this.authStateChangeListeners.add(listener)
   removeAuthStateChangeListener = (listener: DXLinkAuthStateChangeListener) =>
@@ -235,67 +135,74 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
   addErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.add(listener)
   removeErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.delete(listener)
 
-  openChannel = (
-    service: string,
-    parameters?: Record<string, unknown> | undefined
-  ): Promise<DXLinkChannel> => {
+  openChannel = (service: string, parameters?: Record<string, unknown> | undefined) => {
     throw new Error('Method not implemented.')
   }
 
-  close = (): void => {
-    console.debug('Closing...')
+  private setConnectionState = (newStatus: DXLinkConnectionState) => {
+    console.debug('Connection status', status)
 
-    this.reset()
-
-    // TODO: mb remove CLOSED state
-    this.setConnectionState({
-      ...NOT_CONNECTED_STATE,
-      status: DXLinkConnectionStatus.CLOSED,
-    })
-  }
-
-  private reset = (): void => {
-    console.debug('Resetting...')
-    this.connection = undefined
-
-    this.onInitSetupMessage = undefined
-    this.onInitAuthStateMessage = undefined
-    this.onInitConnectionCancel = undefined
-    this.onInitError = undefined
-
-    for (const key of Object.keys(this.timeoutIds)) {
-      this.clearTimeout(key)
-    }
-
-    this.connectionStateChangeListeners.clear()
-    this.errorListeners.clear()
-    this.authStateChangeListeners.clear()
-    // TODO: reset channels
-    this.channels.clear()
-  }
-
-  private setConnectionState = (state: DXLinkConnectionState) => {
-    console.debug('Connection state', state)
     const prev = this.connectionState
-    this.connectionState = state
+    if (prev === newStatus) return
+
+    this.connectionState = newStatus
     for (const listener of this.connectionStateChangeListeners) {
-      listener(state, prev)
+      listener(newStatus, prev)
     }
   }
 
   private sendMessage = (message: Message): void => {
-    console.debug('Send message', message)
-    if (!this.connection) throw new Error('Connection is not established.')
-
-    this.connection.send(message)
+    this.connector?.sendMessage(message)
 
     this.scheduleKeepalive()
 
+    // TODO: mb move to connector
     this.lastSentMillis = Date.now()
+  }
+
+  private sendSetupMessage = (setupMessage: SetupMessage) => {
+    // Setup timeout check
+    this.timeoutIds['SETUP_TIMEOUT'] = setTimeout(() => {
+      const errorMessage: ErrorMessage = {
+        type: 'ERROR',
+        channel: 0,
+        error: 'TIMEOUT',
+        message: 'No setup message received for ' + this.config.actionTimeout + 's',
+      }
+
+      this.sendMessage(errorMessage)
+
+      this.publishError({
+        type: errorMessage.error,
+        message: `${errorMessage.message} from server`,
+      })
+
+      this.disconnect()
+    }, this.config.actionTimeout * 1000)
+
+    this.sendMessage(setupMessage)
   }
 
   private sendAuthMessage = (token: string): void => {
     this.setAuthState(DXLinkAuthState.AUTHORIZING)
+
+    this.timeoutIds['AUTH_STATE_TIMEOUT'] = setTimeout(() => {
+      const errorMessage: ErrorMessage = {
+        type: 'ERROR',
+        channel: 0,
+        error: 'TIMEOUT',
+        message: 'No auth state message received for ' + this.config.actionTimeout + 's',
+      }
+
+      this.sendMessage(errorMessage)
+
+      this.publishError({
+        type: errorMessage.error,
+        message: `${errorMessage.message} from server`,
+      })
+
+      this.disconnect()
+    }, this.config.actionTimeout * 1000)
 
     this.sendMessage({
       type: 'AUTH',
@@ -307,8 +214,13 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
   private setAuthState = (state: DXLinkAuthState): void => {
     const prev = this.authState
     this.authState = state
+
     for (const listener of this.authStateChangeListeners) {
-      listener(state, prev)
+      try {
+        listener(state, prev)
+      } catch (e) {
+        console.error('Auth state listener error', e)
+      }
     }
   }
 
@@ -333,7 +245,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
         case 'AUTH_STATE':
           return this.processAuthStateMessage(message)
         case 'ERROR':
-          return this.processError({
+          return this.publishError({
             type: message.error,
             message: message.message,
           })
@@ -350,62 +262,83 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
   private processSetupMessage = (serverSetup: SetupMessage): void => {
     console.debug('Setup', serverSetup)
-    if (this.onInitSetupMessage) {
-      this.onInitSetupMessage(serverSetup)
+
+    // Clear setup timeout check from connect method
+    this.clearTimeout('SETUP_TIMEOUT')
+
+    // Mark connection as connected after first setup message and subsequent ones
+    if (
+      this.connectionState === DXLinkConnectionState.CONNECTING ||
+      this.connectionState === DXLinkConnectionState.CONNECTED
+    ) {
+      this.connectionDetails = {
+        ...this.connectionDetails,
+        serverVersion: serverSetup.version,
+        clientKeepaliveTimeout: this.config.keepaliveTimeout,
+        serverKeepaliveTimeout: serverSetup.keepaliveTimeout,
+      }
+
+      this.setConnectionState(DXLinkConnectionState.CONNECTED)
     }
 
-    // Setup keepalive timeout check
+    // Connection maintance: Setup keepalive timeout check
     const timeoutMills = (serverSetup.keepaliveTimeout ?? 60) * 1000
     this.timeoutIds['TIMEOUT'] = setTimeout(() => this.timeoutCheck(timeoutMills), timeoutMills)
   }
 
-  private processError = (error: DXLinkError): void => {
+  private publishError = (error: DXLinkError): void => {
     console.debug('Error', error)
-    if (this.onInitError) {
-      return this.onInitError(error)
-    }
 
     if (this.errorListeners.size === 0) {
-      console.error('Unhandled error', error)
+      console.error('Unhandled dxLink error', error)
       return
     }
 
     for (const listener of this.errorListeners) {
-      listener(error)
+      try {
+        listener(error)
+      } catch (e) {
+        console.error('Error listener error', e)
+      }
     }
   }
 
   private processAuthStateMessage = (message: AuthStateMessage): void => {
     console.debug('Auth state', message)
-    if (this.onInitAuthStateMessage) {
-      this.onInitAuthStateMessage(message)
-    }
 
-    if (this.connectionState.status === DXLinkConnectionStatus.CONNECTED) {
-      // Reset auth token if server rejected it
-      if (message.state === 'UNAUTHORIZED') {
-        this.lastSettedAuthToken = undefined
-      }
+    // Clear auth state timeout check from send method
+    this.clearTimeout('AUTH_STATE_TIMEOUT')
+
+    // Reset auth token if server rejected it
+    if (message.state === 'UNAUTHORIZED') {
+      this.lastSettedAuthToken = undefined
     }
 
     this.setAuthState(DXLinkAuthState[message.state])
   }
 
-  private processTransportError = (error: Error): void => {
-    console.debug('Transport error', error)
+  private processTransportOpen = (): void => {
+    console.debug('Connection established')
 
-    this.processError({
-      type: 'UNKNOWN',
-      message: error.message,
-    })
+    const setupMessage: SetupMessage = {
+      type: 'SETUP',
+      channel: 0,
+      version: `${this.connectionDetails.protocolVersion}-${this.connectionDetails.clientVersion}`,
+      keepaliveTimeout: this.config.keepaliveTimeout,
+      acceptKeepaliveTimeout: this.config.acceptKeepaliveTimeout,
+    }
+
+    this.sendSetupMessage(setupMessage)
+
+    if (this.lastSettedAuthToken !== undefined) {
+      this.sendAuthMessage(this.lastSettedAuthToken)
+    }
   }
 
   private processTransportClose = (): void => {
-    console.debug('Connection closed')
+    console.debug('Connection closed by server')
 
-    this.reset()
-
-    this.setConnectionState(NOT_CONNECTED_STATE)
+    this.disconnect()
   }
 
   private timeoutCheck = (timeoutMills: number) => {
@@ -419,7 +352,8 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
         message: 'No keepalive received for ' + noKeepaliveDuration + 'ms',
       })
 
-      return this.close()
+      // TODO: Should we disconnect here or reconnect?
+      return this.disconnect()
     }
 
     const nextTimeout = Math.max(200, timeoutMills - noKeepaliveDuration)
