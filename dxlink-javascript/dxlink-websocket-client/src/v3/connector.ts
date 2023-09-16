@@ -54,6 +54,8 @@ export class WebSocketConnector {
     this.messageListener = listener
   }
 
+  getUrl = () => this.url
+
   private handleOpen = () => {
     if (this.socket === undefined) return
 

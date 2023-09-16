@@ -1,12 +1,17 @@
 import { ErrorType } from './messages'
 
 /**
+ * Error type that can be used to handle errors or send them to the remote endpoint.
+ */
+export type DXLinkErrorType = ErrorType
+
+/**
  * Unified error that can be used to handle errors or send them to the remote endpoint.
  * @see {@link DXLinkChannel.error}
  * @see {@link DXLinkWebSocketClient.addErrorListener}
  */
 export interface DXLinkError {
-  readonly type: ErrorType
+  readonly type: DXLinkErrorType
   readonly message: string
 }
 

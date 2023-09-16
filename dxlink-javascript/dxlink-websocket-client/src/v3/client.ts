@@ -30,10 +30,10 @@ export interface DXLinkWebSocketConfig {
   readonly logLevel: DXLinkLogLevel
 }
 
-export const PROTOCOL_VERSION = '0.1'
+export const DXLINK_WS_PROTOCOL_VERSION = '0.1'
 
 const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
-  protocolVersion: PROTOCOL_VERSION,
+  protocolVersion: DXLINK_WS_PROTOCOL_VERSION,
   clientVersion: '0.0.0', // TODO: get from package.json
 }
 
@@ -86,16 +86,21 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
   }
 
   connect = async (url: string): Promise<void> => {
+    // Do nothing if already connected to the same url
+    if (this.connector?.getUrl() === url) return
+
+    // Disconnect from previous connection if any exists
     this.disconnect()
 
+    // Immediately set connection state to CONNECTING
     this.setConnectionState(DXLinkConnectionState.CONNECTING)
 
     this.connector = new WebSocketConnector(url)
-    this.connector.start()
-
     this.connector.setOpenListener(this.processTransportOpen)
     this.connector.setMessageListener(this.processMessage)
     this.connector.setCloseListener(this.processTransportClose)
+
+    this.connector.start()
 
     return new Promise((resolve, reject) => {
       const listener: DXLinkConnectionStateChangeListener = (state) => {
