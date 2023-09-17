@@ -1,3 +1,4 @@
+import { DXLinkWebSocketConfig } from './client'
 import {
   DXLinkChannel,
   DXLinkChannelMessage,
@@ -7,6 +8,7 @@ import {
   DXLinkError,
   DXLinkErrorListener,
 } from './dxlink'
+import { DXLinkLogger, Logger } from './logger'
 import { ChannelPayloadMessage, Message } from './messages'
 
 export class Channel implements DXLinkChannel {
@@ -16,12 +18,17 @@ export class Channel implements DXLinkChannel {
   private readonly statusListeners = new Set<DXLinkChannelStatusListener>()
   private readonly errorListeners = new Set<DXLinkErrorListener>()
 
+  private logger: DXLinkLogger
+
   constructor(
     public readonly id: number,
     public readonly service: string,
     public readonly parameters: Record<string, unknown>,
-    private readonly sendMessage: (message: Message) => void
-  ) {}
+    private readonly sendMessage: (message: Message) => void,
+    config: DXLinkWebSocketConfig
+  ) {
+    this.logger = new Logger(`${Channel.name}#${id} ${service}`, config.logLevel)
+  }
 
   send = ({ type, ...payload }: DXLinkChannelMessage) => {
     if (this.status !== DXLinkChannelStatus.OPENED) {
@@ -56,6 +63,8 @@ export class Channel implements DXLinkChannel {
     })
 
   close = () => {
+    this.logger.debug(`Closing by user`)
+
     this.send({
       type: 'CHANNEL_CANCEL',
     })
@@ -66,6 +75,19 @@ export class Channel implements DXLinkChannel {
     this.setStatus(DXLinkChannelStatus.CLOSED)
   }
 
+  request = () => {
+    this.logger.debug('Requesting')
+
+    this.send({
+      type: 'CHANNEL_REQUEST',
+      channel: this.id,
+      service: this.service,
+      parameters: this.parameters,
+    })
+
+    this.setStatus(DXLinkChannelStatus.REQUESTED)
+  }
+
   processPayloadMessage = (message: ChannelPayloadMessage) => {
     for (const listener of this.messageListeners) {
       listener(message)
@@ -73,14 +95,14 @@ export class Channel implements DXLinkChannel {
   }
 
   processStatusOpened = () => {
+    this.logger.debug('Opened')
+
     this.setStatus(DXLinkChannelStatus.OPENED)
   }
 
-  processStatusRequested = () => {
-    this.setStatus(DXLinkChannelStatus.REQUESTED)
-  }
-
   processStatusClosed = () => {
+    this.logger.debug('Closed by remote endpoint')
+
     this.setStatus(DXLinkChannelStatus.CLOSED)
     this.clear()
   }

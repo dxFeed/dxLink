@@ -96,7 +96,9 @@ async function startV2() {
 }
 
 async function startV3() {
-  const client = new DXLInkWebSocketV3()
+  const client = new DXLInkWebSocketV3({
+    logLevel: 0,
+  })
 
   await client.connect('wss://demo.dxfeed.com/dxlink-ws')
 
