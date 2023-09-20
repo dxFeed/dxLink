@@ -1,6 +1,6 @@
 import { DXLinkWebSocket } from '../src'
 import { DXLinkWebSocketConnectorConfig, DXLinkWebSocketConnector, DXLinkError } from '../src/v2'
-import { DXLinkWebSocket as DXLInkWebSocketV3 } from '../src/v3'
+import { DXLinkWebSocketClientImpl as DXLInkWebSocketClientV3 } from '../src/v3'
 
 async function start() {
   console.log('Start')
@@ -96,11 +96,15 @@ async function startV2() {
 }
 
 async function startV3() {
-  const client = new DXLInkWebSocketV3({
+  const client = new DXLInkWebSocketClientV3({
     logLevel: 0,
   })
 
-  await client.connect('wss://demo.dxfeed.com/dxlink-ws')
+  client.addAuthStateChangeListener((state) => {
+    if (state === 'UNAUTHORIZED') {
+      client.setAuthToken('token')
+    }
+  })
 
   client.addErrorListener((error) => {
     console.error('Client error', error)
@@ -109,10 +113,13 @@ async function startV3() {
   const channel = client.openChannel('FEED', { contract: 'TICKER' })
 
   channel.addMessageListener((message) => {
+    if (message.type === 'FEED_DATA') {
+      return console.log('Data', message.data)
+    }
     console.log('Channel message', message)
   })
 
-  channel.addStatusListener((status) => {
+  channel.addStateChangeListener((status) => {
     console.log('Channel status', status)
     if (status === 'OPENED') {
       channel.send({
@@ -127,6 +134,8 @@ async function startV3() {
       })
     }
   })
+
+  void client.connect('wss://demo.dxfeed.com/dxlink-ws')
 
   // await client.connect('wss://demo.dxfeed.com/dxlink-ws')
 

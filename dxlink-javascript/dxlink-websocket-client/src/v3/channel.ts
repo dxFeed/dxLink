@@ -3,8 +3,8 @@ import {
   DXLinkChannel,
   DXLinkChannelMessage,
   DXLinkChannelMessageListener,
-  DXLinkChannelStatus,
-  DXLinkChannelStatusListener,
+  DXLinkChannelState,
+  DXLinkChannelStateChangeListener,
   DXLinkError,
   DXLinkErrorListener,
 } from './dxlink'
@@ -12,10 +12,11 @@ import { DXLinkLogger, Logger } from './logger'
 import { ChannelPayloadMessage, Message } from './messages'
 
 export class Channel implements DXLinkChannel {
-  private status = DXLinkChannelStatus.REQUESTED
+  private status = DXLinkChannelState.REQUESTED
 
+  // Listeners
   private readonly messageListeners = new Set<DXLinkChannelMessageListener>()
-  private readonly statusListeners = new Set<DXLinkChannelStatusListener>()
+  private readonly statusListeners = new Set<DXLinkChannelStateChangeListener>()
   private readonly errorListeners = new Set<DXLinkErrorListener>()
 
   private logger: DXLinkLogger
@@ -31,7 +32,7 @@ export class Channel implements DXLinkChannel {
   }
 
   send = ({ type, ...payload }: DXLinkChannelMessage) => {
-    if (this.status !== DXLinkChannelStatus.OPENED) {
+    if (this.status !== DXLinkChannelState.OPENED) {
       throw new Error('Channel is not ready')
     }
 
@@ -47,9 +48,10 @@ export class Channel implements DXLinkChannel {
   removeMessageListener = (listener: DXLinkChannelMessageListener) =>
     this.messageListeners.delete(listener)
 
-  getStatus = () => this.status
-  addStatusListener = (listener: DXLinkChannelStatusListener) => this.statusListeners.add(listener)
-  removeStatusListener = (listener: DXLinkChannelStatusListener) =>
+  getState = () => this.status
+  addStateChangeListener = (listener: DXLinkChannelStateChangeListener) =>
+    this.statusListeners.add(listener)
+  removeStateChangeListener = (listener: DXLinkChannelStateChangeListener) =>
     this.statusListeners.delete(listener)
 
   addErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.add(listener)
@@ -72,20 +74,20 @@ export class Channel implements DXLinkChannel {
     this.clear()
 
     // After sending CHANNEL_CANCEL we can think that channel is closed already
-    this.setStatus(DXLinkChannelStatus.CLOSED)
+    this.setStatus(DXLinkChannelState.CLOSED)
   }
 
   request = () => {
     this.logger.debug('Requesting')
 
-    this.send({
+    this.sendMessage({
       type: 'CHANNEL_REQUEST',
       channel: this.id,
       service: this.service,
       parameters: this.parameters,
     })
 
-    this.setStatus(DXLinkChannelStatus.REQUESTED)
+    this.processStatusRequested()
   }
 
   processPayloadMessage = (message: ChannelPayloadMessage) => {
@@ -97,13 +99,19 @@ export class Channel implements DXLinkChannel {
   processStatusOpened = () => {
     this.logger.debug('Opened')
 
-    this.setStatus(DXLinkChannelStatus.OPENED)
+    this.setStatus(DXLinkChannelState.OPENED)
+  }
+
+  processStatusRequested = () => {
+    this.logger.debug('Requested')
+
+    this.setStatus(DXLinkChannelState.REQUESTED)
   }
 
   processStatusClosed = () => {
     this.logger.debug('Closed by remote endpoint')
 
-    this.setStatus(DXLinkChannelStatus.CLOSED)
+    this.setStatus(DXLinkChannelState.CLOSED)
     this.clear()
   }
 
@@ -122,12 +130,11 @@ export class Channel implements DXLinkChannel {
     }
   }
 
-  private setStatus = (newStatus: DXLinkChannelStatus) => {
+  private setStatus = (newStatus: DXLinkChannelState) => {
     if (this.status === newStatus) return
 
     const prev = this.status
     this.status = newStatus
-
     for (const listener of this.statusListeners) {
       try {
         listener(newStatus, prev)

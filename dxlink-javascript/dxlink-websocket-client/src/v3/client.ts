@@ -7,7 +7,8 @@ import {
   DXLinkConnectionDetails,
   DXLinkConnectionStateChangeListener,
   DXLinkConnectionState,
-  DXLinkChannelStatus,
+  DXLinkChannelState,
+  DXLinkChannel,
 } from './dxlink'
 import {
   Message,
@@ -61,7 +62,7 @@ const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
   clientVersion: '0.0.0', // TODO: get from package.json
 }
 
-export class DXLinkWebSocket implements DXLinkWebSocketClient {
+export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
   private readonly config: DXLinkWebSocketConfig
 
   private readonly logger: DXLinkLogger
@@ -115,7 +116,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
       ...config,
     }
 
-    this.logger = new Logger(DXLinkWebSocket.name, this.config.logLevel)
+    this.logger = new Logger(this.constructor.name, this.config.logLevel)
   }
 
   connect = async (url: string): Promise<void> => {
@@ -135,6 +136,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     this.connector.setMessageListener(this.processMessage)
     this.connector.setCloseListener(this.processTransportClose)
 
+    // Initiate websocket connection
     this.connector.start()
 
     return new Promise((resolve, reject) => {
@@ -185,7 +187,13 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     // Increase reconnect attempts counter
     this.reconnectAttempts++
 
+    // Update state for connection and channels
     this.setConnectionState(DXLinkConnectionState.CONNECTING)
+    for (const channel of this.channels.values()) {
+      if (channel.getState() === DXLinkChannelState.CLOSED) continue
+
+      channel.processStatusRequested()
+    }
 
     // Schedule reconnect attempt after some time
     // Additionally, task will be executed in case when tab is active again
@@ -225,6 +233,10 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
     this.setAuthState(DXLinkAuthState.UNAUTHORIZED)
   }
 
+  close = () => {
+    this.disconnect()
+  }
+
   getConnectionDetails = () => this.connectionDetails
   getConnectionState = () => this.connectionState
   addConnectionStateChangeListener = (listener: DXLinkConnectionStateChangeListener) =>
@@ -249,7 +261,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
   addErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.add(listener)
   removeErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.delete(listener)
 
-  openChannel = (service: string, parameters: Record<string, unknown>) => {
+  openChannel = (service: string, parameters: Record<string, unknown>): DXLinkChannel => {
     const channelId = this.globalChannelId
     this.globalChannelId += 2
 
@@ -444,7 +456,7 @@ export class DXLinkWebSocket implements DXLinkWebSocketClient {
 
   private requestActiveChannels = (): void => {
     for (const channel of this.channels.values()) {
-      if (channel.getStatus() === DXLinkChannelStatus.CLOSED) {
+      if (channel.getState() === DXLinkChannelState.CLOSED) {
         this.channels.delete(channel.id)
         continue
       }

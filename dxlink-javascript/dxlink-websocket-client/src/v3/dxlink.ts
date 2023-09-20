@@ -101,8 +101,14 @@ export type DXLinkAuthStateChangeListener = (state: DXLinkAuthState, prev: DXLin
  * @see {@link DXLinkChannel.send} and {@link DXLinkChannel.addMessageListener}
  */
 export interface DXLinkChannelMessage {
+  /**
+   * Type of the message.
+   */
   readonly type: string
-  readonly [key: string]: unknown
+  /**
+   * Payload of the message.
+   */
+  readonly [key: string]: any
 }
 
 /**
@@ -112,32 +118,33 @@ export interface DXLinkChannelMessage {
 export type DXLinkChannelMessageListener = (message: DXLinkChannelMessage) => void
 
 /**
- * Listener for channel status changes.
- * @see {@link DXLinkChannel.addStatusListener}
+ * Listener for channel state changes.
+ * @see {@link DXLinkChannel.addStateChangeListener}
  */
-export type DXLinkChannelStatusListener = (
-  status: DXLinkChannelStatus,
-  prev: DXLinkChannelStatus
+export type DXLinkChannelStateChangeListener = (
+  state: DXLinkChannelState,
+  prev: DXLinkChannelState
 ) => void
 
 /**
  * Listener for errors from the server.
+ * @see {@link DXLinkWebSocketClient.addErrorListener}
  */
 export type DXLinkErrorListener = (error: DXLinkError) => void
 
 /**
- * Channel status that can be used to check if channel is available for sending messages.
- * @see {@link DXLinkChannel.getStatus}
+ * Channel state that can be used to check if channel is available for sending messages.
+ * @see {@link DXLinkChannel.getState}
  */
-export enum DXLinkChannelStatus {
+export enum DXLinkChannelState {
+  /**
+   * Channel is requested and cannot be used to {@link DXLinkChannel.send} messages yet.
+   */
+  REQUESTED = 'REQUESTED',
   /**
    * Channel is opened and can be used to {@link DXLinkChannel.send} messages.
    */
   OPENED = 'OPENED',
-  /**
-   * Channel is opening and cannot be used to {@link DXLinkChannel.send} messages.
-   */
-  REQUESTED = 'REQUESTED',
   /**
    * Channel was closed by {@link DXLinkChannel.close} or by server.
    * Channel cannot be used anymore.
@@ -150,8 +157,17 @@ export enum DXLinkChannelStatus {
  * @see {@link DXLinkWebSocketClient.openChannel}
  */
 export interface DXLinkChannel {
+  /**
+   * Unique identifier of the channel.
+   */
   readonly id: number
+  /**
+   * Name of the service that channel is opened to.
+   */
   readonly service: string
+  /**
+   * 
+   */
   readonly parameters: Record<string, unknown>
 
   /**
@@ -169,21 +185,21 @@ export interface DXLinkChannel {
   removeMessageListener(listener: DXLinkChannelMessageListener): void
 
   /**
-   * Get channel status that can be used to check if channel is available for sending messages.
+   * Get channel state that can be used to check if channel is available for sending messages.
    */
-  getStatus(): DXLinkChannelStatus
+  getState(): DXLinkChannelState
   /**
-   * Add a listener for channel status changes.
-   * If channel is ready to use, listener will be called immediately with {@link DXLinkChannelStatus.OPENED} status.
-   * @see {@link DXLinkChannelStatus}
-   * Note: when remote endpoint reconnects, channel will be reopened and listener will be called with {@link DXLinkChannelStatus.OPENED} status again.
+   * Add a listener for channel state changes.
+   * If channel is ready to use, listener will be called immediately with {@link DXLinkChannelState.OPENED} state.
+   * @see {@link DXLinkChannelState}
+   * Note: when remote endpoint reconnects, channel will be reopened and listener will be called with {@link DXLinkChannelState.OPENED} state again.
    * @see {@link DXLinkWebSocketClient.getConnectionState}
    */
-  addStatusListener(listener: DXLinkChannelStatusListener): void
+  addStateChangeListener(listener: DXLinkChannelStateChangeListener): void
   /**
-   * Remove a listener for channel status changes.
+   * Remove a listener for channel state changes.
    */
-  removeStatusListener(listener: DXLinkChannelStatusListener): void
+  removeStateChangeListener(listener: DXLinkChannelStateChangeListener): void
 
   /**
    * Add a listener for errors from the server.
@@ -197,22 +213,16 @@ export interface DXLinkChannel {
   removeErrorListener(listener: DXLinkErrorListener): void
 
   /**
-   * Send an error to the channel.
-   * @see {@link DXLinkError}
-   */
-  error(error: DXLinkError): void
-
-  /**
    * Close the channel and free all resources.
    * This method does nothing if the channel is already closed.
    * The channel {@see DXLinkChannel.getStatus} immediately becomes {@link State#CLOSED CLOSED}.
-   * @see {@link DXLinkChannelStatus}
+   * @see {@link DXLinkChannelState}
    */
   close(): void
 }
 
 /**
- * dxLink WebSocket client that can be used to connect to the remote endpoint and open channels to services.
+ * dxLink WebSocket client that can be used to connect to the remote dxLink WebSocket endpoint and open channels to services.
  */
 export interface DXLinkWebSocketClient {
   /**
@@ -251,7 +261,13 @@ export interface DXLinkWebSocketClient {
    * Get connection state that can be used to check if connection is established and ready to use.
    */
   getConnectionState(): DXLinkConnectionState
+  /**
+   * Add a listener for connection state changes.
+   */
   addConnectionStateChangeListener(listener: DXLinkConnectionStateChangeListener): void
+  /**
+   * Remove a listener for connection state changes.
+   */
   removeConnectionStateChangeListener(listener: DXLinkConnectionStateChangeListener): void
 
   /**
@@ -269,12 +285,18 @@ export interface DXLinkWebSocketClient {
    * When auth state is {@link DXLinkAuthState.UNAUTHORIZED}, you can call {@link DXLinkWebSocketClient.setAuthToken} to authorize the client.
    */
   addAuthStateChangeListener(listener: DXLinkAuthStateChangeListener): void
+  /**
+   * Remove a listener for authentication state changes.
+   */
   removeAuthStateChangeListener(listener: DXLinkAuthStateChangeListener): void
 
   /**
    * Error listener that can be used to handle errors from the server.
    */
   addErrorListener(listener: DXLinkErrorListener): void
+  /**
+   * Remove a listener for errors from the server.
+   */
   removeErrorListener(listener: DXLinkErrorListener): void
 
   /**
@@ -284,4 +306,10 @@ export interface DXLinkWebSocketClient {
    * @see {@link DXLinkChannel}
    */
   openChannel(service: string, parameters: Record<string, unknown>): DXLinkChannel
+
+  /**
+   * Close the client and free all resources.
+   * This method works the same as {@link DXLinkWebSocketClient.disconnect}.
+   */
+  close(): void
 }
