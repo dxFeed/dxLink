@@ -65,6 +65,8 @@ export class Channel implements DXLinkChannel {
     })
 
   close = () => {
+    if (this.status === DXLinkChannelState.CLOSED) return
+
     this.logger.debug(`Closing by user`)
 
     this.send({

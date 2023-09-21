@@ -1,6 +1,11 @@
 import { DXLinkWebSocket } from '../src'
 import { DXLinkWebSocketConnectorConfig, DXLinkWebSocketConnector, DXLinkError } from '../src/v2'
-import { DXLinkWebSocketClientImpl as DXLInkWebSocketClientV3 } from '../src/v3'
+import {
+  DXLinkWebSocketClientImpl as DXLInkWebSocketClientV3,
+  DXLinkFeedImpl,
+  FeedContract,
+  FeedDataFormat,
+} from '../src/v3'
 
 async function start() {
   console.log('Start')
@@ -148,6 +153,42 @@ async function startV3() {
   // ...
 }
 
+async function startV3Feed() {
+  const client = new DXLInkWebSocketClientV3({
+    logLevel: 0,
+  })
+
+  client.connect('wss://demo.dxfeed.com/dxlink-ws')
+
+  const feed = new DXLinkFeedImpl(client, FeedContract.HISTORY)
+
+  feed.addEventListener((events) => {
+    console.log('Events', events)
+  })
+
+  feed.configure({
+    acceptAggregationPeriod: 0,
+    acceptDataFormat: FeedDataFormat.COMPACT,
+    acceptEventFields: {
+      Quote: ['eventSymbol', 'askPrice', 'bidPrice'],
+      Candle: ['eventSymbol', 'open', 'close', 'high', 'low', 'volume'],
+    },
+  })
+
+  const sub1 = { type: 'Quote', symbol: 'AAPL' }
+
+  const subs = Array.from({ length: 200 }).map(
+    (_, index) =>
+      ({
+        type: 'Candle',
+        symbol: `${Array.from({ length: 10 }).join('A')}{=${index}d}`,
+        fromTime: Date.now(),
+      } as const)
+  )
+
+  feed.addSubscriptions(subs)
+}
+
 // startV2().catch((error) => console.error('Start error', error))
 
-startV3().catch((error) => console.error('Start error', error))
+startV3Feed().catch((error) => console.error('Start error', error))
