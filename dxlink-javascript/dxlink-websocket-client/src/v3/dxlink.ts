@@ -11,7 +11,15 @@ export type DXLinkErrorType = ErrorType
  * @see {@link DXLinkWebSocketClient.addErrorListener}
  */
 export interface DXLinkError {
+  /**
+   * Type of the error.
+   * @example 'TIMEOUT'
+   */
   readonly type: DXLinkErrorType
+  /**
+   * Message of the error with details.
+   * @example 'Timeout exceeded'
+   */
   readonly message: string
 }
 
@@ -166,7 +174,7 @@ export interface DXLinkChannel {
    */
   readonly service: string
   /**
-   * 
+   *
    */
   readonly parameters: Record<string, unknown>
 
@@ -236,7 +244,7 @@ export interface DXLinkWebSocketClient {
    *
    * @param url WebSocket URL to connect to.
    */
-  connect(url: string): Promise<void>
+  connect(url: string): void
   /**
    * Reconnect to the remote endpoint.
    * This method does nothing if the client is not connected.

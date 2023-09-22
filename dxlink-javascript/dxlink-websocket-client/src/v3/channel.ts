@@ -1,4 +1,4 @@
-import { DXLinkWebSocketConfig } from './client'
+import { DXLinkWebSocketClientOptions } from './client'
 import {
   DXLinkChannel,
   DXLinkChannelMessage,
@@ -11,7 +11,7 @@ import {
 import { DXLinkLogger, Logger } from './logger'
 import { ChannelPayloadMessage, Message } from './messages'
 
-export class Channel implements DXLinkChannel {
+export class DXLinkChannelImpl implements DXLinkChannel {
   private status = DXLinkChannelState.REQUESTED
 
   // Listeners
@@ -26,9 +26,9 @@ export class Channel implements DXLinkChannel {
     public readonly service: string,
     public readonly parameters: Record<string, unknown>,
     private readonly sendMessage: (message: Message) => void,
-    config: DXLinkWebSocketConfig
+    options: DXLinkWebSocketClientOptions
   ) {
-    this.logger = new Logger(`${Channel.name}#${id} ${service}`, config.logLevel)
+    this.logger = new Logger(`${DXLinkChannelImpl.name}#${id} ${service}`, options.logLevel)
   }
 
   send = ({ type, ...payload }: DXLinkChannelMessage) => {
@@ -119,7 +119,7 @@ export class Channel implements DXLinkChannel {
 
   processError = (error: DXLinkError) => {
     if (this.errorListeners.size === 0) {
-      console.error(`Unhandled error in channel#${this.id}: `, error)
+      this.logger.error(`Unhandled error in channel#${this.id}: `, error)
       return
     }
 
@@ -127,7 +127,7 @@ export class Channel implements DXLinkChannel {
       try {
         listener(error)
       } catch (e) {
-        console.error(`Error in channel#${this.id} error listener: `, e)
+        this.logger.error(`Error in channel#${this.id} error listener: `, e)
       }
     }
   }
@@ -141,7 +141,7 @@ export class Channel implements DXLinkChannel {
       try {
         listener(newStatus, prev)
       } catch (e) {
-        console.error(`Error in channel#${this.id} status listener: `, e)
+        this.logger.error(`Error in channel#${this.id} status listener: `, e)
       }
     }
   }

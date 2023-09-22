@@ -20,11 +20,14 @@ import {
   isChannelMessage,
 } from './messages'
 import { WebSocketConnector } from './connector'
-import { Channel } from './channel'
+import { DXLinkChannelImpl } from './channel'
 import { DXLinkLogLevel, DXLinkLogger, Logger } from './logger'
 import { Scheduler } from './scheduler'
 
-export interface DXLinkWebSocketConfig {
+/**
+ * Options for {@link DXLinkWebSocketClientImpl}.
+ */
+export interface DXLinkWebSocketClientOptions {
   /**
    * Interval in seconds between keepalive messages which are sent to server.
    */
@@ -55,6 +58,9 @@ export interface DXLinkWebSocketConfig {
   readonly maxReconnectAttempts: number
 }
 
+/**
+ * Protocol version that is used by client.
+ */
 export const DXLINK_WS_PROTOCOL_VERSION = '0.1'
 
 const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
@@ -62,8 +68,11 @@ const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
   clientVersion: '0.0.0', // TODO: get from package.json
 }
 
+/**
+ * Implementation of {@link DXLinkWebSocketClient}.
+ */
 export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
-  private readonly config: DXLinkWebSocketConfig
+  private readonly config: DXLinkWebSocketClientOptions
 
   private readonly logger: DXLinkLogger
 
@@ -103,9 +112,9 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
 
   // Channels
   private globalChannelId = 1
-  private readonly channels = new Map<number, Channel>()
+  private readonly channels = new Map<number, DXLinkChannelImpl>()
 
-  constructor(config?: Partial<DXLinkWebSocketConfig>) {
+  constructor(config?: Partial<DXLinkWebSocketClientOptions>) {
     this.config = {
       keepaliveInterval: 30,
       keepaliveTimeout: 60,
@@ -138,20 +147,6 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
 
     // Initiate websocket connection
     this.connector.start()
-
-    return new Promise((resolve, reject) => {
-      const listener: DXLinkConnectionStateChangeListener = (state) => {
-        this.removeConnectionStateChangeListener(listener)
-
-        if (state === DXLinkConnectionState.CONNECTED) {
-          resolve()
-        } else if (state === DXLinkConnectionState.NOT_CONNECTED) {
-          reject(new Error('Connection failed'))
-        }
-      }
-
-      this.addConnectionStateChangeListener(listener)
-    })
   }
 
   reconnect = () => {
@@ -265,7 +260,13 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
     const channelId = this.globalChannelId
     this.globalChannelId += 2
 
-    const channel = new Channel(channelId, service, parameters, this.sendMessage, this.config)
+    const channel = new DXLinkChannelImpl(
+      channelId,
+      service,
+      parameters,
+      this.sendMessage,
+      this.config
+    )
 
     this.channels.set(channelId, channel)
 
@@ -336,9 +337,7 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
       })
     }
 
-    /**
-     * Connection messages are messages that are sent to the channel 0.
-     */
+    // Connection messages are messages that are sent to the channel 0
     if (isConnectionMessage(message)) {
       switch (message.type) {
         case 'SETUP':
@@ -465,6 +464,14 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
     }
   }
 
+  /**
+   * Process transport open event from connector.
+   * After transport is opened:
+   * - setup message is sent to server
+   * - auth message is sent to server if auth token is set
+   * - wait for setup message from server
+   * - wait for auth state message from server
+   */
   private processTransportOpen = (): void => {
     this.logger.debug('Connection opened')
 
@@ -494,7 +501,7 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
         })
 
         // Disconnect if no setup message received
-        this.disconnect() // TODO: mb reconnect
+        this.reconnect()
       },
       this.config.actionTimeout * 1000,
       'SETUP_TIMEOUT'
@@ -519,7 +526,7 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
         })
 
         // Disconnect if no auth state message received
-        this.disconnect() // TODO: mb reconnect
+        this.reconnect()
       },
       this.config.actionTimeout * 1000,
       'AUTH_STATE_TIMEOUT'
@@ -530,6 +537,12 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
     }
   }
 
+  /**
+   *  Process transport close event from connector.
+   *  After transport is closed by server:
+   * - reconnect if connection is authorized
+   * - disconnect if connection is not authorized
+   */
   private processTransportClose = (): void => {
     this.logger.debug('Connection closed by server')
 

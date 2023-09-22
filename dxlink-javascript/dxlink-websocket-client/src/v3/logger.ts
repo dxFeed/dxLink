@@ -1,3 +1,6 @@
+/**
+ * A logger interface that can be used to log messages.
+ */
 export interface DXLinkLogger {
   debug(message: string, ...args: unknown[]): void
   info(message: string, ...args: unknown[]): void
@@ -5,6 +8,9 @@ export interface DXLinkLogger {
   error(message: string, ...args: unknown[]): void
 }
 
+/**
+ * Level of logging that can be used to filter out messages.
+ */
 export enum DXLinkLogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -12,6 +18,9 @@ export enum DXLinkLogLevel {
   ERROR = 3,
 }
 
+/**
+ * A logger that uses the console to log messages.
+ */
 export class Logger implements DXLinkLogger {
   constructor(private readonly prefix: string, private readonly level: DXLinkLogLevel) {}
 

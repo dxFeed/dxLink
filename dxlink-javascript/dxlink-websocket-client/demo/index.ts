@@ -1,11 +1,6 @@
 import { DXLinkWebSocket } from '../src'
 import { DXLinkWebSocketConnectorConfig, DXLinkWebSocketConnector, DXLinkError } from '../src/v2'
-import {
-  DXLinkWebSocketClientImpl as DXLInkWebSocketClientV3,
-  DXLinkFeedImpl,
-  FeedContract,
-  FeedDataFormat,
-} from '../src/v3'
+import { DXLink, FeedContract, FeedDataFormat } from '../src/v3'
 
 async function start() {
   console.log('Start')
@@ -154,13 +149,11 @@ async function startV3() {
 }
 
 async function startV3Feed() {
-  const client = new DXLInkWebSocketClientV3({
-    logLevel: 0,
-  })
+  const dxlink = DXLink.getInstance()
 
-  client.connect('wss://demo.dxfeed.com/dxlink-ws')
+  dxlink.connect('wss://demo.dxfeed.com/dxlink-ws')
 
-  const feed = new DXLinkFeedImpl(client, FeedContract.HISTORY)
+  const feed = dxlink.createFeed(FeedContract.TICKER)
 
   feed.addEventListener((events) => {
     console.log('Events', events)

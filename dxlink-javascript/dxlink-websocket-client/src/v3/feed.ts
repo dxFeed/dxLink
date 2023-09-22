@@ -22,6 +22,7 @@ import {
   FeedEventValue,
   FeedConfigMessage,
 } from './feed-messages'
+import { DXLinkLogLevel, DXLinkLogger, Logger } from './logger'
 
 /**
  * Prefered configuration for the feed channel.
@@ -107,7 +108,7 @@ const getSubscriptionKey = (subscription: AnySubscription) =>
 /**
  * Subscription type by the contract.
  */
-type SubscriptionByContract<Contract extends FeedContract> = {
+export type SubscriptionByContract<Contract extends FeedContract> = {
   [FeedContract.AUTO]: Subscription | TimeSeriesSubscription | IndexedEventSubscription
   [FeedContract.TICKER]: Subscription
   [FeedContract.HISTORY]: TimeSeriesSubscription | IndexedEventSubscription
@@ -127,16 +128,6 @@ interface FeedSubscriptionChunk {
   remove?: AnySubscription[]
   reset?: boolean
 }
-
-/**
- * Maximum size of the subscription chunk to be sent to the channel.
- */
-const MAX_SEND_SUBSCRIPTION_CHUNK_SIZE = 4096 * 2
-
-/**
- * Time in milliseconds to wait for more pending subscriptions before sending them to the channel.
- */
-const BATCH_SUBSCRIPTION_TIME = 10
 
 /**
  * dxLink FEED service instance for the specified {@link FeedContract}.
@@ -214,10 +205,30 @@ export interface DXLinkFeed<
   close(): void
 }
 
+/**
+ * Options for the {@link DXLinkFeedImpl} instance.
+ */
+export interface DXLinkFeedOptions {
+  /**
+   * Time in milliseconds to wait for more pending subscriptions before sending them to the channel.
+   */
+  batchSubscriptionsTime: number
+  /**
+   * Maximum size of the subscription chunk to be sent to the channel.
+   */
+  maxSendSubscriptionChunkSize: number
+  /**
+   * Log level for the feed.
+   */
+  logLevel: DXLinkLogLevel
+}
+
 export class DXLinkFeedImpl<Contract extends FeedContract>
   implements DXLinkFeed<SubscriptionByContract<Contract>, Contract>
 {
   public readonly id: number
+
+  private readonly options: DXLinkFeedOptions
 
   /**
    * dxLink channel instance.
@@ -271,10 +282,23 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
    */
   private scheduleTimeoutId: any
 
+  private readonly logger: DXLinkLogger
+
   /**
    * Allows to create {@link DXLinkFeed} instance with the specified {@link FeedContract} for the given {@link DXLinkWebSocketClient}.
    */
-  constructor(client: DXLinkWebSocketClient, public readonly contract: Contract) {
+  constructor(
+    client: DXLinkWebSocketClient,
+    public readonly contract: Contract,
+    options: Partial<DXLinkFeedOptions> = {}
+  ) {
+    this.options = {
+      logLevel: DXLinkLogLevel.WARN,
+      batchSubscriptionsTime: 100,
+      maxSendSubscriptionChunkSize: 4096 * 2,
+      ...options,
+    }
+
     this.channel = client.openChannel('FEED', { contract })
     this.id = this.channel.id
     this.channel.addMessageListener(this.processMessage)
@@ -283,6 +307,8 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
 
     this.addSubscriptions = this.addSubscriptions.bind(this)
     this.removeSubscriptions = this.removeSubscriptions.bind(this)
+
+    this.logger = new Logger(`${DXLinkFeedImpl.name}#${this.id}`, this.options.logLevel)
   }
 
   addConfigChangeListener = (listener: DXLinkFeedConfigChangeListner) =>
@@ -379,7 +405,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
       }
     }
 
-    console.warn('Unknown message', message)
+    this.logger.warn('Unknown message', message)
   }
 
   /**
@@ -403,7 +429,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
       try {
         listener(newConfig)
       } catch (error) {
-        console.error('Error in config listener', error)
+        this.logger.error('Error in config listener', error)
       }
     }
   }
@@ -464,11 +490,11 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
         try {
           listener(events)
         } catch (error) {
-          console.error('Error in event listener', error)
+          this.logger.error('Error in event listener', error)
         }
       }
     } catch (error) {
-      console.error('Cannot parse data', error)
+      this.logger.error('Cannot parse data', error)
       return
     }
   }
@@ -522,7 +548,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
    * Process error received from the channel.
    */
   private processError = (processError: DXLinkError) => {
-    console.error('Error in channel', processError)
+    this.logger.error('Error in channel', processError)
   }
 
   /**
@@ -556,7 +582,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
       this.scheduleTimeoutId = undefined
 
       this.processPendings()
-    }, BATCH_SUBSCRIPTION_TIME)
+    }, this.options.batchSubscriptionsTime)
   }
 
   /**
@@ -583,7 +609,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
       this.subscriptions.delete(getSubscriptionKey(subscription))
 
       // Send the chunk if it is too big already
-      if (chunkSize >= MAX_SEND_SUBSCRIPTION_CHUNK_SIZE) {
+      if (chunkSize >= this.options.maxSendSubscriptionChunkSize) {
         this.sendSubscriptionChunkAndSchema(chunk)
         chunk = {}
         chunkSize = 0
@@ -606,7 +632,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract>
       this.subscriptions.set(key, subscription)
 
       // Send the chunk if it is too big already
-      if (chunkSize >= MAX_SEND_SUBSCRIPTION_CHUNK_SIZE) {
+      if (chunkSize >= this.options.maxSendSubscriptionChunkSize) {
         this.sendSubscriptionChunkAndSchema(chunk, newTouchedEvents)
         newTouchedEvents.clear()
         chunk = {}
