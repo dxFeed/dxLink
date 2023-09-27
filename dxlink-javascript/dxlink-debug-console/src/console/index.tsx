@@ -3,12 +3,16 @@ import { Connection, ConnectParams } from './connection'
 import { ChannelsManager } from './channels-manager'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  DXLinkWebSocket,
+  DXLinkAuthState,
+  DXLinkConnectionDetails,
+  DXLinkConnectionState,
+  DXLinkError,
+  DXLinkFeed,
+  DXLinkWebSocketClient,
+  DXLinkWebSocketClientImpl,
+  DXLinkLogLevel,
   FeedContract,
-  FeedChannel,
-  ErrorData,
-  ConnectionStatus,
-  AuthState,
+  DXLinkFeedImpl,
 } from '@dxfeed/dxlink-websocket-client'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { Text } from '@dxfeed/ui-kit/Text'
@@ -30,18 +34,21 @@ const Version = styled(Text)`
   display: block;
 `
 
-interface ClientState {
-  status: ConnectionStatus
-  serverKeepaliveTimeout?: number
-  serverVersion?: string
+interface ConnectionState {
+  state: DXLinkConnectionState
+  details?: DXLinkConnectionDetails
+}
+
+const DEFAULT_CONNECTION_STATE: ConnectionState = {
+  state: DXLinkConnectionState.NOT_CONNECTED,
 }
 
 export function Console() {
-  const [errors, setErrors] = useState<ErrorData[]>([])
-  const [client, setClient] = useState<DXLinkWebSocket.Client>()
-  const [state, setState] = useState<ClientState>()
-  const [authState, setAuthState] = useState<AuthState | undefined>()
-  const [channels, setChannels] = useState<FeedChannel[]>([])
+  const [errors, setErrors] = useState<DXLinkError[]>([])
+  const [client, setClient] = useState<DXLinkWebSocketClient>()
+  const [connectionState, setConnectionState] = useState<ConnectionState>(DEFAULT_CONNECTION_STATE)
+  const [authState, setAuthState] = useState<DXLinkAuthState | undefined>()
+  const [channels, setChannels] = useState<DXLinkFeed<FeedContract>[]>([])
 
   const handleError = (error: unknown) => {
     console.error(error)
@@ -56,26 +63,38 @@ export function Console() {
   const handleConnect = async (con: ConnectParams) => {
     setClient(undefined)
     setAuthState(undefined)
-    setState({ status: 'PENDED' })
     setErrors([])
 
     try {
-      const client = await DXLinkWebSocket.newClient(con)
+      const client = new DXLinkWebSocketClientImpl({
+        logLevel: DXLinkLogLevel.DEBUG,
+        keepaliveTimeout: con.keepaliveTimeout,
+        acceptKeepaliveTimeout: con.acceptKeepaliveTimeout,
+        keepaliveInterval: con.keepaliveInterval,
+        maxReconnectAttempts: 1,
+      })
+
+      setConnectionState({
+        state: DXLinkConnectionState.CONNECTING,
+        details: client.getConnectionDetails(),
+      })
+
+      client.connect(con.url)
 
       setClient(client)
     } catch (error) {
       handleError(error)
 
-      setState({ status: 'CLOSED' })
+      handleDisconnect()
     }
   }
 
   const handleDisconnect = useCallback(() => {
     console.log('Disconnecting')
 
-    client?.close()
+    client?.disconnect()
     setClient(undefined)
-    setState(undefined)
+    setConnectionState(DEFAULT_CONNECTION_STATE)
     setAuthState(undefined)
     setChannels([])
   }, [client])
@@ -85,27 +104,36 @@ export function Console() {
 
   useEffect(() => {
     if (client !== undefined) {
-      const stateSub = client.connectionState.subscribe((state) => {
+      const connectionStateListener = (state: DXLinkConnectionState) => {
         console.log('Connection state', state)
 
-        if (state.status === 'CLOSED') {
+        if (state === DXLinkConnectionState.NOT_CONNECTED) {
           return handleDisconnect()
         }
 
-        setState(state)
-      })
-      const authStateSub = client.authState.subscribe((state) => {
+        setConnectionState({
+          state,
+          details: client.getConnectionDetails(),
+        })
+      }
+      client.addConnectionStateChangeListener(connectionStateListener)
+
+      const authStateListener = (state: DXLinkAuthState) => {
         console.log('Auth state', state)
         setAuthState(state)
-      })
-      const errorSub = client.error.subscribe((error) => {
+      }
+      client.addAuthStateChangeListener(authStateListener)
+
+      const errorListener = (error: DXLinkError) => {
+        console.error(error)
         setErrors((prev) => [...prev, error])
-      })
+      }
+      client.addErrorListener(errorListener)
 
       return () => {
-        stateSub.unsubscribe()
-        authStateSub.unsubscribe()
-        errorSub.unsubscribe()
+        client.removeConnectionStateChangeListener(connectionStateListener)
+        client.removeAuthStateChangeListener(authStateListener)
+        client.removeErrorListener(errorListener)
       }
     }
   }, [client, handleDisconnect])
@@ -116,22 +144,25 @@ export function Console() {
         throw new Error('Client must be connected')
       }
 
-      const channel = await client.openFeedChannel(contract)
+      const feed = new DXLinkFeedImpl(client, contract, {
+        logLevel: DXLinkLogLevel.DEBUG,
+      })
 
-      setChannels((prev) => [...prev, channel])
+      setChannels((prev) => [...prev, feed])
     } catch (error) {
       handleError(error)
     }
   }
 
-  const status = state?.status
-  const serverVersion = state?.serverVersion
-  const serverKeepaliveTimeout = state?.serverKeepaliveTimeout
+  const state = connectionState.state
+  const clientVersion = connectionState?.details?.clientVersion
+  const serverVersion = connectionState?.details?.serverVersion
+  const serverKeepaliveTimeout = connectionState?.details?.serverKeepaliveTimeout
 
   return (
     <Root>
       <Connection
-        status={status}
+        state={state}
         serverKeepaliveTimeout={serverKeepaliveTimeout}
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
@@ -140,7 +171,7 @@ export function Console() {
           <>
             {client !== undefined && (
               <Version level={4}>
-                <b>Client version</b>: {client.version}
+                <b>Client version</b>: {clientVersion}
               </Version>
             )}
             {serverVersion !== undefined && (
@@ -151,10 +182,12 @@ export function Console() {
           </>
         }
       />
-      {authState === 'UNAUTHORIZED' && <Authorization onAuth={client?.auth} />}
+      {authState === 'UNAUTHORIZED' && (
+        <Authorization onAuth={(token) => client?.setAuthToken(token)} />
+      )}
       {authState === 'AUTHORIZED' && (
         <ChannelWrapper>
-          {status === 'OPENED' && (
+          {state === DXLinkConnectionState.CONNECTED && (
             <ChannelsManager channels={channels} onOpenChannel={handleOpenChannel} />
           )}
         </ChannelWrapper>

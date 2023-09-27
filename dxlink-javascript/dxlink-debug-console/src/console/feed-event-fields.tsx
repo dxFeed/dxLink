@@ -1,14 +1,14 @@
 import { Dropdown } from '@dxfeed/ui-kit/Dropdown'
 import { TextField } from '@dxfeed/ui-kit/TextField'
 import { unit } from '@dxfeed/ui-kit/utils'
-import { EventFields } from '@dxfeed/dxlink-websocket-client'
+import { FeedEventFields } from '@dxfeed/dxlink-websocket-client'
 import { useCallback, useState } from 'react'
 import styled from 'styled-components'
 import { EVENT_TYPES } from './feed-event-type'
 
-export interface FeedEventFieldsProps {
-  value?: EventFields
-  onChange?: (value: EventFields) => void
+export interface FeedEventFieldsViewProps {
+  value?: FeedEventFields
+  onChange?: (value: FeedEventFields) => void
   readOnly?: boolean
   label: string
   description?: string
@@ -22,7 +22,7 @@ const Field = styled.div`
   padding: ${unit(0.5)} ${unit(1.5)};
 `
 
-export function FeedEventFields({
+export function FeedEventFieldsView({
   label,
   description,
   value,

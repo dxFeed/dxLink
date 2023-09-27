@@ -1,6 +1,6 @@
 import { Button } from '@dxfeed/ui-kit/Button'
 import { ContentTemplate } from '../common/content-template'
-import { FeedChannel, FeedContract } from '@dxfeed/dxlink-websocket-client'
+import { DXLinkFeed, FeedContract } from '@dxfeed/dxlink-websocket-client'
 import { useState } from 'react'
 import { FeedChannelManager } from './feed-channel-manager'
 import { Select } from '../common/select'
@@ -29,10 +29,10 @@ const ChannelItemGroup = styled.div`
   padding: ${unit(1)} 0;
 `
 
-const CONTRACT_LIST: FeedContract[] = ['AUTO', 'TICKER', 'HISTORY', 'STREAM']
+const CONTRACT_LIST: FeedContract[] = Object.values(FeedContract)
 
 export interface ChannelManagerProps {
-  channels: FeedChannel[]
+  channels: DXLinkFeed<FeedContract>[]
   onOpenChannel: (contract: FeedContract) => Promise<void>
 }
 
@@ -68,7 +68,7 @@ export function ChannelsManager({ channels, onOpenChannel }: ChannelManagerProps
         <ChannelsGroup>
           {channels.map((channel) => (
             <ChannelItemGroup key={channel.id}>
-              <ChannelWidget channel={channel}>
+              <ChannelWidget channel={channel.getChannel()}>
                 <FeedChannelManager channel={channel} />
               </ChannelWidget>
             </ChannelItemGroup>

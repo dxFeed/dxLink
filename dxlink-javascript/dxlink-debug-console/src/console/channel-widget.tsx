@@ -1,38 +1,55 @@
 import { IconButton } from '@dxfeed/ui-kit/IconButton'
 import { Close } from '@dxfeed/ui-kit/Icons'
-import { FeedChannel } from '@dxfeed/dxlink-websocket-client'
-import { ReactNode } from 'react'
+import {
+  DXLinkChannel,
+  DXLinkChannelState,
+  DXLinkError,
+  DXLinkFeed,
+} from '@dxfeed/dxlink-websocket-client'
+import { ReactNode, useEffect, useState } from 'react'
 import { ContentTemplate } from '../common/content-template'
-import { useObservable } from '../use-observable'
-import { ErrorsWatcher } from './errors'
+import { Errors } from './errors'
 
 interface ChannelWidgetProps {
-  channel: FeedChannel
+  channel: DXLinkChannel
   children: ReactNode
 }
 
 export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
-  const status = useObservable(channel.state, 'INITIAL')
+  const [state, setState] = useState(channel.getState())
+  const [errors, setErrors] = useState<DXLinkError[]>([])
+
+  useEffect(() => {
+    const stateListener = (state: DXLinkChannelState) => {
+      setState(channel.getState())
+    }
+    const errorListener = (error: DXLinkError) => {
+      setErrors((errors) => [...errors, error])
+    }
+    channel.addStateChangeListener(stateListener)
+    channel.addErrorListener(errorListener)
+    return () => {
+      setErrors([])
+      channel.removeStateChangeListener(stateListener)
+      channel.removeErrorListener(errorListener)
+    }
+  }, [channel])
 
   const handleClose = () => {
     channel.close()
   }
 
-  if (status === 'INITIAL') {
-    return <ContentTemplate kind={'secondary'} title={`Channel #${channel.id}`} />
-  }
-
-  if (status === 'CLOSED') {
+  if (state === DXLinkChannelState.CLOSED) {
     return <ContentTemplate kind={'secondary'} title={`Channel #${channel.id} - CLOSED`} />
   }
 
   return (
     <ContentTemplate
       kind={'secondary'}
-      title={`Channel #${channel.id} - ${channel.contract}`}
+      title={`Channel #${channel.id} - ${channel.parameters.contract}`}
       actions={
         <>
-          <ErrorsWatcher error={channel.error} />
+          <Errors errors={errors} />
           <IconButton title="Close channel" onClick={handleClose} kind={'ghost'}>
             <Close />
           </IconButton>

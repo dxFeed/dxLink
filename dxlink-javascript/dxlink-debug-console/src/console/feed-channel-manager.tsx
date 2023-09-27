@@ -4,20 +4,19 @@ import { unit } from '@dxfeed/ui-kit/utils'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { TextField } from '@dxfeed/ui-kit/TextField'
 import {
-  EventData,
-  EventFields,
-  FeedChannel,
+  DXLinkFeed,
+  FeedConfig,
+  FeedContract,
   FeedDataFormat,
-  OrderBookSubscription,
-  RegularSubscription,
-  SubscriptionAction,
+  FeedEventData,
+  FeedEventFields,
   TimeSeriesSubscription,
 } from '@dxfeed/dxlink-websocket-client'
 import { ContentTemplate } from '../common/content-template'
 import { FeedData } from './feed-data'
 import { FeedSubscription } from './feed-subscriptions'
 import { useObservable } from '../use-observable'
-import { FeedEventFields } from './feed-event-fields'
+import { FeedEventFieldsView } from './feed-event-fields'
 import { Select } from '../common/select'
 
 const ConfigSetupGroup = styled.form`
@@ -52,12 +51,8 @@ const DataFormatSelect = styled(Select)`
 `
 
 interface FeedChannelmanagerProps {
-  channel: FeedChannel
+  channel: DXLinkFeed<FeedContract>
 }
-
-type Action = SubscriptionAction<
-  RegularSubscription | TimeSeriesSubscription | OrderBookSubscription
->
 
 const DATA_FORMATS = ['FULL', 'COMPACT']
 
@@ -67,15 +62,23 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
   const rootRef = useRef<HTMLDivElement>(null)
 
   const [acceptAggregetionPeriod, setAcceptAggregetionPeriod] = useState<string>('1')
-  const [acceptEventFields, setAcceptEventFields] = useState<EventFields>({})
-  const [acceptDataFormat, setAcceptDataFormat] = useState<FeedDataFormat>('FULL')
+  const [acceptEventFields, setAcceptEventFields] = useState<FeedEventFields>({})
+  const [acceptDataFormat, setAcceptDataFormat] = useState<FeedDataFormat>(FeedDataFormat.COMPACT)
 
-  const config = useObservable(channel.config, null)
+  const [config, setConfig] = useState<FeedConfig>()
 
-  const [eventData, setEventData] = useState<Record<string, Record<string, EventData>>>({})
+  useEffect(() => {
+    const configListener = (config: FeedConfig) => {
+      setConfig(config)
+    }
+    channel.addConfigChangeListener(configListener)
+    return () => channel.removeConfigChangeListener(configListener)
+  }, [channel])
+
+  const [eventData, setEventData] = useState<Record<string, Record<string, FeedEventData>>>({})
 
   const handleSetup = () => {
-    const finalAcceptEventFields = Object.keys(acceptEventFields).reduce<EventFields>(
+    const finalAcceptEventFields = Object.keys(acceptEventFields).reduce<FeedEventFields>(
       (acc, field) => {
         const fields = acceptEventFields[field].filter(Boolean)
 
@@ -93,7 +96,7 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
       {}
     )
 
-    channel.setup({
+    channel.configure({
       acceptAggregationPeriod:
         acceptAggregetionPeriod === '' ? undefined : Number(acceptAggregetionPeriod),
       acceptDataFormat: acceptDataFormat,
@@ -108,19 +111,10 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
     }
   }, [])
 
-  const handleSubscription = (action: Action) => {
-    if (action.reset) {
-      setEventData({})
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    channel.subscription(action as any)
-  }
-
   const eventFields = config?.eventFields
 
   useEffect(() => {
-    const subscription = channel.data.subscribe((events) => {
+    const eventListener = (events: FeedEventData[]) => {
       setEventData((prev) => {
         const data = { ...prev }
         for (const event of events) {
@@ -137,9 +131,10 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
         }
         return data
       })
-    })
-    return () => subscription.unsubscribe()
-  }, [channel.data])
+    }
+    channel.addEventListener(eventListener)
+    return () => channel.removeEventListener(eventListener)
+  }, [channel])
 
   return (
     <>
@@ -178,7 +173,7 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
             </FieldWrapper>
 
             <FieldWrapper>
-              <FeedEventFields
+              <FeedEventFieldsView
                 label={'Accept event fields'}
                 description={'Specify the fields, separated by commas (,)'}
                 value={acceptEventFields}
@@ -209,13 +204,18 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
             </FieldWrapper>
 
             <FieldWrapper>
-              <FeedEventFields label={'Event fields'} value={config?.eventFields} readOnly />
+              <FeedEventFieldsView label={'Event fields'} value={config?.eventFields} readOnly />
             </FieldWrapper>
           </ContentTemplate>
         </CurrentConfigGroup>
       </ConfigGroup>
 
-      <FeedSubscription contract={channel.contract} onAction={handleSubscription} />
+      <FeedSubscription
+        contract={channel.contract}
+        onAdd={channel.addSubscriptions}
+        onRemove={channel.removeSubscriptions}
+        onReset={channel.clearSubscriptions}
+      />
 
       {eventFields && <FeedData eventFields={eventFields} data={eventData} />}
     </>

@@ -4,7 +4,7 @@ import { ContentTemplate } from '../common/content-template'
 import { useState } from 'react'
 import styled from 'styled-components'
 import { unit } from '@dxfeed/ui-kit/utils'
-import { ConnectionStatus } from '@dxfeed/dxlink-websocket-client'
+import { DXLinkConnectionState } from '@dxfeed/dxlink-websocket-client'
 
 const ActionsGroup = styled.div`
   display: flex;
@@ -63,7 +63,7 @@ export interface ConnectParams {
 }
 
 export interface ConnectionProps {
-  status: ConnectionStatus | undefined
+  state: DXLinkConnectionState
   serverKeepaliveTimeout?: number
   onConnect: (con: ConnectParams) => void
   onDisconnect: () => void
@@ -84,7 +84,7 @@ const DEFAULT_URL =
     : getConnectionUrl(new URL('wss://demo.dxfeed.com/dxlink-ws') as unknown as Location)
 
 export function Connection({
-  status,
+  state,
   serverKeepaliveTimeout,
   onConnect,
   onDisconnect,
@@ -114,7 +114,8 @@ export function Connection({
     onConnect(conn)
   }
 
-  const inputFreeze = status === 'OPENED'
+  const inputFreeze =
+    state === DXLinkConnectionState.CONNECTED || state === DXLinkConnectionState.CONNECTING
 
   return (
     <ContentTemplate title="Connection">
@@ -174,11 +175,25 @@ export function Connection({
           <Info>{info}</Info>
           {error}
           <ConnectionButton>
-            <Button type="submit" disabled={status === 'PENDED' || status === 'OPENED'}>
-              {status === 'OPENED' ? <ConnectioStatus>Connected</ConnectioStatus> : 'Connect'}
+            <Button
+              type="submit"
+              disabled={
+                state === DXLinkConnectionState.CONNECTING ||
+                state === DXLinkConnectionState.CONNECTED
+              }
+            >
+              {state === DXLinkConnectionState.CONNECTED ? (
+                <ConnectioStatus>Connected</ConnectioStatus>
+              ) : (
+                'Connect'
+              )}
             </Button>
           </ConnectionButton>
-          <Button type="button" onClick={onDisconnect} disabled={status !== 'OPENED'}>
+          <Button
+            type="button"
+            onClick={onDisconnect}
+            disabled={state === DXLinkConnectionState.NOT_CONNECTED}
+          >
             Disconnect
           </Button>
         </ActionsGroup>

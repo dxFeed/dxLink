@@ -1,6 +1,6 @@
 import { Tooltip } from '@dxfeed/ui-kit/Tooltip'
 import { Table, TableRow, TableHeadCell, TableCell } from '@dxfeed/ui-kit/Table'
-import { EventData, EventFields } from '@dxfeed/dxlink-websocket-client'
+import { FeedEventData, FeedEventFields } from '@dxfeed/dxlink-websocket-client'
 import { ContentTemplate } from '../common/content-template'
 import { unit } from '@dxfeed/ui-kit/utils'
 import styled from 'styled-components'
@@ -34,13 +34,13 @@ const DataTableCell = styled(TableCell)`
 `
 
 export interface FeedDataProps {
-  eventFields: EventFields
-  data: Record<string, Record<string, EventData>>
+  eventFields: FeedEventFields
+  data: Record<string, Record<string, FeedEventData>>
 }
 
 export function FeedData({ eventFields, data }: FeedDataProps) {
   const dataFields = useMemo(() => {
-    return Object.keys(eventFields).reduce<EventFields>((acc, key) => {
+    return Object.keys(eventFields).reduce<FeedEventFields>((acc, key) => {
       acc[key] = eventFields[key].reduce<string[]>((acc, value) => {
         if (value === 'eventSymbol') {
           acc.unshift(value)

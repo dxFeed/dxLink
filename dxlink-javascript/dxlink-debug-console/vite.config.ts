@@ -15,6 +15,11 @@ export default defineConfig({
       projects: [],
     }),
   ],
+  resolve: {
+    alias: {
+      '@dxfeed/dxlink-websocket-client': '@dxfeed/dxlink-websocket-client/src/index.ts',
+    },
+  },
   test: {
     globals: true,
     cache: {

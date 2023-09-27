@@ -1,13 +1,8 @@
 import { DXLinkWebSocketClient } from './dxlink'
 import { DXLinkWebSocketClientImpl, DXLinkWebSocketClientOptions } from './client'
-import {
-  DXLinkFeed,
-  DXLinkFeedImpl,
-  DXLinkFeedOptions,
-  FeedContract,
-  SubscriptionByContract,
-} from './feed'
+import { DXLinkFeed, DXLinkFeedImpl, DXLinkFeedOptions } from './feed'
 import { DXLinkLogLevel } from './logger'
+import { FeedContract } from './feed-messages'
 
 /**
  * The options to use for the {@link DXLink}.
@@ -77,7 +72,7 @@ export class DXLink {
 
   /**
    * Connects to the server.
-   * @see {@link DXLinkWebSocketClient.connect} for more details.
+   * @see {DXLinkWebSocketClient.connect} for more details.
    */
   connect(url: string) {
     this.client.connect(url)
@@ -85,7 +80,7 @@ export class DXLink {
 
   /**
    * Reconnects to the server.
-   * @see {@link DXLinkWebSocketClient.reconnect} for more details.
+   * @see {DXLinkWebSocketClient.reconnect} for more details.
    */
   reconnect() {
     this.client.reconnect()
@@ -93,7 +88,7 @@ export class DXLink {
 
   /**
    * Disconnects from the server.
-   * @see {@link DXLinkWebSocketClient.disconnect} for more details.
+   * @see {DXLinkWebSocketClient.disconnect} for more details.
    */
   disconnect() {
     this.client.disconnect()
@@ -108,11 +103,9 @@ export class DXLink {
 
   /**
    * Creates a new feed for the specified contract.
-   * @see {@link DXLinkFeed} for more details.
+   * @see {DXLinkFeed} for more details.
    */
-  createFeed<Contract extends FeedContract>(
-    contract: Contract
-  ): DXLinkFeed<SubscriptionByContract<Contract>, Contract> {
+  createFeed<Contract extends FeedContract>(contract: Contract): DXLinkFeed<Contract> {
     return new DXLinkFeedImpl(this.client, contract, {
       logLevel: this.options?.logLevel,
       ...this.options?.feed,

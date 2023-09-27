@@ -1,5 +1,9 @@
 import { Message } from './messages'
 
+/**
+ * Connector for the WebSocket connection.
+ * @internal
+ */
 export class WebSocketConnector {
   private socket: WebSocket | undefined = undefined
 

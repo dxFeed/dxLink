@@ -5,9 +5,8 @@ import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
 import { unit } from '@dxfeed/ui-kit/utils'
 import {
   FeedContract,
-  OrderBookSubscription,
-  RegularSubscription,
-  SubscriptionAction,
+  Subscription,
+  IndexedEventSubscription,
   TimeSeriesSubscription,
 } from '@dxfeed/dxlink-websocket-client'
 import { useState } from 'react'
@@ -61,46 +60,36 @@ const OrderSourceWrapper = styled.div`
 `
 export interface FeedSubscriptionProps {
   contract: FeedContract
-  onAction: (
-    action: SubscriptionAction<RegularSubscription | TimeSeriesSubscription | OrderBookSubscription>
-  ) => void
+  onAdd(subscription: Subscription | TimeSeriesSubscription | IndexedEventSubscription): void
+  onRemove(subscription: Subscription | TimeSeriesSubscription | IndexedEventSubscription): void
+  onReset(): void
 }
 
-export function FeedSubscription({ onAction, contract }: FeedSubscriptionProps) {
+export function FeedSubscription({ onAdd, onRemove, onReset, contract }: FeedSubscriptionProps) {
   const [symbol, setSymbol] = useState('')
   const [eventType, setEventType] = useState('Quote')
   const [fromTime, setFromTime] = useState('')
   const [source, setSource] = useState('')
 
   const handleAdd = () => {
-    onAction({
-      add: [
-        {
-          type: eventType,
-          symbol,
-          fromTime: fromTime !== '' ? Number(fromTime) : undefined,
-          source: source !== '' ? source : undefined,
-        },
-      ],
+    onAdd({
+      type: eventType,
+      symbol,
+      fromTime: fromTime !== '' ? Number(fromTime) : undefined,
+      source: source !== '' ? source : undefined,
     })
   }
 
   const handleRemove = () => {
-    onAction({
-      remove: [
-        {
-          type: eventType,
-          symbol,
-          fromTime: fromTime !== '' ? Number(fromTime) : undefined,
-        },
-      ],
+    onRemove({
+      type: eventType,
+      symbol,
+      fromTime: fromTime !== '' ? Number(fromTime) : undefined,
     })
   }
 
   const handleReset = () => {
-    onAction({
-      reset: true,
-    })
+    onReset()
   }
 
   return (

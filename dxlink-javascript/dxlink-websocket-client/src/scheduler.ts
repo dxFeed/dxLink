@@ -1,19 +1,27 @@
-export interface Disoisable {
-  (): void
-}
+/**
+ * Scheduler for scheduling callbacks.
+ * @internal
+ */
+export class Scheduler {
+  private timeoutIds: Record<string, any> = {}
 
-export interface Scheduler {
-  schedule(cb: () => void, delay?: number): Disoisable
-  scheduleInterval(cb: () => void, period: number): Disoisable
-}
+  schedule = (callback: () => void, timeout: number, key: string) => {
+    this.cancel(key)
+    this.timeoutIds[key] = setTimeout(callback, timeout)
 
-export const newDefaultScheduler = (): Scheduler => ({
-  schedule(cb: () => void, delay: number = 0): Disoisable {
-    const timer = setTimeout(cb, delay)
-    return () => clearTimeout(timer)
-  },
-  scheduleInterval(cb: () => void, period: number): Disoisable {
-    const timer = setInterval(cb, period)
-    return () => clearInterval(timer)
-  },
-})
+    return key
+  }
+
+  cancel = (key: string) => {
+    if (this.timeoutIds[key] !== undefined) {
+      clearTimeout(this.timeoutIds[key])
+      delete this.timeoutIds[key]
+    }
+  }
+
+  clear = () => {
+    for (const key of Object.keys(this.timeoutIds)) {
+      this.cancel(key)
+    }
+  }
+}

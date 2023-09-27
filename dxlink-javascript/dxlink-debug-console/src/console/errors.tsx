@@ -1,13 +1,12 @@
 import { IconButton } from '@dxfeed/ui-kit/IconButton'
 import { ControlLabel } from '@dxfeed/ui-kit/ControlLabel'
 import { Menu, MenuItem } from '@dxfeed/ui-kit/Menu'
-import { ErrorData } from '@dxfeed/dxlink-websocket-client'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Observable } from 'rxjs'
+import { DXLinkError } from '@dxfeed/dxlink-websocket-client'
+import { useCallback, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 export interface ErrorProps {
-  errors: ErrorData[]
+  errors: DXLinkError[]
 }
 
 const ErrorButton = styled(IconButton)`
@@ -56,22 +55,4 @@ export function Errors({ errors }: ErrorProps) {
       </Menu>
     </>
   )
-}
-
-export interface ErrorWatcherProps {
-  error: Observable<ErrorData>
-}
-
-export function ErrorsWatcher({ error }: ErrorWatcherProps) {
-  const [errroList, setErrorList] = useState<ErrorData[]>([])
-
-  useEffect(() => {
-    const subscription = error.subscribe((error) => {
-      setErrorList((prev) => [...prev, error])
-    })
-
-    return () => subscription.unsubscribe()
-  }, [error])
-
-  return <Errors errors={errroList} />
 }

@@ -20,6 +20,7 @@ export enum DXLinkLogLevel {
 
 /**
  * A logger that uses the console to log messages.
+ * @internal
  */
 export class Logger implements DXLinkLogger {
   constructor(private readonly prefix: string, private readonly level: DXLinkLogLevel) {}

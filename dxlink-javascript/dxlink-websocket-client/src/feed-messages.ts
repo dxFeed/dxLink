@@ -34,16 +34,20 @@ export interface FeedConfigMessage {
   readonly eventFields?: FeedEventFields
 }
 
-export interface Subscription {
+export type Subscription = {
   readonly type: string
   readonly symbol: string
 }
 
-export interface TimeSeriesSubscription extends Subscription {
+export type TimeSeriesSubscription = {
+  readonly type: string
+  readonly symbol: string
   readonly fromTime: number
 }
 
-export interface IndexedEventSubscription extends Subscription {
+export type IndexedEventSubscription = {
+  readonly type: string
+  readonly symbol: string
   readonly source: string
 }
 

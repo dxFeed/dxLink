@@ -27,7 +27,7 @@ const FieldWrapper = styled.div`
 `
 
 export interface AuthorizationProps {
-  onAuth?: (token: string) => Promise<void>
+  onAuth?: (token: string) => void
 }
 
 export function Authorization({ onAuth }: AuthorizationProps) {
@@ -41,7 +41,7 @@ export function Authorization({ onAuth }: AuthorizationProps) {
     }
 
     setInProgress(true)
-    onAuth(token).finally(() => setInProgress(false))
+    onAuth(token)
   }
 
   useEffect(() => {
