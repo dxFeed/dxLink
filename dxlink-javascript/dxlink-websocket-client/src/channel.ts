@@ -8,7 +8,7 @@ import {
   DXLinkError,
   DXLinkErrorListener,
 } from './dxlink'
-import { DXLinkLogger, Logger } from './logger'
+import { DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
 import { ChannelPayloadMessage, Message } from './messages'
 
 /**

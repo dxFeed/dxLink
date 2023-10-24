@@ -21,7 +21,7 @@ import {
 } from './messages'
 import { WebSocketConnector } from './connector'
 import { DXLinkChannelImpl } from './channel'
-import { DXLinkLogLevel, DXLinkLogger, Logger } from './logger'
+import { DXLinkLogLevel, DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
 import { Scheduler } from './scheduler'
 import { VERSION } from './version'
 

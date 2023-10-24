@@ -28,7 +28,9 @@
     "test": "tsx src/index.test.ts",
     "test:watch": "tsx watch src/index.test.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@dxfeed/dxlink-core": "0.1.0"
+  },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [
     {

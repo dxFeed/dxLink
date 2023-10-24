@@ -22,7 +22,7 @@ import {
   FeedEventData,
   FeedConfigMessage,
 } from './feed-messages'
-import { DXLinkLogLevel, DXLinkLogger, Logger } from './logger'
+import { DXLinkLogLevel, DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
 
 /**
  * Prefered configuration for the feed channel.

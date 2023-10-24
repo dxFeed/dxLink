@@ -1,4 +1,4 @@
-export { DXLinkLogLevel } from './logger'
+export { DXLinkLogLevel } from '@dxfeed/dxlink-core'
 export {
   type DXLinkChannel,
   type DXLinkChannelMessage,

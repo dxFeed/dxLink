@@ -1,10 +1,12 @@
 import { test } from 'uvu'
 import * as assert from 'uvu/assert'
 
-import { DXLINK_CORE } from './'
+import { Logger } from './'
 
 test(`test`, () => {
-  assert.is(DXLINK_CORE, 'DXLINK_CORE')
+  const logger = new Logger(`test`, 0)
+
+  assert.instance(logger, Logger)
   ;`👍` //?
 })
 
