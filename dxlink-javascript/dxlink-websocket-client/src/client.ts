@@ -23,6 +23,7 @@ import { WebSocketConnector } from './connector'
 import { DXLinkChannelImpl } from './channel'
 import { DXLinkLogLevel, DXLinkLogger, Logger } from './logger'
 import { Scheduler } from './scheduler'
+import { VERSION } from './version'
 
 /**
  * Options for {@link DXLinkWebSocketClientImpl}.
@@ -65,7 +66,7 @@ export const DXLINK_WS_PROTOCOL_VERSION = '0.1'
 
 const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
   protocolVersion: DXLINK_WS_PROTOCOL_VERSION,
-  clientVersion: '0.0.0', // TODO: get from package.json
+  clientVersion: VERSION,
 }
 
 /**
@@ -478,7 +479,7 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
     const setupMessage: SetupMessage = {
       type: 'SETUP',
       channel: 0,
-      version: `${this.connectionDetails.protocolVersion}-${this.connectionDetails.clientVersion}`,
+      version: `${this.connectionDetails.protocolVersion}-js/${this.connectionDetails.clientVersion}`,
       keepaliveTimeout: this.config.keepaliveTimeout,
       acceptKeepaliveTimeout: this.config.acceptKeepaliveTimeout,
     }

@@ -1,12 +1,9 @@
 {
-  "name": "@dxfeed/dxlink-websocket-client",
+  "name": "@dxfeed/dxlink-core",
   "version": "0.1.0",
   "private": false,
-  "publishConfig": {
-    "access": "public"
-  },
   "sideEffects": false,
-  "description": "dxFeed WebSocket Client allows to receive market data from dxFeed services",
+  "description": "dxLink core",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",
@@ -24,7 +21,7 @@
   },
   "scripts": {
     "prepublishOnly": "npm run build && npm run test",
-    "build": "microbundle -f esm,cjs --define VERSION=$(node -p \"require('./package.json').version\")",
+    "build": "microbundle -f esm,cjs",
     "test": "tsx src/index.test.ts",
     "test:watch": "tsx watch src/index.test.ts"
   },

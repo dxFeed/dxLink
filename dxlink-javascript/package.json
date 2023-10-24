@@ -13,11 +13,20 @@
   },
   "homepage": "https://github.com/dxFeed/dxLink#readme",
   "workspaces": [
+    "dxlink-core",
     "dxlink-websocket-client",
     "dxlink-debug-console"
   ],
   "scripts": {
     "demo": "npm run start -w dxlink-websocket-client",
     "debug-console": "npm run start -w dxlink-debug-console"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "microbundle": "^0.15.1",
+    "tsx": "^3.14.0",
+    "turbo": "^1.10.16",
+    "typescript": "^5.2.2",
+    "uvu": "^0.5.6"
   }
 }
