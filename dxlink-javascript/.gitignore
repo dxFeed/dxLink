@@ -5,6 +5,9 @@ dist
 build
 tmp
 /out-tsc
+.turbo
+.vercel
+.cache
 
 # dependencies
 node_modules

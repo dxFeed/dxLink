@@ -19,6 +19,8 @@
     "dxlink-docs"
   ],
   "scripts": {
+    "build": "turbo run build",
+    "format": "prettier --write **/*.{js,ts,tsx,md}",
     "demo": "npm run start -w dxlink-websocket-client",
     "debug-console": "npm run start -w dxlink-debug-console"
   },
