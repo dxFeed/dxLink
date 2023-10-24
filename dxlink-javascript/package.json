@@ -15,7 +15,8 @@
   "workspaces": [
     "dxlink-core",
     "dxlink-websocket-client",
-    "dxlink-debug-console"
+    "dxlink-debug-console",
+    "dxlink-docs"
   ],
   "scripts": {
     "demo": "npm run start -w dxlink-websocket-client",

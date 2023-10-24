@@ -1,0 +1,17 @@
+{
+  "name": "@dxfeed/dxlink-docs",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "astro dev",
+    "astro": "astro",
+    "build": "astro check && astro build"
+  },
+  "dependencies": {
+    "@astrojs/react": "^3.0.4",
+    "astro": "^3.3.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
