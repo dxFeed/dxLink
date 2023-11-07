@@ -3,6 +3,7 @@
  * @internal
  */
 export class Scheduler {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private timeoutIds: Record<string, any> = {}
 
   schedule = (callback: () => void, timeout: number, key: string) => {

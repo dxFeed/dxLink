@@ -1,0 +1,12 @@
+{
+  "extends": ["../.eslintrc.json"],
+  "overrides": [
+    {
+      "files": ["*.ts"],
+      "rules": {}
+      // "parserOptions": {
+      //   "project": ["/dxlink-javascript/dxlink-websocket-client/tsconfig.json"]
+      // }
+    }
+  ]
+}

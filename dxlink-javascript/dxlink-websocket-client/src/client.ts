@@ -1,6 +1,6 @@
 import {
   DXLinkAuthState,
-  DXLinkAuthStateChangeListener,
+  type DXLinkAuthStateChangeListener,
   DXLinkErrorListener,
   DXLinkWebSocketClient,
   DXLinkError,
@@ -11,11 +11,11 @@ import {
   DXLinkChannel,
 } from './dxlink'
 import {
-  Message,
-  SetupMessage,
+  type Message,
+  type SetupMessage,
   isConnectionMessage,
-  AuthStateMessage,
-  ErrorMessage,
+  type AuthStateMessage,
+  type ErrorMessage,
   isChannelLifecycleMessage,
   isChannelMessage,
 } from './messages'

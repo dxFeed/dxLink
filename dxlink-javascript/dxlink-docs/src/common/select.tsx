@@ -27,6 +27,23 @@ export function Select({ value, onChange, options, label, className, disabled }:
     handleDropdownClose()
   }
 
+  if (disabled) {
+    return (
+      <Dropdown
+        className={className}
+        selectedValue={value}
+        isOpen={false}
+        head={label}
+        onOpen={() => {}}
+        onClose={() => {}}
+      >
+        <DropdownItem onClick={() => {}} value={value}>
+          <Text>{value}</Text>
+        </DropdownItem>
+      </Dropdown>
+    )
+  }
+
   return (
     <Dropdown
       className={className}

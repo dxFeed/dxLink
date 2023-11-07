@@ -116,7 +116,7 @@ export interface DXLinkChannelMessage {
   /**
    * Payload of the message.
    */
-  readonly [key: string]: any
+  readonly [key: string]: any // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 /**

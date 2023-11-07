@@ -1,7 +1,7 @@
 import { Dropdown } from '@dxfeed/ui-kit/Dropdown'
 import { TextField } from '@dxfeed/ui-kit/TextField'
 import { unit } from '@dxfeed/ui-kit/utils'
-import { FeedEventFields } from '@dxfeed/dxlink-websocket-client'
+import { type FeedEventFields } from '@dxfeed/dxlink-websocket-client'
 import { useCallback, useState } from 'react'
 import styled from 'styled-components'
 import { EVENT_TYPES } from './feed-event-type'

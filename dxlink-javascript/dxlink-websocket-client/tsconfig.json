@@ -17,6 +17,8 @@
     "noUnusedParameters": true,
     "noImplicitAny": true,
     "noUncheckedIndexedAccess": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
     "allowJs": false,
     "declaration": true,
     "resolveJsonModule": true

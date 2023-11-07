@@ -6,12 +6,17 @@
   "scripts": {
     "start": "astro dev",
     "astro": "astro",
-    "build": "astro check && astro build"
+    "build": "astro build",
+    "lint": "eslint src"
   },
   "dependencies": {
+    "@astrojs/check": "^0.2.1",
     "@astrojs/react": "^3.0.4",
+    "@dxfeed/dxlink-websocket-client": "*",
+    "@dxfeed/ui-kit": "2.7.0",
     "astro": "^3.3.4",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "typescript": "^5.2.2"
   }
 }

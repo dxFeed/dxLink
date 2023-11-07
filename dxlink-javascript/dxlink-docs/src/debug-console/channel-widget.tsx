@@ -1,12 +1,11 @@
 import { IconButton } from '@dxfeed/ui-kit/IconButton'
 import { Close } from '@dxfeed/ui-kit/Icons'
 import {
-  DXLinkChannel,
+  type DXLinkChannel,
   DXLinkChannelState,
-  DXLinkError,
-  DXLinkFeed,
+  type DXLinkError,
 } from '@dxfeed/dxlink-websocket-client'
-import { ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { ContentTemplate } from '../common/content-template'
 import { Errors } from './errors'
 
@@ -20,7 +19,7 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
   const [errors, setErrors] = useState<DXLinkError[]>([])
 
   useEffect(() => {
-    const stateListener = (state: DXLinkChannelState) => {
+    const stateListener = (_state: DXLinkChannelState) => {
       setState(channel.getState())
     }
     const errorListener = (error: DXLinkError) => {

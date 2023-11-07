@@ -1,6 +1,6 @@
 import { Tooltip } from '@dxfeed/ui-kit/Tooltip'
 import { Table, TableRow, TableHeadCell, TableCell } from '@dxfeed/ui-kit/Table'
-import { FeedEventData, FeedEventFields } from '@dxfeed/dxlink-websocket-client'
+import { type FeedEventData, type FeedEventFields } from '@dxfeed/dxlink-websocket-client'
 import { ContentTemplate } from '../common/content-template'
 import { unit } from '@dxfeed/ui-kit/utils'
 import styled from 'styled-components'

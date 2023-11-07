@@ -1,6 +1,6 @@
 import { Button } from '@dxfeed/ui-kit/Button'
 import { ContentTemplate } from '../common/content-template'
-import { DXLinkFeed, FeedContract } from '@dxfeed/dxlink-websocket-client'
+import { type DXLinkFeed, FeedContract } from '@dxfeed/dxlink-websocket-client'
 import { useState } from 'react'
 import { FeedChannelManager } from './feed-channel-manager'
 import { Select } from '../common/select'

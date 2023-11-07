@@ -1,14 +1,14 @@
 import styled from 'styled-components'
-import { Connection, ConnectParams } from './connection'
+import { Connection, type ConnectParams } from './connection'
 import { ChannelsManager } from './channels-manager'
 import { useCallback, useEffect, useState } from 'react'
 import {
   DXLinkAuthState,
-  DXLinkConnectionDetails,
+  type DXLinkConnectionDetails,
   DXLinkConnectionState,
-  DXLinkError,
-  DXLinkFeed,
-  DXLinkWebSocketClient,
+  type DXLinkError,
+  type DXLinkFeed,
+  type DXLinkWebSocketClient,
   DXLinkWebSocketClientImpl,
   DXLinkLogLevel,
   FeedContract,
@@ -43,7 +43,7 @@ const DEFAULT_CONNECTION_STATE: ConnectionState = {
   state: DXLinkConnectionState.NOT_CONNECTED,
 }
 
-export function Console() {
+export function DebugConsole() {
   const [errors, setErrors] = useState<DXLinkError[]>([])
   const [client, setClient] = useState<DXLinkWebSocketClient>()
   const [connectionState, setConnectionState] = useState<ConnectionState>(DEFAULT_CONNECTION_STATE)

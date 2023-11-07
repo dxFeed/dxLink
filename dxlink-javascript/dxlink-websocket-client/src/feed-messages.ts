@@ -1,4 +1,4 @@
-import { DXLinkChannelMessage } from './dxlink'
+import { type DXLinkChannelMessage } from './dxlink'
 
 export enum FeedContract {
   'TICKER' = 'TICKER',

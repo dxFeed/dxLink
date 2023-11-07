@@ -5,9 +5,9 @@ import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
 import { unit } from '@dxfeed/ui-kit/utils'
 import {
   FeedContract,
-  Subscription,
-  IndexedEventSubscription,
-  TimeSeriesSubscription,
+  type Subscription,
+  type IndexedEventSubscription,
+  type TimeSeriesSubscription,
 } from '@dxfeed/dxlink-websocket-client'
 import { useState } from 'react'
 import styled from 'styled-components'

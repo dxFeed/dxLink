@@ -4,18 +4,16 @@ import { unit } from '@dxfeed/ui-kit/utils'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { TextField } from '@dxfeed/ui-kit/TextField'
 import {
-  DXLinkFeed,
-  FeedConfig,
+  type DXLinkFeed,
+  type FeedConfig,
   FeedContract,
   FeedDataFormat,
-  FeedEventData,
-  FeedEventFields,
-  TimeSeriesSubscription,
+  type FeedEventData,
+  type FeedEventFields,
 } from '@dxfeed/dxlink-websocket-client'
 import { ContentTemplate } from '../common/content-template'
 import { FeedData } from './feed-data'
 import { FeedSubscription } from './feed-subscriptions'
-import { useObservable } from '../use-observable'
 import { FeedEventFieldsView } from './feed-event-fields'
 import { Select } from '../common/select'
 

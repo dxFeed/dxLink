@@ -20,12 +20,16 @@
   ],
   "scripts": {
     "build": "turbo run build",
+    "lint": "turbo run lint",
     "format": "prettier --write **/*.{js,ts,tsx,md}",
     "demo": "npm run start -w dxlink-websocket-client",
     "debug-console": "npm run start -w dxlink-debug-console"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "@typescript-eslint/eslint-plugin": "^6.9.0",
+    "@typescript-eslint/parser": "^6.9.0",
+    "eslint": "^8.52.0",
     "microbundle": "^0.15.1",
     "tsx": "^3.14.0",
     "turbo": "^1.10.16",

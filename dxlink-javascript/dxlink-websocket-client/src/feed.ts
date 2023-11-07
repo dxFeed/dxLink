@@ -1,28 +1,28 @@
 import {
-  DXLinkChannel,
-  DXLinkChannelMessage,
+  type DXLinkChannel,
+  type DXLinkChannelMessage,
   DXLinkChannelState,
-  DXLinkChannelStateChangeListener,
-  DXLinkError,
-  DXLinkWebSocketClient,
+  type DXLinkChannelStateChangeListener,
+  type DXLinkError,
+  type DXLinkWebSocketClient,
 } from './dxlink'
 import {
-  FeedEventFields,
+  type FeedEventFields,
   FeedContract,
   FeedDataFormat,
-  IndexedEventSubscription,
-  Subscription,
-  TimeSeriesSubscription,
-  FeedSetupMessage,
-  FeedSubscriptionMessage,
+  type IndexedEventSubscription,
+  type Subscription,
+  type TimeSeriesSubscription,
+  type FeedSetupMessage,
+  type FeedSubscriptionMessage,
   isFeedMessage,
   isFeedFullData,
-  FeedDataMessage,
+  type FeedDataMessage,
   isFeedCompactData,
-  FeedEventData,
-  FeedConfigMessage,
+  type FeedEventData,
+  type FeedConfigMessage,
 } from './feed-messages'
-import { DXLinkLogLevel, DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
+import { DXLinkLogLevel, type DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
 
 /**
  * Prefered configuration for the feed channel.
@@ -271,6 +271,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
   /**
    * Timeout identifier for the {@link scheduleProcessPendings} method.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private scheduleTimeoutId: any
 
   private readonly logger: DXLinkLogger
@@ -608,7 +609,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
    * Process pending subscriptions and send them to the channel.
    */
   private processPendings() {
-    let newTouchedEvents = new Set<string>() // New events to be sent to the channel
+    const newTouchedEvents = new Set<string>() // New events to be sent to the channel
     let chunk: FeedSubscriptionChunk = {} // Chunk to be sent to the channel
     let chunkSize = 0 // Approximate size of the chunk in bytes
 
@@ -621,7 +622,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
 
     // Add `remove` subscriptions to the chunk
     for (const [key, subscription] of this.pendingRemove.entries()) {
-      ;(chunk.remove ??= []).push(subscription)
+      (chunk.remove ??= []).push(subscription)
       chunkSize += key.length + ('fromTime' in subscription ? 34 : 21) // Approximate size of the subscription in bytes
 
       // Remove the subscription from the active subscriptions
@@ -638,7 +639,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
 
     // Add `add` subscriptions to the chunk
     for (const [key, subscription] of this.pendingAdd.entries()) {
-      ;(chunk.add ??= []).push(subscription)
+      (chunk.add ??= []).push(subscription)
       chunkSize += key.length + ('fromTime' in subscription ? 34 : 21) // Approximate size of the subscription in bytes
 
       // Add the event type to the new touched events if it is not touched yet
