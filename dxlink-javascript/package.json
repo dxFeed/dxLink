@@ -15,7 +15,6 @@
   "workspaces": [
     "dxlink-core",
     "dxlink-websocket-client",
-    "dxlink-debug-console",
     "dxlink-docs"
   ],
   "scripts": {

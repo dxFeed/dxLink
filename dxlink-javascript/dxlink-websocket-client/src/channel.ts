@@ -1,15 +1,15 @@
-import { DXLinkWebSocketClientOptions } from './client'
+import { type DXLinkWebSocketClientOptions } from './client'
 import {
-  DXLinkChannel,
-  DXLinkChannelMessage,
-  DXLinkChannelMessageListener,
+  type DXLinkChannel,
+  type DXLinkChannelMessage,
+  type DXLinkChannelMessageListener,
   DXLinkChannelState,
-  DXLinkChannelStateChangeListener,
-  DXLinkError,
-  DXLinkErrorListener,
+  type DXLinkChannelStateChangeListener,
+  type DXLinkError,
+  type DXLinkErrorListener,
 } from './dxlink'
-import { DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
-import { ChannelPayloadMessage, Message } from './messages'
+import { type DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
+import { type ChannelPayloadMessage, type Message } from './messages'
 
 /**
  * A DXLink channel implementation.

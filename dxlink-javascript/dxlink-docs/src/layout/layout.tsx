@@ -2,7 +2,7 @@ import { unit } from '@dxfeed/ui-kit/utils'
 import { Text } from '@dxfeed/ui-kit/Text'
 import { Button } from '@dxfeed/ui-kit/Button'
 import styled from 'styled-components'
-import { Console } from '../console'
+import { DebugConsole } from '../debug-console'
 import { Header } from './header'
 // import { Protocol } from '../protocol'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
@@ -40,7 +40,7 @@ const MenuItem = styled.div`
 
 const Version = styled(Text)``
 
-export function App() {
+export function Layout() {
   const location = useLocation()
 
   return (
@@ -74,7 +74,7 @@ export function App() {
       </Header>
       <Content>
         <Routes>
-          <Route path="/" element={<Console />} />
+          <Route path="/" element={<DebugConsole />} />
           <Route path="/protocol" element={<AsyncApiProtocol />} />
           {/* <Route path="/protocol" element={<Protocol />} /> */}
         </Routes>
@@ -82,5 +82,3 @@ export function App() {
     </>
   )
 }
-
-export default App

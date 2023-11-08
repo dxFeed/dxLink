@@ -4,7 +4,7 @@ import * as ReactDOM from 'react-dom/client'
 import { CssBaseline } from '@dxfeed/ui-kit/CssBaseline'
 import { ThemeProvider } from '@dxfeed/ui-kit/theme'
 import { light as LIGHT_THEME } from '@dxfeed/ui-kit/theme/light'
-import App from './app/app'
+import { Layout } from './layout/layout'
 import styled, { createGlobalStyle } from 'styled-components'
 import { HashRouter } from 'react-router-dom'
 
@@ -27,7 +27,7 @@ root.render(
       <HashRouter>
         <Container>
           <GlobalStyles />
-          <App />
+          <Layout />
         </Container>
       </HashRouter>
     </ThemeProvider>

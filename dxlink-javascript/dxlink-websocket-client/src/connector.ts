@@ -1,4 +1,4 @@
-import { Message } from './messages'
+import { type Message } from './messages'
 
 /**
  * Connector for the WebSocket connection.

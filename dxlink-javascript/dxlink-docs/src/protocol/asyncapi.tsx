@@ -1,4 +1,4 @@
-import AsyncApi, { ConfigInterface } from '@asyncapi/react-component/browser'
+import AsyncApi, { type ConfigInterface } from '@asyncapi/react-component/browser'
 import '@asyncapi/react-component/styles/default.css'
 import styled from 'styled-components'
 import { Download as DownloadIcon } from '@dxfeed/ui-kit/Icons'

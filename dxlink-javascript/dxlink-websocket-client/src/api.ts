@@ -1,6 +1,6 @@
-import { DXLinkWebSocketClient } from './dxlink'
-import { DXLinkWebSocketClientImpl, DXLinkWebSocketClientOptions } from './client'
-import { DXLinkFeed, DXLinkFeedImpl, DXLinkFeedOptions } from './feed'
+import { type DXLinkWebSocketClient } from './dxlink'
+import { DXLinkWebSocketClientImpl, type DXLinkWebSocketClientOptions } from './client'
+import { type DXLinkFeed, DXLinkFeedImpl, type DXLinkFeedOptions } from './feed'
 import { DXLinkLogLevel } from '@dxfeed/dxlink-core'
 import { FeedContract } from './feed-messages'
 

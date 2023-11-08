@@ -1,4 +1,4 @@
-import { ErrorType } from './messages'
+import { type ErrorType } from './messages'
 
 /**
  * Error type that can be used to handle errors or send them to the remote endpoint.
