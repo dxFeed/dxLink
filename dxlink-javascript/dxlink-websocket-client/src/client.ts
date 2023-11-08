@@ -1,6 +1,7 @@
 import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
 
 import { DXLinkChannelImpl } from './channel'
+import type { DXLinkWebSocketClientConfig } from './client-config'
 import { WebSocketConnector } from './connector'
 import {
   DXLinkAuthState,
@@ -26,40 +27,6 @@ import {
 import { VERSION } from './version'
 
 /**
- * Options for {@link DXLinkWebSocketClientImpl}.
- */
-export interface DXLinkWebSocketClientOptions {
-  /**
-   * Interval in seconds between keepalive messages which are sent to server.
-   */
-  readonly keepaliveInterval: number
-  /**
-   * Timeout in seconds for server to detect that client is disconnected.
-   * @see {DXLinkConnectionDetails.clientKeepaliveTimeout}
-   */
-  readonly keepaliveTimeout: number
-  /**
-   * Prefered timeout in seconds in for client to detect that server is disconnected.
-   * @see {DXLinkConnectionDetails.serverKeepaliveTimeout}
-   */
-  readonly acceptKeepaliveTimeout: number
-  /**
-   * Timeout for action which requires update from server.
-   */
-  readonly actionTimeout: number
-  /**
-   * Log level for internal logger.
-   */
-  readonly logLevel: DXLinkLogLevel
-  /**
-   * Maximum number of reconnect attempts.
-   * If connection is not established after this number of attempts, connection will be closed.
-   * If 0, then reconnect attempts are not limited.
-   */
-  readonly maxReconnectAttempts: number
-}
-
-/**
  * Protocol version that is used by client.
  */
 export const DXLINK_WS_PROTOCOL_VERSION = '0.1'
@@ -73,7 +40,7 @@ const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
  * Implementation of {@link DXLinkWebSocketClient}.
  */
 export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
-  private readonly config: DXLinkWebSocketClientOptions
+  private readonly config: DXLinkWebSocketClientConfig
 
   private readonly logger: DXLinkLogger
 
@@ -115,7 +82,7 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
   private globalChannelId = 1
   private readonly channels = new Map<number, DXLinkChannelImpl>()
 
-  constructor(config?: Partial<DXLinkWebSocketClientOptions>) {
+  constructor(config?: Partial<DXLinkWebSocketClientConfig>) {
     this.config = {
       keepaliveInterval: 30,
       keepaliveTimeout: 60,

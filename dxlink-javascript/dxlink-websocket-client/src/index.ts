@@ -15,8 +15,5 @@ export {
   type DXLinkAuthStateChangeListener,
   type DXLinkConnectionDetails,
 } from './dxlink'
-export {
-  type DXLinkWebSocketClientOptions,
-  DXLinkWebSocketClientImpl,
-  DXLINK_WS_PROTOCOL_VERSION,
-} from './client'
+export { DXLinkWebSocketClientImpl, DXLINK_WS_PROTOCOL_VERSION } from './client'
+export { type DXLinkWebSocketClientConfig } from './client-config'

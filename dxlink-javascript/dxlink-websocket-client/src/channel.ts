@@ -1,6 +1,6 @@
 import { type DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
 
-import { type DXLinkWebSocketClientOptions } from './client'
+import { type DXLinkWebSocketClientConfig } from './client-config'
 import {
   type DXLinkChannel,
   type DXLinkChannelMessage,
@@ -31,9 +31,9 @@ export class DXLinkChannelImpl implements DXLinkChannel {
     public readonly service: string,
     public readonly parameters: Record<string, unknown>,
     private readonly sendMessage: (message: Message) => void,
-    options: DXLinkWebSocketClientOptions
+    config: DXLinkWebSocketClientConfig
   ) {
-    this.logger = new Logger(`${DXLinkChannelImpl.name}#${id} ${service}`, options.logLevel)
+    this.logger = new Logger(`${DXLinkChannelImpl.name}#${id} ${service}`, config.logLevel)
   }
 
   send = ({ type, ...payload }: DXLinkChannelMessage) => {
