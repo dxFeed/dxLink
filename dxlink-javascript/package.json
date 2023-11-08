@@ -13,8 +13,10 @@
   },
   "homepage": "https://github.com/dxFeed/dxLink#readme",
   "workspaces": [
+    "dxlink-api",
     "dxlink-core",
     "dxlink-websocket-client",
+    "dxlink-feed",
     "dxlink-docs"
   ],
   "scripts": {

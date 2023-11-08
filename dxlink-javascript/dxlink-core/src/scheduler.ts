@@ -1,6 +1,5 @@
 /**
  * Scheduler for scheduling callbacks.
- * @internal
  */
 export class Scheduler {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,5 +23,9 @@ export class Scheduler {
     for (const key of Object.keys(this.timeoutIds)) {
       this.cancel(key)
     }
+  }
+
+  has = (key: string) => {
+    return this.timeoutIds[key] !== undefined
   }
 }

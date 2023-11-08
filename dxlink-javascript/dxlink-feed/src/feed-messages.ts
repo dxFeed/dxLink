@@ -1,4 +1,4 @@
-import { type DXLinkChannelMessage } from './dxlink'
+import { type DXLinkChannelMessage } from '@dxfeed/dxlink-websocket-client'
 
 export enum FeedContract {
   'TICKER' = 'TICKER',

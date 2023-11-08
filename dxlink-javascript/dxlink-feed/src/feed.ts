@@ -5,7 +5,7 @@ import {
   type DXLinkChannelStateChangeListener,
   type DXLinkError,
   type DXLinkWebSocketClient,
-} from './dxlink'
+} from '@dxfeed/dxlink-websocket-client'
 import {
   type FeedEventFields,
   FeedContract,
@@ -22,7 +22,7 @@ import {
   type FeedEventData,
   type FeedConfigMessage,
 } from './feed-messages'
-import { DXLinkLogLevel, type DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
+import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
 
 /**
  * Prefered configuration for the feed channel.
@@ -269,10 +269,9 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
   private readonly touchedEvents = new Set<string>()
 
   /**
-   * Timeout identifier for the {@link scheduleProcessPendings} method.
+   * Scheduler for scheduling subscriptions sending to the channel.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private scheduleTimeoutId: any
+  private subScheduler: Scheduler = new Scheduler()
 
   private readonly logger: DXLinkLogger
 
@@ -329,10 +328,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
     this.subscriptions.clear()
     this.touchedEvents.clear()
 
-    if (this.scheduleTimeoutId !== undefined) {
-      clearTimeout(this.scheduleTimeoutId)
-      this.scheduleTimeoutId = undefined
-    }
+    this.subScheduler.clear()
 
     this.channel.close()
   }
@@ -530,10 +526,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
       }
       case DXLinkChannelState.REQUESTED: {
         // Clear the timeout if it is set to avoid sending the subscriptions while the channel is not ready
-        if (this.scheduleTimeoutId !== undefined) {
-          clearTimeout(this.scheduleTimeoutId)
-          this.scheduleTimeoutId = undefined
-        }
+        this.subScheduler.clear()
         return
       }
       case DXLinkChannelState.CLOSED:
@@ -594,15 +587,15 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
    * Schedule sending pending subscriptions to the channel to batch them together to reduce the number of messages.
    */
   private scheduleProcessPendings() {
-    if (this.scheduleTimeoutId !== undefined) {
+    if (this.subScheduler.has('processPendings')) {
       return
     }
 
-    this.scheduleTimeoutId = setTimeout(() => {
-      this.scheduleTimeoutId = undefined
-
-      this.processPendings()
-    }, this.options.batchSubscriptionsTime)
+    this.subScheduler.schedule(
+      this.processPendings,
+      this.options.batchSubscriptionsTime,
+      'processPendings'
+    )
   }
 
   /**
@@ -622,7 +615,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
 
     // Add `remove` subscriptions to the chunk
     for (const [key, subscription] of this.pendingRemove.entries()) {
-      (chunk.remove ??= []).push(subscription)
+      ;(chunk.remove ??= []).push(subscription)
       chunkSize += key.length + ('fromTime' in subscription ? 34 : 21) // Approximate size of the subscription in bytes
 
       // Remove the subscription from the active subscriptions
@@ -639,7 +632,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
 
     // Add `add` subscriptions to the chunk
     for (const [key, subscription] of this.pendingAdd.entries()) {
-      (chunk.add ??= []).push(subscription)
+      ;(chunk.add ??= []).push(subscription)
       chunkSize += key.length + ('fromTime' in subscription ? 34 : 21) // Approximate size of the subscription in bytes
 
       // Add the event type to the new touched events if it is not touched yet

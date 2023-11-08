@@ -1,0 +1,54 @@
+{
+  "name": "@dxfeed/dxlink-api",
+  "version": "0.1.0",
+  "private": false,
+  "sideEffects": false,
+  "description": "dxLink API",
+  "source": "src/index.ts",
+  "exports": {
+    "types": "./build/index.d.ts",
+    "require": "./build/index.js",
+    "default": "./build/index.module.js"
+  },
+  "main": "build/index.js",
+  "module": "build/index.module.js",
+  "types": "build/index.d.ts",
+  "browserslist": [
+    "last 1 year"
+  ],
+  "minify": {
+    "mangle": false
+  },
+  "scripts": {
+    "prepublishOnly": "npm run build && npm run test",
+    "build": "microbundle -f esm,cjs",
+    "test": "tsx src/index.test.ts",
+    "test:watch": "tsx watch src/index.test.ts"
+  },
+  "dependencies": {
+    "@dxfeed/dxlink-core": "0.1.0",
+    "@dxfeed/dxlink-websocket-client": "0.1.0",
+    "@dxfeed/dxlink-feed": "0.1.0"
+  },
+  "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
+  "maintainers": [
+    {
+      "name": "Fyzu",
+      "url": "https://github.com/fyzu"
+    }
+  ],
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/dxfeed/dxlink.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dxfeed/dxlink/issues"
+  },
+  "homepage": "https://dxfeed.com/",
+  "keywords": [],
+  "files": [
+    "/build",
+    "/package.json"
+  ]
+}
