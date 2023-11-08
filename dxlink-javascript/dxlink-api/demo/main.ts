@@ -1,21 +1,22 @@
 import {
-  DXLink,
   FeedContract,
   FeedDataFormat,
   DXLinkWebSocketClientImpl,
   DXLinkFeedImpl,
-  Subscription,
-  TimeSeriesSubscription,
+  type Subscription,
+  type TimeSeriesSubscription,
 } from '../src'
 
 async function start() {
   console.log('Start')
 
-  const dxlink = DXLink.getInstance()
+  const client = new DXLinkWebSocketClientImpl({
+    logLevel: 0,
+  })
 
-  dxlink.connect('wss://demo.dxfeed.com/dxlink-ws')
+  client.connect('wss://demo.dxfeed.com/dxlink-ws')
 
-  const feed = dxlink.createFeed(FeedContract.TICKER)
+  const feed = new DXLinkFeedImpl(client, FeedContract.TICKER)
 
   feed.addEventListener((events) => {
     console.log('Events', events)

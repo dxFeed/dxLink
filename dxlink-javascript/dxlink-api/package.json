@@ -20,6 +20,7 @@
     "mangle": false
   },
   "scripts": {
+    "start": "vite ./demo",
     "prepublishOnly": "npm run build && npm run test",
     "build": "microbundle -f esm,cjs",
     "lint": "eslint src",

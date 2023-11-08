@@ -602,7 +602,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
   /**
    * Process pending subscriptions and send them to the channel.
    */
-  private processPendings() {
+  private processPendings = () => {
     const newTouchedEvents = new Set<string>() // New events to be sent to the channel
     let chunk: FeedSubscriptionChunk = {} // Chunk to be sent to the channel
     let chunkSize = 0 // Approximate size of the chunk in bytes
