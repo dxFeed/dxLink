@@ -7,14 +7,14 @@ export {
   type IndexedEventSubscription,
   type FeedEventData,
   type FeedEventValue,
-} from './feed-messages'
+} from './messages'
 export {
-  type DXLinkFeed,
   type DXLinkFeedOptions,
   type FeedAcceptConfig,
   type FeedConfig,
   type DXLinkFeedConfigChangeListner,
   type DXLinkFeedEventListner,
   type SubscriptionByContract,
-  DXLinkFeedImpl,
+  type DXLinkFeedRequester,
+  DXLinkFeed,
 } from './feed'

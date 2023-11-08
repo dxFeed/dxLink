@@ -3,11 +3,9 @@ import {
   type DXLinkConnectionDetails,
   DXLinkConnectionState,
   type DXLinkError,
-  type DXLinkFeed,
-  DXLinkFeedImpl,
+  DXLinkFeed,
   DXLinkLogLevel,
-  type DXLinkWebSocketClient,
-  DXLinkWebSocketClientImpl,
+  DXLinkWebSocketClient,
   FeedContract,
 } from '@dxfeed/dxlink-api'
 import { Text } from '@dxfeed/ui-kit/Text'
@@ -67,7 +65,7 @@ export function DebugConsole() {
     setErrors([])
 
     try {
-      const client = new DXLinkWebSocketClientImpl({
+      const client = new DXLinkWebSocketClient({
         logLevel: DXLinkLogLevel.DEBUG,
         keepaliveTimeout: con.keepaliveTimeout,
         acceptKeepaliveTimeout: con.acceptKeepaliveTimeout,
@@ -145,7 +143,7 @@ export function DebugConsole() {
         throw new Error('Client must be connected')
       }
 
-      const feed = new DXLinkFeedImpl(client, contract, {
+      const feed = new DXLinkFeed(client, contract, {
         logLevel: DXLinkLogLevel.DEBUG,
       })
 

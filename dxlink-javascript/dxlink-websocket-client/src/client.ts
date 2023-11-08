@@ -1,20 +1,23 @@
-import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
-
-import { DXLinkChannelImpl } from './channel'
-import type { DXLinkWebSocketClientConfig } from './client-config'
-import { WebSocketConnector } from './connector'
 import {
-  DXLinkAuthState,
-  type DXLinkAuthStateChangeListener,
-  type DXLinkChannel,
-  DXLinkChannelState,
+  DXLinkLogLevel,
+  type DXLinkLogger,
+  Logger,
+  Scheduler,
   type DXLinkConnectionDetails,
   DXLinkConnectionState,
   type DXLinkConnectionStateChangeListener,
-  type DXLinkError,
   type DXLinkErrorListener,
-  type DXLinkWebSocketClient,
-} from './dxlink'
+  DXLinkAuthState,
+  DXLinkChannelState,
+  type DXLinkAuthStateChangeListener,
+  type DXLinkChannel,
+  type DXLinkError,
+  type DXLinkClient,
+} from '@dxfeed/dxlink-core'
+
+import { DXLinkWebSocketChannel } from './channel'
+import type { DXLinkWebSocketClientConfig } from './config'
+import { WebSocketConnector } from './connector'
 import {
   type AuthStateMessage,
   type ErrorMessage,
@@ -31,15 +34,17 @@ import { VERSION } from './version'
  */
 export const DXLINK_WS_PROTOCOL_VERSION = '0.1'
 
+const CLIENT_VERSION = `js/${VERSION}`
+
 const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
   protocolVersion: DXLINK_WS_PROTOCOL_VERSION,
-  clientVersion: VERSION,
+  clientVersion: CLIENT_VERSION,
 }
 
 /**
- * Implementation of {@link DXLinkWebSocketClient}.
+ * dxLink WebSocket client that can be used to connect to the remote dxLink WebSocket endpoint and open channels to services.
  */
-export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
+export class DXLinkWebSocketClient implements DXLinkClient {
   private readonly config: DXLinkWebSocketClientConfig
 
   private readonly logger: DXLinkLogger
@@ -80,8 +85,12 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
 
   // Channels
   private globalChannelId = 1
-  private readonly channels = new Map<number, DXLinkChannelImpl>()
+  private readonly channels = new Map<number, DXLinkWebSocketChannel>()
 
+  /**
+   * Create new instance of {@link DXLinkWebSocketClient}.
+   * @param config Configuration of the client.
+   */
   constructor(config?: Partial<DXLinkWebSocketClientConfig>) {
     this.config = {
       keepaliveInterval: 30,
@@ -228,7 +237,7 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
     const channelId = this.globalChannelId
     this.globalChannelId += 2
 
-    const channel = new DXLinkChannelImpl(
+    const channel = new DXLinkWebSocketChannel(
       channelId,
       service,
       parameters,
@@ -446,7 +455,7 @@ export class DXLinkWebSocketClientImpl implements DXLinkWebSocketClient {
     const setupMessage: SetupMessage = {
       type: 'SETUP',
       channel: 0,
-      version: `${this.connectionDetails.protocolVersion}-js/${this.connectionDetails.clientVersion}`,
+      version: `${this.connectionDetails.protocolVersion}-${this.connectionDetails.clientVersion}`,
       keepaliveTimeout: this.config.keepaliveTimeout,
       acceptKeepaliveTimeout: this.config.acceptKeepaliveTimeout,
     }

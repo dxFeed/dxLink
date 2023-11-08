@@ -1,22 +1,23 @@
-import { type DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
-
-import { type DXLinkWebSocketClientConfig } from './client-config'
 import {
+  type DXLinkLogger,
+  Logger,
   type DXLinkChannel,
-  type DXLinkChannelMessage,
-  type DXLinkChannelMessageListener,
   DXLinkChannelState,
+  type DXLinkChannelMessageListener,
   type DXLinkChannelStateChangeListener,
-  type DXLinkError,
   type DXLinkErrorListener,
-} from './dxlink'
+  type DXLinkChannelMessage,
+  type DXLinkError,
+} from '@dxfeed/dxlink-core'
+
+import { type DXLinkWebSocketClientConfig } from './config'
 import { type ChannelPayloadMessage, type Message } from './messages'
 
 /**
  * A DXLink channel implementation.
  * @internal
  */
-export class DXLinkChannelImpl implements DXLinkChannel {
+export class DXLinkWebSocketChannel implements DXLinkChannel {
   private status = DXLinkChannelState.REQUESTED
 
   // Listeners
@@ -33,7 +34,7 @@ export class DXLinkChannelImpl implements DXLinkChannel {
     private readonly sendMessage: (message: Message) => void,
     config: DXLinkWebSocketClientConfig
   ) {
-    this.logger = new Logger(`${DXLinkChannelImpl.name}#${id} ${service}`, config.logLevel)
+    this.logger = new Logger(`${DXLinkWebSocketChannel.name}#${id} ${service}`, config.logLevel)
   }
 
   send = ({ type, ...payload }: DXLinkChannelMessage) => {

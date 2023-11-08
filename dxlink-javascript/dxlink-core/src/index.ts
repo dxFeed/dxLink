@@ -1,2 +1,6 @@
+export * from './auth'
+export * from './client'
+export * from './channel'
+export * from './error'
 export * from './logger'
 export * from './scheduler'

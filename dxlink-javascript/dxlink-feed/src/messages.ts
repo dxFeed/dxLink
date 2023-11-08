@@ -1,10 +1,10 @@
-import { type DXLinkChannelMessage } from '@dxfeed/dxlink-websocket-client'
+import { type DXLinkChannelMessage } from '@dxfeed/dxlink-core'
 
 export enum FeedContract {
+  'AUTO' = 'AUTO',
   'TICKER' = 'TICKER',
   'HISTORY' = 'HISTORY',
   'STREAM' = 'STREAM',
-  'AUTO' = 'AUTO',
 }
 
 export enum FeedDataFormat {

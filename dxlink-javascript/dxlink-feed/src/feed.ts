@@ -1,12 +1,15 @@
-import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
 import {
   type DXLinkChannel,
   type DXLinkChannelMessage,
   DXLinkChannelState,
   type DXLinkChannelStateChangeListener,
   type DXLinkError,
-  type DXLinkWebSocketClient,
-} from '@dxfeed/dxlink-websocket-client'
+  type DXLinkClient,
+  DXLinkLogLevel,
+  type DXLinkLogger,
+  Logger,
+  Scheduler,
+} from '@dxfeed/dxlink-core'
 
 import {
   type FeedEventFields,
@@ -23,7 +26,7 @@ import {
   isFeedCompactData,
   type FeedEventData,
   type FeedConfigMessage,
-} from './feed-messages'
+} from './messages'
 
 /**
  * Prefered configuration for the feed channel.
@@ -122,7 +125,7 @@ interface FeedSubscriptionChunk {
 /**
  * dxLink FEED service instance for the specified {@link FeedContract}.
  */
-export interface DXLinkFeed<Contract extends FeedContract = FeedContract.AUTO> {
+export interface DXLinkFeedRequester<Contract extends FeedContract = FeedContract.AUTO> {
   /**
    * Unique identifier of the feed channel.
    */
@@ -200,7 +203,7 @@ export interface DXLinkFeed<Contract extends FeedContract = FeedContract.AUTO> {
 }
 
 /**
- * Options for the {@link DXLinkFeedImpl} instance.
+ * Options for the {@link DXLinkFeed} instance.
  */
 export interface DXLinkFeedOptions {
   /**
@@ -217,8 +220,19 @@ export interface DXLinkFeedOptions {
   logLevel: DXLinkLogLevel
 }
 
-export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed<Contract> {
+const FEED_SERVICE_NAME = 'FEED'
+
+export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequester<Contract> {
+  /**
+   * Unique identifier of the feed channel.
+   */
   public readonly id: number
+
+  /**
+   * Contract of the feed channel.
+   * @see {FeedContract}
+   */
+  public contract: Contract
 
   private readonly options: DXLinkFeedOptions
 
@@ -279,11 +293,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
   /**
    * Allows to create {@link DXLinkFeed} instance with the specified {@link FeedContract} for the given {@link DXLinkWebSocketClient}.
    */
-  constructor(
-    client: DXLinkWebSocketClient,
-    public readonly contract: Contract,
-    options: Partial<DXLinkFeedOptions> = {}
-  ) {
+  constructor(client: DXLinkClient, contract: Contract, options: Partial<DXLinkFeedOptions> = {}) {
     this.options = {
       logLevel: DXLinkLogLevel.WARN,
       batchSubscriptionsTime: 100,
@@ -291,8 +301,9 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
       ...options,
     }
 
-    this.channel = client.openChannel('FEED', { contract })
+    this.channel = client.openChannel(FEED_SERVICE_NAME, { contract })
     this.id = this.channel.id
+    this.contract = contract
     this.channel.addMessageListener(this.processMessage)
     this.channel.addStateChangeListener(this.processStatus)
     this.channel.addErrorListener(this.processError)
@@ -300,7 +311,7 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
     this.addSubscriptions = this.addSubscriptions.bind(this)
     this.removeSubscriptions = this.removeSubscriptions.bind(this)
 
-    this.logger = new Logger(`${DXLinkFeedImpl.name}#${this.id}`, this.options.logLevel)
+    this.logger = new Logger(`${DXLinkFeed.name}#${this.id}`, this.options.logLevel)
   }
 
   getChannel = () => this.channel
@@ -312,10 +323,12 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
     this.channel.removeStateChangeListener(listener)
 
   getConfig = () => this.config
-  addConfigChangeListener = (listener: DXLinkFeedConfigChangeListner) =>
+  addConfigChangeListener = (listener: DXLinkFeedConfigChangeListner) => {
     this.configListeners.add(listener)
-  removeConfigChangeListener = (listener: DXLinkFeedConfigChangeListner) =>
+  }
+  removeConfigChangeListener = (listener: DXLinkFeedConfigChangeListner) => {
     this.configListeners.delete(listener)
+  }
 
   close = () => {
     this.acceptConfig = {}
@@ -381,8 +394,12 @@ export class DXLinkFeedImpl<Contract extends FeedContract> implements DXLinkFeed
     this.scheduleProcessPendings()
   }
 
-  addEventListener = (listener: DXLinkFeedEventListner) => this.eventListeners.add(listener)
-  removeEventListener = (listener: DXLinkFeedEventListner) => this.eventListeners.delete(listener)
+  addEventListener = (listener: DXLinkFeedEventListner) => {
+    this.eventListeners.add(listener)
+  }
+  removeEventListener = (listener: DXLinkFeedEventListner) => {
+    this.eventListeners.delete(listener)
+  }
 
   /**
    * Clean the subscription from the fields which are not allowed for the specified contract.
