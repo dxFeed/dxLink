@@ -23,9 +23,7 @@
     "start": "vite ./demo",
     "prepublishOnly": "npm run build && npm run test",
     "build": "microbundle -f esm,cjs",
-    "lint": "eslint src",
-    "test": "tsx src/index.test.ts",
-    "test:watch": "tsx watch src/index.test.ts"
+    "lint": "eslint src"
   },
   "dependencies": {
     "@dxfeed/dxlink-core": "0.1.0",
