@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   FeedContract,
   FeedDataFormat,
@@ -78,7 +79,7 @@ async function start2() {
         type: 'Candle',
         symbol: `${Array.from({ length: 10 }).join('A')}{=${index}d}`,
         fromTime: Date.now(),
-      } as const)
+      }) as const
   )
 
   feed.addSubscriptions(subs)

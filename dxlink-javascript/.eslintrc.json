@@ -1,5 +1,6 @@
 {
   "root": true,
+  "ignorePatterns": ["**/build/*"],
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint", "prettier", "import"],
   "extends": [
@@ -20,14 +21,7 @@
     "import/order": [
       "error",
       {
-        "groups": [
-          "builtin",
-          "external",
-          "internal",
-          ["sibling", "parent"],
-          "index",
-          "unknown"
-        ],
+        "groups": ["builtin", "external", "internal", ["sibling", "parent"], "index", "unknown"],
         "newlines-between": "always",
         "alphabetize": {
           "order": "asc",
