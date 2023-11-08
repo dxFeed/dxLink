@@ -1,23 +1,22 @@
-import { Fragment, createElement, ReactNode, useState, useEffect } from 'react'
-import { Options } from 'rehype-react'
-import rehypeReact from 'rehype-react'
-import {
-  Link,
-  Paragraph,
-  Table,
-  TableRow,
-  TableCell,
-  TableHeadCell,
-  Div,
-  Pre,
-} from './body-components'
-
-import PROTOCOL_MD from './protocol.md?raw'
-import { unified } from 'unified'
+import { Fragment, ReactNode, createElement, useEffect, useState } from 'react'
+import rehypeReact, { Options } from 'rehype-react'
+import rehypeSlug from 'rehype-slug'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
+import { unified } from 'unified'
+
+import {
+  Div,
+  Link,
+  Paragraph,
+  Pre,
+  Table,
+  TableCell,
+  TableHeadCell,
+  TableRow,
+} from './body-components'
+import PROTOCOL_MD from './protocol.md?raw'
 import { ContentTemplate } from '../common/content-template'
-import rehypeSlug from 'rehype-slug'
 
 const REHYPE_REACT_OPTIONS: Options = {
   createElement,

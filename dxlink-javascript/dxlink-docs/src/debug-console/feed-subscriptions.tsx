@@ -1,20 +1,21 @@
-import { Button } from '@dxfeed/ui-kit/Button'
-import { Checkbox } from '@dxfeed/ui-kit/Checkbox'
-import { TextField } from '@dxfeed/ui-kit/TextField'
-import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
-import { unit } from '@dxfeed/ui-kit/utils'
 import {
   FeedContract,
-  type Subscription,
   type IndexedEventSubscription,
+  type Subscription,
   type TimeSeriesSubscription,
-} from '@dxfeed/dxlink-websocket-client'
+} from '@dxfeed/dxlink-api'
+import { Button } from '@dxfeed/ui-kit/Button'
+import { Checkbox } from '@dxfeed/ui-kit/Checkbox'
+import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
+import { TextField } from '@dxfeed/ui-kit/TextField'
+import { unit } from '@dxfeed/ui-kit/utils'
 import { useState } from 'react'
 import styled from 'styled-components'
-import { ContentTemplate } from '../common/content-template'
-import { Select } from '../common/select'
+
 import { EVENT_TYPES } from './feed-event-type'
 import { FEED_ORDER_SOURCE } from './feed-order-source'
+import { ContentTemplate } from '../common/content-template'
+import { Select } from '../common/select'
 
 const FieldsGroup = styled.div`
   display: flex;

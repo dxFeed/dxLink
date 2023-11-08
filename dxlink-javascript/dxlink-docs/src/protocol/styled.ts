@@ -1,7 +1,7 @@
-import styled from 'styled-components'
-import { unit } from '@dxfeed/ui-kit/utils'
-import { Text } from '@dxfeed/ui-kit/Text'
 import { Table, TableCell, TableHeadCell, TableRow } from '@dxfeed/ui-kit/Table'
+import { Text } from '@dxfeed/ui-kit/Text'
+import { unit } from '@dxfeed/ui-kit/utils'
+import styled from 'styled-components'
 
 export const NewsImg = styled.img`
   &[referrerpolicy] {

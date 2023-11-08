@@ -1,10 +1,11 @@
+import { type FeedEventData, type FeedEventFields } from '@dxfeed/dxlink-api'
+import { Table, TableCell, TableHeadCell, TableRow } from '@dxfeed/ui-kit/Table'
 import { Tooltip } from '@dxfeed/ui-kit/Tooltip'
-import { Table, TableRow, TableHeadCell, TableCell } from '@dxfeed/ui-kit/Table'
-import { type FeedEventData, type FeedEventFields } from '@dxfeed/dxlink-websocket-client'
-import { ContentTemplate } from '../common/content-template'
 import { unit } from '@dxfeed/ui-kit/utils'
-import styled from 'styled-components'
 import { useMemo } from 'react'
+import styled from 'styled-components'
+
+import { ContentTemplate } from '../common/content-template'
 
 const EventGroup = styled.div`
   padding: ${unit(1)} 0;

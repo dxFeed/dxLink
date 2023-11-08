@@ -1,7 +1,7 @@
-import { IconButton } from '@dxfeed/ui-kit/IconButton'
+import { type DXLinkError } from '@dxfeed/dxlink-api'
 import { ControlLabel } from '@dxfeed/ui-kit/ControlLabel'
+import { IconButton } from '@dxfeed/ui-kit/IconButton'
 import { Menu, MenuItem } from '@dxfeed/ui-kit/Menu'
-import { type DXLinkError } from '@dxfeed/dxlink-websocket-client'
 import { useCallback, useRef, useState } from 'react'
 import styled from 'styled-components'
 

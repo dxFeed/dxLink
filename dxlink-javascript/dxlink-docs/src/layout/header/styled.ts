@@ -1,8 +1,8 @@
+import { unit } from '@dxfeed/ui-kit/utils'
+import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 
-import { unit } from '@dxfeed/ui-kit/utils'
 import { DxFeedLogo } from './dx-feed-logo'
-import { Link } from 'react-router-dom'
 
 export const Wrapper = styled.div`
   display: flex;

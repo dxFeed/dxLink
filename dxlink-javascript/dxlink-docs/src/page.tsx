@@ -1,8 +1,9 @@
-import { DebugConsole } from './debug-console'
 import { CssBaseline } from '@dxfeed/ui-kit/CssBaseline'
 import { ThemeProvider } from '@dxfeed/ui-kit/theme'
 import { light as LIGHT_THEME } from '@dxfeed/ui-kit/theme/light'
 import styled, { createGlobalStyle } from 'styled-components'
+
+import { DebugConsole } from './debug-console'
 
 const Container = styled(CssBaseline)`
   min-height: 100%;

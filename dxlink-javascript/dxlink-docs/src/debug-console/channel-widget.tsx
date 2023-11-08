@@ -1,13 +1,10 @@
+import { type DXLinkChannel, DXLinkChannelState, type DXLinkError } from '@dxfeed/dxlink-api'
 import { IconButton } from '@dxfeed/ui-kit/IconButton'
 import { Close } from '@dxfeed/ui-kit/Icons'
-import {
-  type DXLinkChannel,
-  DXLinkChannelState,
-  type DXLinkError,
-} from '@dxfeed/dxlink-websocket-client'
 import { type ReactNode, useEffect, useState } from 'react'
-import { ContentTemplate } from '../common/content-template'
+
 import { Errors } from './errors'
+import { ContentTemplate } from '../common/content-template'
 
 interface ChannelWidgetProps {
   channel: DXLinkChannel

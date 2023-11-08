@@ -1,9 +1,10 @@
 import { Button } from '@dxfeed/ui-kit/Button'
 import { TextField } from '@dxfeed/ui-kit/TextField'
-import { ContentTemplate } from '../common/content-template'
+import { unit } from '@dxfeed/ui-kit/utils'
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { unit } from '@dxfeed/ui-kit/utils'
+
+import { ContentTemplate } from '../common/content-template'
 
 const ActionsGroup = styled.div`
   display: flex;

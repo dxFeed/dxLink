@@ -1,3 +1,5 @@
+import { type DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
+
 import { type DXLinkWebSocketClientOptions } from './client'
 import {
   type DXLinkChannel,
@@ -8,7 +10,6 @@ import {
   type DXLinkError,
   type DXLinkErrorListener,
 } from './dxlink'
-import { type DXLinkLogger, Logger } from '@dxfeed/dxlink-core'
 import { type ChannelPayloadMessage, type Message } from './messages'
 
 /**

@@ -1,12 +1,13 @@
+import { type DXLinkFeed, FeedContract } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
-import { ContentTemplate } from '../common/content-template'
-import { type DXLinkFeed, FeedContract } from '@dxfeed/dxlink-websocket-client'
-import { useState } from 'react'
-import { FeedChannelManager } from './feed-channel-manager'
-import { Select } from '../common/select'
-import styled from 'styled-components'
 import { unit } from '@dxfeed/ui-kit/utils'
+import { useState } from 'react'
+import styled from 'styled-components'
+
 import { ChannelWidget } from './channel-widget'
+import { FeedChannelManager } from './feed-channel-manager'
+import { ContentTemplate } from '../common/content-template'
+import { Select } from '../common/select'
 
 const Actions = styled.div`
   display: flex;

@@ -1,27 +1,28 @@
+import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
+
+import { DXLinkChannelImpl } from './channel'
+import { WebSocketConnector } from './connector'
 import {
   DXLinkAuthState,
   type DXLinkAuthStateChangeListener,
+  type DXLinkChannel,
+  DXLinkChannelState,
+  type DXLinkConnectionDetails,
+  DXLinkConnectionState,
+  type DXLinkConnectionStateChangeListener,
+  type DXLinkError,
   type DXLinkErrorListener,
   type DXLinkWebSocketClient,
-  type DXLinkError,
-  type DXLinkConnectionDetails,
-  type DXLinkConnectionStateChangeListener,
-  DXLinkConnectionState,
-  DXLinkChannelState,
-  type DXLinkChannel,
 } from './dxlink'
 import {
-  type Message,
-  type SetupMessage,
-  isConnectionMessage,
   type AuthStateMessage,
   type ErrorMessage,
+  type Message,
+  type SetupMessage,
   isChannelLifecycleMessage,
   isChannelMessage,
+  isConnectionMessage,
 } from './messages'
-import { WebSocketConnector } from './connector'
-import { DXLinkChannelImpl } from './channel'
-import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
 import { VERSION } from './version'
 
 /**

@@ -1,3 +1,4 @@
+import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
 import {
   type DXLinkChannel,
   type DXLinkChannelMessage,
@@ -6,6 +7,7 @@ import {
   type DXLinkError,
   type DXLinkWebSocketClient,
 } from '@dxfeed/dxlink-websocket-client'
+
 import {
   type FeedEventFields,
   FeedContract,
@@ -22,7 +24,6 @@ import {
   type FeedEventData,
   type FeedConfigMessage,
 } from './feed-messages'
-import { DXLinkLogLevel, type DXLinkLogger, Logger, Scheduler } from '@dxfeed/dxlink-core'
 
 /**
  * Prefered configuration for the feed channel.

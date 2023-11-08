@@ -1,8 +1,3 @@
-import { useEffect, useRef, useState } from 'react'
-import styled from 'styled-components'
-import { unit } from '@dxfeed/ui-kit/utils'
-import { Button } from '@dxfeed/ui-kit/Button'
-import { TextField } from '@dxfeed/ui-kit/TextField'
 import {
   type DXLinkFeed,
   type FeedConfig,
@@ -10,11 +5,17 @@ import {
   FeedDataFormat,
   type FeedEventData,
   type FeedEventFields,
-} from '@dxfeed/dxlink-websocket-client'
-import { ContentTemplate } from '../common/content-template'
+} from '@dxfeed/dxlink-api'
+import { Button } from '@dxfeed/ui-kit/Button'
+import { TextField } from '@dxfeed/ui-kit/TextField'
+import { unit } from '@dxfeed/ui-kit/utils'
+import { useEffect, useRef, useState } from 'react'
+import styled from 'styled-components'
+
 import { FeedData } from './feed-data'
-import { FeedSubscription } from './feed-subscriptions'
 import { FeedEventFieldsView } from './feed-event-fields'
+import { FeedSubscription } from './feed-subscriptions'
+import { ContentTemplate } from '../common/content-template'
 import { Select } from '../common/select'
 
 const ConfigSetupGroup = styled.form`

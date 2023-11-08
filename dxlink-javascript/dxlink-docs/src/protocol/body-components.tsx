@@ -1,6 +1,6 @@
 import { unit } from '@dxfeed/ui-kit/utils'
-import { Link as BaseRouterLink } from 'react-router-dom'
 import styled, { css } from 'styled-components'
+
 import {
   NewsContent,
   NewsImg,
@@ -36,10 +36,6 @@ const linkStyles = css`
 `
 
 const Anchor = styled.a`
-  ${linkStyles}
-`
-
-const RouterLink = styled(BaseRouterLink)`
   ${linkStyles}
 `
 

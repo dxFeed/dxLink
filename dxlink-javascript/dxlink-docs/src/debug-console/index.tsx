@@ -1,23 +1,24 @@
-import styled from 'styled-components'
-import { Connection, type ConnectParams } from './connection'
-import { ChannelsManager } from './channels-manager'
-import { useCallback, useEffect, useState } from 'react'
 import {
   DXLinkAuthState,
   type DXLinkConnectionDetails,
   DXLinkConnectionState,
   type DXLinkError,
   type DXLinkFeed,
+  DXLinkFeedImpl,
+  DXLinkLogLevel,
   type DXLinkWebSocketClient,
   DXLinkWebSocketClientImpl,
-  DXLinkLogLevel,
   FeedContract,
-  DXLinkFeedImpl,
-} from '@dxfeed/dxlink-websocket-client'
-import { unit } from '@dxfeed/ui-kit/utils'
+} from '@dxfeed/dxlink-api'
 import { Text } from '@dxfeed/ui-kit/Text'
-import { Errors } from './errors'
+import { unit } from '@dxfeed/ui-kit/utils'
+import { useCallback, useEffect, useState } from 'react'
+import styled from 'styled-components'
+
 import { Authorization } from './authorization'
+import { ChannelsManager } from './channels-manager'
+import { type ConnectParams, Connection } from './connection'
+import { Errors } from './errors'
 
 const Root = styled.div`
   display: flex;

@@ -26,7 +26,6 @@
     "prepublishOnly": "npm run build && npm run test",
     "build": "microbundle -f esm,cjs --define VERSION=$(node -p \"require('./package.json').version\")",
     "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
     "test": "tsx src/index.test.ts",
     "test:watch": "tsx watch src/index.test.ts"
   },

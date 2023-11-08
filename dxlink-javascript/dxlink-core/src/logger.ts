@@ -22,7 +22,10 @@ export enum DXLinkLogLevel {
  * A logger that uses the console to log messages.
  */
 export class Logger implements DXLinkLogger {
-  constructor(private readonly prefix: string, private readonly level: DXLinkLogLevel) {}
+  constructor(
+    private readonly prefix: string,
+    private readonly level: DXLinkLogLevel
+  ) {}
 
   debug(message: string, ...args: unknown[]): void {
     if (this.level <= DXLinkLogLevel.DEBUG) {

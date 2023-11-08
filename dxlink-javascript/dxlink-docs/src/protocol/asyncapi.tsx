@@ -1,8 +1,9 @@
 import AsyncApi, { type ConfigInterface } from '@asyncapi/react-component/browser'
 import '@asyncapi/react-component/styles/default.css'
-import styled from 'styled-components'
-import { Download as DownloadIcon } from '@dxfeed/ui-kit/Icons'
 import { IconButton } from '@dxfeed/ui-kit/IconButton'
+import { Download as DownloadIcon } from '@dxfeed/ui-kit/Icons'
+import styled from 'styled-components'
+
 import schemaUrl from '../../../../dxlink-specification/asyncapi.yml?url'
 
 const CONFIG: ConfigInterface = {

@@ -1,11 +1,12 @@
-import { unit } from '@dxfeed/ui-kit/utils'
-import { Text } from '@dxfeed/ui-kit/Text'
 import { Button } from '@dxfeed/ui-kit/Button'
-import styled from 'styled-components'
-import { DebugConsole } from '../debug-console'
-import { Header } from './header'
-// import { Protocol } from '../protocol'
+import { Text } from '@dxfeed/ui-kit/Text'
+import { unit } from '@dxfeed/ui-kit/utils'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import styled from 'styled-components'
+
+import { Header } from './header'
+import { DebugConsole } from '../debug-console'
+// import { Protocol } from '../protocol'
 import { AsyncApiProtocol } from '../protocol/asyncapi'
 
 const Content = styled.div`

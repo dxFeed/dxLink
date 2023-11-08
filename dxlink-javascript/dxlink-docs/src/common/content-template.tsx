@@ -1,9 +1,7 @@
-import { type ReactNode } from 'react'
-
-import styled from 'styled-components'
-
 import { Text } from '@dxfeed/ui-kit/Text'
 import { unit } from '@dxfeed/ui-kit/utils'
+import { type ReactNode } from 'react'
+import styled from 'styled-components'
 
 export interface ContentTemplateProps {
   title: ReactNode
