@@ -7,7 +7,10 @@ export class Scheduler {
 
   schedule = (callback: () => void, timeout: number, key: string) => {
     this.cancel(key)
-    this.timeoutIds[key] = setTimeout(callback, timeout)
+    this.timeoutIds[key] = setTimeout(() => {
+      delete this.timeoutIds[key]
+      callback()
+    }, timeout)
 
     return key
   }
