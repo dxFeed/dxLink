@@ -1,7 +1,11 @@
 # dxLink
 
-Technical solution for providing market data to end users.
+This package provides access to [dxFeed market data](https://dxfeed.com/market-data/) vi dxLink API.
 
-## Modules
+## Libraries
 
-- [JavaScript Libraries](dxlink-javascript/README.md)
+- [JavaScript](dxlink-javascript/README.md)
+- [Java](https://dxfeed.com/api/java-api/)
+- [.NET](https://github.com/dxFeed/dxfeed-graal-net-api)
+- [C/C++](https://github.com/dxFeed/dxfeed-graal-cxx-api)
+- [Swift](https://github.com/dxFeed/dxfeed-graal-swift-api)
