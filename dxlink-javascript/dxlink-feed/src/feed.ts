@@ -84,9 +84,9 @@ export interface FeedConfig {
 }
 
 /**
- * Listner for the feed channel config changes.
+ * Listener for the feed channel config changes.
  */
-export type DXLinkFeedConfigChangeListner = (config: FeedConfig) => void
+export type DXLinkFeedConfigChangeListener = (config: FeedConfig) => void
 
 type AnySubscription = Subscription | TimeSeriesSubscription | IndexedEventSubscription
 
@@ -109,9 +109,9 @@ export type SubscriptionByContract = {
 }
 
 /**
- * Listner for the feed channel events received from the channel.
+ * Listener for the feed channel events received from the channel.
  */
-export type DXLinkFeedEventListner = (event: FeedEventData[]) => void
+export type DXLinkFeedEventListener = (event: FeedEventData[]) => void
 
 /**
  * Chunk of the subscriptions to be sent to the channel.
@@ -156,11 +156,11 @@ export interface DXLinkFeedRequester<Contract extends FeedContract = FeedContrac
   /**
    * Add a listener for the feed channel config changes.
    */
-  addConfigChangeListener(listener: DXLinkFeedConfigChangeListner): void
+  addConfigChangeListener(listener: DXLinkFeedConfigChangeListener): void
   /**
    * Remove a listener for the feed channel config changes.
    */
-  removeConfigChangeListener(listener: DXLinkFeedConfigChangeListner): void
+  removeConfigChangeListener(listener: DXLinkFeedConfigChangeListener): void
 
   /**
    * Add subscriptions to the feed channel.
@@ -190,11 +190,11 @@ export interface DXLinkFeedRequester<Contract extends FeedContract = FeedContrac
   /**
    * Add a listener for the feed channel events received from the channel.
    */
-  addEventListener(listener: DXLinkFeedEventListner): void
+  addEventListener(listener: DXLinkFeedEventListener): void
   /**
    * Remove a listener for the feed channel events received from the channel.
    */
-  removeEventListener(listener: DXLinkFeedEventListner): void
+  removeEventListener(listener: DXLinkFeedEventListener): void
 
   /**
    * Close the feed channel.
@@ -256,8 +256,8 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
   }
 
   // Listeners
-  private readonly configListeners = new Set<DXLinkFeedConfigChangeListner>()
-  private readonly eventListeners = new Set<DXLinkFeedEventListner>()
+  private readonly configListeners = new Set<DXLinkFeedConfigChangeListener>()
+  private readonly eventListeners = new Set<DXLinkFeedEventListener>()
 
   /**
    * Pending add subscriptions to be sent to the channel.
@@ -323,10 +323,10 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
     this.channel.removeStateChangeListener(listener)
 
   getConfig = () => this.config
-  addConfigChangeListener = (listener: DXLinkFeedConfigChangeListner) => {
+  addConfigChangeListener = (listener: DXLinkFeedConfigChangeListener) => {
     this.configListeners.add(listener)
   }
-  removeConfigChangeListener = (listener: DXLinkFeedConfigChangeListner) => {
+  removeConfigChangeListener = (listener: DXLinkFeedConfigChangeListener) => {
     this.configListeners.delete(listener)
   }
 
@@ -394,10 +394,10 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
     this.scheduleProcessPendings()
   }
 
-  addEventListener = (listener: DXLinkFeedEventListner) => {
+  addEventListener = (listener: DXLinkFeedEventListener) => {
     this.eventListeners.add(listener)
   }
-  removeEventListener = (listener: DXLinkFeedEventListner) => {
+  removeEventListener = (listener: DXLinkFeedEventListener) => {
     this.eventListeners.delete(listener)
   }
 
