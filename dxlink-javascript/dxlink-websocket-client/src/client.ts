@@ -105,7 +105,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     this.logger = new Logger(this.constructor.name, this.config.logLevel)
   }
 
-  connect = async (url: string): Promise<void> => {
+  connect = (url: string) => {
     // Do nothing if already connected to the same url
     if (this.connector?.getUrl() === url) return
 
