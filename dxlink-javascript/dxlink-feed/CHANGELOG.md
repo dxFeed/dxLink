@@ -1,5 +1,13 @@
 # @dxfeed/dxlink-feed
 
+## 0.1.1
+
+### Patch Changes
+
+- Add basic usage in readme
+- Updated dependencies
+  - @dxfeed/dxlink-core@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
