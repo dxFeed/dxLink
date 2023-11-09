@@ -21,7 +21,7 @@
   },
   "scripts": {
     "start": "vite ./demo",
-    "prepublishOnly": "npm run build && npm run test",
+    "prepublishOnly": "npm run build",
     "build": "microbundle -f esm,cjs",
     "lint": "eslint src"
   },
