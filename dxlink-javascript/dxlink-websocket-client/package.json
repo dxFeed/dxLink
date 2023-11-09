@@ -48,7 +48,11 @@
     "url": "https://github.com/dxfeed/dxlink/issues"
   },
   "homepage": "https://dxfeed.com/",
-  "keywords": [],
+  "keywords": [
+    "transport client",
+    "dxlink",
+    "dxfeed"
+  ],
   "files": [
     "/build",
     "/package.json"

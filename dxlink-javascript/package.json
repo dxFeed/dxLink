@@ -43,5 +43,17 @@
     "turbo": "^1.10.16",
     "typescript": "^5.2.2",
     "uvu": "^0.5.6"
-  }
+  },
+  "keywords": [
+    "api",
+    "client",
+    "financial data",
+    "market data",
+    "market api",
+    "stock market",
+    "real-time",
+    "stock price data",
+    "historical",
+    "dxfeed"
+  ]
 }
