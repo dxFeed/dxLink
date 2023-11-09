@@ -1,6 +1,6 @@
-# @dxFeed/dxLink-WebSocket-Client
+# @dxfeed/dxlink-websocket-client
 
-This package provides access to receive market data from [dxFeed](https://www.dxfeed.com/) services.
+Client implementation for the dxLink WebSocket transport protocol.
 
 ## Install
 
@@ -16,40 +16,47 @@ Import library into your project.
 import { DXLinkWebSocket } from '@dxfeed/dxlink-websocket-client'
 ```
 
-### Create client
+### Client
 
-Create instance of the client with url.
+Create instance of the client.
 
 ```typescript
-const client = await DXLinkWebSocket.newClient({
-  url: 'wss://demo.dxfeed.com/dxlink-ws',
-})
+const client = new DXLinkWebSocketClient()
+```
+
+Connect to the server.
+
+```typescript
+client.connect('wss://demo.dxfeed.com/dxlink-ws')
 ```
 
 Provide auth token if required by the server.
 
 ```typescript
-client.auth(token)
+client.setAuthToken(token)
 ```
 
 ### Channels
 
-Create Feed channel with delivery contract `AUTO`.
+Open isolated channel to service within single connection.
 
 ```typescript
-const channel = await client.openFeedChannel('AUTO')
+const channel = await client.openChannel('FEED', {
+  contract: 'AUTO',
+})
 ```
 
-Configure created channel.
+Send message to the channel.
 
 ```typescript
-channel.setup({
-  acceptAggregationPeriod: 10,
-  acceptDataFormat: 'COMPACT',
-  acceptEventFields: {
-    Quote: ['eventSymbol', 'askPrice', 'bidPrice'],
-    Candle: ['eventSymbol', 'open', 'close', 'high', 'low', 'volume'],
-  },
+channel.send({
+  type: 'FEED_SUBSCRIPTION',
+  add: [
+    {
+      type: 'Quote',
+      symbol: 'AAPL',
+    },
+  ],
 })
 ```
 
@@ -74,10 +81,12 @@ channel.subscription({
 })
 ```
 
-Receive data from the channel.
+Receive messages from the channel.
 
 ```typescript
-channel.data.subscribe((events) => {
-  // do something with events
+channel.addMessageListener((message) => {
+  if (message.type === 'FEED_DATA') {
+    console.log(message.data)
+  }
 })
 ```
