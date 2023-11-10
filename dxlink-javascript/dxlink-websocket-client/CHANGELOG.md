@@ -1,5 +1,14 @@
 # @dxfeed/dxlink-websocket-client
 
+## 0.1.2
+
+### Patch Changes
+
+- Bugfix: typo in listeners
+- Updated dependencies
+- Updated dependencies
+  - @dxfeed/dxlink-core@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes

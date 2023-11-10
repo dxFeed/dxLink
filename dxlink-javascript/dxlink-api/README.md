@@ -65,13 +65,13 @@ const sub1 = {
   symbol: 'AAPL',
 }
 
-channel.addSubscriptions(sub1)
+feed.addSubscriptions(sub1)
 ```
 
 Remove subscription from the feed.
 
 ```typescript
-channel.removeSubscriptions(sub1)
+feed.removeSubscriptions(sub1)
 ```
 
 Receive data from the channel.

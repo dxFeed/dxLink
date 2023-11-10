@@ -1,5 +1,12 @@
 # @dxfeed/dxlink-core
 
+## 0.1.2
+
+### Patch Changes
+
+- Bugfix: scheduler should clear `timeoutId` after execute
+- Bugfix: typo in listeners
+
 ## 0.1.1
 
 ### Patch Changes

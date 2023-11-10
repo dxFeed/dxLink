@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-websocket-client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -30,7 +30,7 @@
     "test:watch": "tsx watch src/index.test.ts"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.1.1"
+    "@dxfeed/dxlink-core": "0.1.2"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [
