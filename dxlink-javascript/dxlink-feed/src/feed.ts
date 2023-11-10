@@ -222,6 +222,9 @@ export interface DXLinkFeedOptions {
 
 const FEED_SERVICE_NAME = 'FEED'
 
+/**
+ * dxLink FEED provides access to the real-time and historical data of dxFeed.
+ */
 export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequester<Contract> {
   /**
    * Unique identifier of the feed channel.

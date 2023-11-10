@@ -3,7 +3,7 @@
   "version": "0.1.2",
   "private": false,
   "sideEffects": false,
-  "description": "dxLink Feed",
+  "description": "dxLink FEED provides access to the real-time and historical data of dxFeed",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",

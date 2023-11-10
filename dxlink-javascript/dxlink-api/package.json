@@ -3,7 +3,7 @@
   "version": "0.1.2",
   "private": false,
   "sideEffects": false,
-  "description": "dxLink API",
+  "description": "dxLink API provides access to market data from dxFeed services",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",

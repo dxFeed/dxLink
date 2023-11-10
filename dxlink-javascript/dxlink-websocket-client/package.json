@@ -6,7 +6,7 @@
     "access": "public"
   },
   "sideEffects": false,
-  "description": "dxFeed WebSocket Client allows to receive market data from dxFeed services",
+  "description": "dxLink WebSocket Client allows to connect the remote dxLink WebSocket endpoint",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",
