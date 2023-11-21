@@ -42,14 +42,17 @@ export interface FeedDataProps {
 export function FeedData({ eventFields, data }: FeedDataProps) {
   const dataFields = useMemo(() => {
     return Object.keys(eventFields).reduce<FeedEventFields>((acc, key) => {
-      acc[key] = eventFields[key].reduce<string[]>((acc, value) => {
-        if (value === 'eventSymbol') {
-          acc.unshift(value)
-        } else {
-          acc.push(value)
-        }
-        return acc
-      }, [])
+      const fields = eventFields[key]
+      if (fields !== undefined) {
+        acc[key] = fields.reduce<string[]>((acc, value) => {
+          if (value === 'eventSymbol') {
+            acc.unshift(value)
+          } else {
+            acc.push(value)
+          }
+          return acc
+        }, [])
+      }
       return acc
     }, {})
   }, [eventFields])
@@ -62,7 +65,7 @@ export function FeedData({ eventFields, data }: FeedDataProps) {
         const symbols = Object.keys(data[eventType] ?? {})
         const fields = dataFields[eventType]
 
-        if (symbols.length === 0) {
+        if (symbols.length === 0 || fields === undefined) {
           return null
         }
 
@@ -83,7 +86,7 @@ export function FeedData({ eventFields, data }: FeedDataProps) {
                   {symbols.map((symbol) => (
                     <DataTableRow key={symbol}>
                       {fields.map((eventField) => {
-                        const value = data[eventType][symbol][eventField]
+                        const value = data[eventType]?.[symbol]?.[eventField] ?? '—'
                         return (
                           <DataTableCell key={eventField}>
                             <Tooltip content={value} placement={'top'}>

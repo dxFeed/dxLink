@@ -39,7 +39,7 @@ export interface ChannelManagerProps {
 
 export function ChannelsManager({ channels, onOpenChannel }: ChannelManagerProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const [contract, setContract] = useState<FeedContract>(CONTRACT_LIST[0])
+  const [contract, setContract] = useState<FeedContract>(FeedContract.AUTO)
 
   const handleOpenChannel = () => {
     if (isLoading) {

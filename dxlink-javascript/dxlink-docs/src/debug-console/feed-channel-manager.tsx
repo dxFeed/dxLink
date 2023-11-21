@@ -79,9 +79,9 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
   const handleSetup = () => {
     const finalAcceptEventFields = Object.keys(acceptEventFields).reduce<FeedEventFields>(
       (acc, field) => {
-        const fields = acceptEventFields[field].filter(Boolean)
+        const fields = acceptEventFields[field]?.filter(Boolean)
 
-        if (fields.length > 0) {
+        if (fields !== undefined && fields.length > 0) {
           return {
             ...acc,
             [field]: DEFAULT_EVENT_FIELDS.concat(
@@ -119,13 +119,16 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
         for (const event of events) {
           if ('eventType' in event && 'eventSymbol' in event) {
             const eventType = String(event.eventType)
-            const eventSymbol = String(event.eventSymbol)
-            data[eventType] = prev[eventType] ?? {}
-            data[eventType][eventSymbol] = event
+            const eventSymbol =
+              String(event.eventSymbol) + ('source' in event ? `#${String(event.source)}` : '')
+            const group = prev[eventType] ?? {}
+            group[eventSymbol] = event
+            data[eventType] = group
           } else {
             console.error('Unmatched event', event)
-            data['unknown'] = prev['unknown'] ?? []
-            data['unknown']['unknown'] = event
+            const group = prev['unknown'] ?? {}
+            group['unknown'] = event
+            data['unknown'] = group
           }
         }
         return data

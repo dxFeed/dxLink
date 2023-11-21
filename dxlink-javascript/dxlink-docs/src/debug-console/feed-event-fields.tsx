@@ -23,6 +23,14 @@ const Field = styled.div`
   padding: ${unit(0.5)} ${unit(1.5)};
 `
 
+export interface FeedEventFieldsProps {
+  label: string
+  description?: string
+  value?: FeedEventFields
+  onChange?: (value: FeedEventFields) => void
+  readOnly?: boolean
+}
+
 export function FeedEventFieldsView({
   label,
   description,

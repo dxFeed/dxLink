@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { type ReactNode } from 'react'
 
 import { Content, Head, HeaderContainer, Logo, LogoLink, SideContent, Wrapper } from './styled'
 

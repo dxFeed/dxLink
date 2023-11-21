@@ -6,7 +6,6 @@ import styled from 'styled-components'
 
 import { Header } from './header'
 import { DebugConsole } from '../debug-console'
-// import { Protocol } from '../protocol'
 import { AsyncApiProtocol } from '../protocol/asyncapi'
 
 const Content = styled.div`
@@ -77,7 +76,6 @@ export function Layout() {
         <Routes>
           <Route path="/" element={<DebugConsole />} />
           <Route path="/protocol" element={<AsyncApiProtocol />} />
-          {/* <Route path="/protocol" element={<Protocol />} /> */}
         </Routes>
       </Content>
     </>

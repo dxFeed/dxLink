@@ -185,6 +185,8 @@ export function Connection({
             >
               {state === DXLinkConnectionState.CONNECTED ? (
                 <ConnectioStatus>Connected</ConnectioStatus>
+              ) : state === DXLinkConnectionState.CONNECTING ? (
+                'Connecting'
               ) : (
                 'Connect'
               )}

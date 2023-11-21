@@ -154,9 +154,8 @@ export function DebugConsole() {
   }
 
   const state = connectionState.state
-  const clientVersion = connectionState?.details?.clientVersion
-  const serverVersion = connectionState?.details?.serverVersion
-  const serverKeepaliveTimeout = connectionState?.details?.serverKeepaliveTimeout
+  const connectionDetails = connectionState?.details
+  const serverKeepaliveTimeout = connectionDetails?.serverKeepaliveTimeout
 
   return (
     <Root>
@@ -167,29 +166,35 @@ export function DebugConsole() {
         onDisconnect={handleDisconnect}
         error={<Errors errors={errors} />}
         info={
-          <>
-            {client !== undefined && (
-              <Version level={4}>
-                <b>Client version</b>: {clientVersion}
-              </Version>
-            )}
-            {serverVersion !== undefined && (
-              <Version level={4}>
-                <b>Server version</b>: {serverVersion}
-              </Version>
-            )}
-          </>
+          connectionDetails !== undefined && (
+            <>
+              {
+                <Version level={4}>
+                  <b>Client version</b>: {connectionDetails.clientVersion}
+                </Version>
+              }
+              {connectionDetails.serverVersion !== undefined && (
+                <Version level={4}>
+                  <b>Server version</b>: {connectionDetails.serverVersion}
+                </Version>
+              )}
+            </>
+          )
         }
       />
-      {authState === 'UNAUTHORIZED' && (
-        <Authorization onAuth={(token) => client?.setAuthToken(token)} />
-      )}
-      {authState === 'AUTHORIZED' && (
-        <ChannelWrapper>
-          {state === DXLinkConnectionState.CONNECTED && (
-            <ChannelsManager channels={channels} onOpenChannel={handleOpenChannel} />
+      {state === DXLinkConnectionState.CONNECTED && (
+        <>
+          {authState === 'UNAUTHORIZED' && (
+            <Authorization onAuth={(token) => client?.setAuthToken(token)} />
           )}
-        </ChannelWrapper>
+          {authState === 'AUTHORIZED' && (
+            <ChannelWrapper>
+              {state === DXLinkConnectionState.CONNECTED && (
+                <ChannelsManager channels={channels} onOpenChannel={handleOpenChannel} />
+              )}
+            </ChannelWrapper>
+          )}
+        </>
       )}
     </Root>
   )
