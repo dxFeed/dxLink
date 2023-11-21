@@ -1,5 +1,11 @@
 # @dxfeed/dxlink-core
 
+## 0.1.3
+
+### Patch Changes
+
+- Update descriptions
+
 ## 0.1.2
 
 ### Patch Changes

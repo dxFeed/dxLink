@@ -1,5 +1,15 @@
 # @dxfeed/dxlink-websocket-client
 
+## 0.1.3
+
+### Patch Changes
+
+- Bugfix: publish transport errors
+- Bugfix: allow limit the number of reconnects
+- Update descriptions
+- Updated dependencies
+  - @dxfeed/dxlink-core@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes

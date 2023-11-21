@@ -1,5 +1,17 @@
 # @dxfeed/dxlink-api
 
+## 0.1.3
+
+### Patch Changes
+
+- Update descriptions
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - @dxfeed/dxlink-websocket-client@0.1.3
+  - @dxfeed/dxlink-core@0.1.3
+  - @dxfeed/dxlink-feed@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes
