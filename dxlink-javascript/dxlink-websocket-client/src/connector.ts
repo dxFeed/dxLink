@@ -1,5 +1,7 @@
 import { type Message } from './messages'
 
+type CloseListener = (reason: string, error: boolean) => void
+
 /**
  * Connector for the WebSocket connection.
  * @internal
@@ -10,7 +12,7 @@ export class WebSocketConnector {
   private isAvailable = false
 
   private openListener: (() => void) | undefined = undefined
-  private closeListener: ((error?: Error) => void) | undefined = undefined
+  private closeListener: CloseListener | undefined = undefined
   private messageListener: ((message: Message) => void) | undefined = undefined
 
   constructor(private readonly url: string) {}
@@ -50,7 +52,7 @@ export class WebSocketConnector {
     this.openListener = listener
   }
 
-  setCloseListener = (listener: () => void) => {
+  setCloseListener = (listener: CloseListener) => {
     this.closeListener = listener
   }
 
@@ -73,22 +75,20 @@ export class WebSocketConnector {
     this.openListener?.()
   }
 
-  private handleClosed = (_ev?: CloseEvent) => {
+  private handleClosed = (ev: CloseEvent) => {
     if (this.socket === undefined) return
 
     this.stop()
 
-    this.closeListener?.()
+    this.closeListener?.(ev.reason, false)
   }
 
   private handleError = (_ev: Event) => {
-    // TODO: handle error
-
     if (this.socket === undefined) return
 
     this.stop()
 
-    this.closeListener?.()
+    this.closeListener?.('Unable to connect', true)
   }
 
   private handleMessage = (ev: MessageEvent) => {

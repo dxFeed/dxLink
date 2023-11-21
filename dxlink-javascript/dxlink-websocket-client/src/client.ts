@@ -520,8 +520,15 @@ export class DXLinkWebSocketClient implements DXLinkClient {
    * - reconnect if connection is authorized
    * - disconnect if connection is not authorized
    */
-  private processTransportClose = (_error?: Error): void => {
-    this.logger.debug('Connection closed by server')
+  private processTransportClose = (reason: string, error: boolean): void => {
+    this.logger.debug('Connection closed', reason)
+
+    if (error !== undefined) {
+      this.publishError({
+        type: 'UNKNOWN',
+        message: reason,
+      })
+    }
 
     if (this.authState === DXLinkAuthState.UNAUTHORIZED) {
       this.lastSettedAuthToken = undefined
