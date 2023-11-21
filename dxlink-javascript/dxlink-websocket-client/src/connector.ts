@@ -40,7 +40,7 @@ export class WebSocketConnector {
 
   sendMessage = (message: Message) => {
     if (this.socket === undefined || !this.isAvailable) {
-      throw new Error('Socket is not available')
+      return
     }
 
     this.socket.send(JSON.stringify(message))

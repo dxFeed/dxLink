@@ -75,14 +75,15 @@ export class DXLinkWebSocketChannel implements DXLinkChannel {
 
     this.logger.debug(`Closing by user`)
 
-    this.send({
-      type: 'CHANNEL_CANCEL',
-    })
-
-    // After sending CHANNEL_CANCEL we can think that channel is closed already
+    // We can think that channel is closed already
     this.setStatus(DXLinkChannelState.CLOSED)
 
     this.clear()
+
+    this.sendMessage({
+      type: 'CHANNEL_CANCEL',
+      channel: this.id,
+    })
   }
 
   request = () => {
@@ -111,8 +112,6 @@ export class DXLinkWebSocketChannel implements DXLinkChannel {
   }
 
   processStatusRequested = () => {
-    this.logger.debug('Requested')
-
     this.setStatus(DXLinkChannelState.REQUESTED)
   }
 

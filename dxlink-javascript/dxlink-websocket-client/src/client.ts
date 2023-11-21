@@ -34,7 +34,7 @@ import { VERSION } from './version'
  */
 export const DXLINK_WS_PROTOCOL_VERSION = '0.1'
 
-const CLIENT_VERSION = `js/${VERSION}`
+const CLIENT_VERSION = `DXF-JS/${VERSION}`
 
 const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
   protocolVersion: DXLINK_WS_PROTOCOL_VERSION,
@@ -128,7 +128,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
   reconnect = () => {
     if (
-      this.config.maxReconnectAttempts < 0 &&
+      this.config.maxReconnectAttempts > 0 &&
       this.reconnectAttempts >= this.config.maxReconnectAttempts
     ) {
       this.logger.warn('Max reconnect attempts reached')
@@ -520,7 +520,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
    * - reconnect if connection is authorized
    * - disconnect if connection is not authorized
    */
-  private processTransportClose = (): void => {
+  private processTransportClose = (_error?: Error): void => {
     this.logger.debug('Connection closed by server')
 
     if (this.authState === DXLinkAuthState.UNAUTHORIZED) {
