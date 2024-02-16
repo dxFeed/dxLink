@@ -25,8 +25,8 @@
     "lint:fix": "turbo run lint -- --fix",
     "test": "turbo run test",
     "format": "prettier --write **/*.{js,ts,tsx,md}",
-    "demo": "npm run start -w dxlink-websocket-client",
-    "debug-console": "npm run start -w dxlink-debug-console"
+    "demo": "npm run start -w dxlink-api",
+    "docs": "npm run start -w dxlink-docs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.26.2",
