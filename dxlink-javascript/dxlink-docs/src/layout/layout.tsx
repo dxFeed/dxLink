@@ -45,7 +45,7 @@ export function Layout() {
 
   return (
     <>
-      <Header right={<Version>v0.1-beta</Version>}>
+      <Header right={<Version />}>
         <Text level={1}>dxLink.WebSocket</Text>
         <Menu>
           <MenuItem>
