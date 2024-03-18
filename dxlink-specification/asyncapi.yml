@@ -170,6 +170,82 @@ info:
     }
     ```
 
+    ## `DOM` service
+
+    `FEED` - provides real-time access to depth of market service.
+
+    To open a channel, the client must send the `CHANNEL_REQUEST` message to the server with the `service` field set to `DOM` and desired parameters.
+    The server will respond with the `CHANNEL_OPENED` message.
+
+    ```json
+    {
+      "type": "CHANNEL_REQUEST",
+      "channel": 0,
+      "service": "DOM",
+      "parameters": {
+        "symbol": "AAPL",
+        "sources": ["ntv"]
+      }
+    }
+    ```
+
+    ### Configure
+    To start receiving the snapshot, the client must send the `DOM_SETUP` message first.
+    ```json
+    {
+      "type": "DOM_SETUP",
+      "channel": 1,
+    }
+    ```
+
+    ### Snapshot
+    The server will send the `DOM_SNAPSHOT` message to the client with the snapshot of the depth of market for desired symbol and sources.
+    ```json
+    {
+      "type": "DOM_SNAPSHOT",
+      "channel": 1,
+      "time": 1710262466056,
+      "bids": [
+        { "price": 172.33, "size": 376 },
+        { "price": 172.32, "size": 381 },
+        { "price": 172.31, "size": 405 },
+        { "price": 172.3, "size": 388 },
+        { "price": 172.29, "size": 356 }
+      ],
+      "asks": [
+        { "price": 172.34, "size": 165 },
+        { "price": 172.35, "size": 301 },
+        { "price": 172.36, "size": 300 },
+        { "price": 172.37, "size": 490 },
+        { "price": 172.38, "size": 608 }
+      ]
+    }
+    ```
+
+    ### Configuration
+    To configure the service, the client must send a `DOM_SETUP` message to the server with the acceptable configuration.
+    ```json
+    {
+      "type": "DOM_SETUP",
+      "channel": 1,
+      "acceptAggregationPeriod": 10,
+      "acceptDepthLimit": 5,
+      "acceptDataFormat": "FULL",
+      "acceptOrderFields": ["price", "size"]
+    }
+    ```
+    The server will notify the client with the `DOM_CONFIG` message containing the actual configuration.
+    ```json
+    {
+      "type": "DOM_CONFIG",
+      "channel": 1,
+      "aggregationPeriod": 10,
+      "depthLimit": 5,
+      "dataFormat": "FULL",
+      "orderFields": ["price", "size"]
+    }
+    ```
+
     ## Example
     Real-world example of the protocol exchange:
 
@@ -317,6 +393,8 @@ channels:
           - $ref: "#/components/messages/ChannelClosedMessage"
           - $ref: "#/components/messages/FeedConfigMessage"
           - $ref: "#/components/messages/FeedDataMessage"
+          - $ref: "#/components/messages/DomConfigMessage"
+          - $ref: "#/components/messages/DomSnapshotMessage"
     publish:
       message:
         oneOf:
@@ -324,10 +402,12 @@ channels:
           - $ref: "#/components/messages/SetupMessage"
           - $ref: "#/components/messages/AuthMessage"
           - $ref: "#/components/messages/KeepaliveMessage"
-          - $ref: "#/components/messages/ChannelRequestMessage"
+          - $ref: "#/components/messages/FeedChannelRequestMessage"
+          - $ref: "#/components/messages/DomChannelRequestMessage"
           - $ref: "#/components/messages/ChannelCancelMessage"
           - $ref: "#/components/messages/FeedSetupMessage"
           - $ref: "#/components/messages/FeedSubscriptionMessage"
+          - $ref: "#/components/messages/DomSetupMessage"
 
 components:
   messages:
@@ -497,8 +577,8 @@ components:
           payload:
             { "channel": 0, "type": "AUTH_STATE", "state": "UNAUTHORIZED" }
 
-    ChannelRequestMessage:
-      summary: Allows the client to request the channel.
+    FeedChannelRequestMessage:
+      summary: Allows the client to request the feed channel.
       description: |
         The client can send this message to the server to open a channel for two-way communication with the service.
         The server will notify the client with the `CHANNEL_OPENED` message.
@@ -508,7 +588,7 @@ components:
           - type: object
             properties:
               type:
-                const: CHANNEL_OPEN
+                const: CHANNEL_REQUEST
               service:
                 description: |
                   Operated service. Possible values:
@@ -516,7 +596,7 @@ components:
                 enum:
                   - FEED
               parameters:
-                description: Parameters of the operated service.
+                description: Parameters of the feed service.
                 type: object
                 properties:
                   contract:
@@ -528,9 +608,50 @@ components:
           payload:
             {
               "channel": 1,
-              "type": "CHANNEL_OPEN",
+              "type": "CHANNEL_REQUEST",
               "service": "FEED",
               "parameters": { "contract": "AUTO" },
+            }
+    DomChannelRequestMessage:
+      summary: Allows the client to request the dom channel.
+      description: |
+        The client can send this message to the server to open a channel for two-way communication with the service.
+        The server will notify the client with the `CHANNEL_OPENED` message.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/Message"
+          - type: object
+            properties:
+              type:
+                const: CHANNEL_REQUEST
+              service:
+                description: |
+                  Operated service. Possible values:
+                  - `DOM` - the dom service offer the abilitity to receive real-time updates about the depth of market.
+                enum:
+                  - DOM
+              parameters:
+                description: Parameters of the dom service.
+                type: object
+                properties:
+                  symbol:
+                    type: string
+                  sources:
+                    type: array
+                    items:
+                      description: Order source.
+                      examples: ["ntv"]
+                      type: string
+                required: [symbol, sources]
+            required: [channel, type, service, parameters]
+      examples:
+        - summary: Dom channel request.
+          payload:
+            {
+              "channel": 1,
+              "type": "CHANNEL_REQUEST",
+              "service": "DOM",
+              "parameters": { "symbol": "AAPL", "sources": ["ntv"] },
             }
 
     ChannelOpenedMessage:
@@ -549,12 +670,7 @@ components:
               parameters:
                 description: Parameters of operated channel.
                 type: object
-                properties:
-                  contract:
-                    $ref: "#/components/schemas/FeedContract"
-                  subFormat:
-                    const: LIST
-                required: [contract]
+                required: []
             required: [channel, type, service, parameters]
       examples:
         - summary: Feed channel opened with AUTO contract.
@@ -564,6 +680,14 @@ components:
               "type": "CHANNEL_OPENED",
               "service": "FEED",
               "parameters": { "contract": "AUTO" },
+            }
+        - summary: Dom channel opened.
+          payload:
+            {
+              "channel": 1,
+              "type": "CHANNEL_OPENED",
+              "service": "DOM",
+              "parameters": { "symbol": "AAPL", "sources": ["ntv"] },
             }
 
     ChannelClosedMessage:
@@ -838,6 +962,171 @@ components:
                   ["AAPL", "Trade", 321, 22, "AMZN", "Trade", 123, 11],
                 ],
             }
+
+    DomSetupMessage:
+      summary: Allows the client to configure the `DOM` service.
+      description: |
+        The client can send this message to the server after opening a channel with the `DOM` service.
+        The server will notify the client of the application with the `DOM_CONFIG` message.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/Message"
+          - type: object
+            properties:
+              type:
+                const: DOM_SETUP
+              acceptAggregationPeriod:
+                description: Desired aggregation period of events (in seconds).
+                type: number
+              acceptDepthLimit:
+                description: Desired depth limit of order.
+                type: number
+              acceptOrderFields:
+                type: array
+                items:
+                  description: Order field name.
+                  examples: ["price", "size"]
+                  type: string
+              acceptDataFormat:
+                enum:
+                  - FULL
+            required: [channel, type]
+      examples:
+        - summary: Dom setup.
+          payload: { "channel": 1, "type": "DOM_SETUP" }
+        - summary: Dom setup with parameters.
+          payload:
+            {
+              "channel": 1,
+              "type": "DOM_SETUP",
+              "acceptAggregationPeriod": 1,
+              "acceptDepthLimit": 5,
+            }
+
+    DomConfigMessage:
+      summary: Notification of the `DOM` service configuration.
+      description: |
+        The server can send this message to the client after receiving the `DOM_CONFIG` message.
+        The server can send this message to the client if the `DOM` service configuration has changed.
+        Parameters are lazy therefore the server may not send the notification immediately, but before the first `DOM_SNAPSHOT` is sent.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/Message"
+          - type: object
+            properties:
+              type:
+                const: DOM_CONFIG
+              aggregationPeriod:
+                description: Desired aggregation period of events (in seconds).
+                type: number
+              depthLimit:
+                description: Desired depth limit of order.
+                type: number
+              orderFields:
+                type: array
+                items:
+                  description: Order field name.
+                  examples: ["price", "size"]
+                  type: string
+              dataFormat:
+                enum:
+                  - FULL
+            required:
+              [
+                channel,
+                type,
+                aggregationPeriod,
+                depthLimit,
+                dataFormat,
+                orderFields,
+              ]
+      examples:
+        - summary: Dom config.
+          payload:
+            {
+              "channel": 1,
+              "type": "DOM_CONFIG",
+              "aggregationPeriod": 1,
+              "depthLimit": 5,
+              "dataFormat": "FULL",
+              "orderFields": ["price", "size"],
+            }
+
+    DomSnapshotMessage:
+      summary: Contains the snapshot of request depth of market.
+      description: |
+        The server will send snapshot in the format that was described in the `DOM_CONFIG` message.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/Message"
+          - type: object
+            properties:
+              type:
+                const: DOM_SNAPSHOT
+              time:
+                description: Snapshot acquisition time (unix)
+                type: number
+                example: 1710262466056
+              bids:
+                description: |
+                  List of bid orders.
+                  Empty fields are omitted from the json.
+                type: array
+                items:
+                  type: object
+                  parameters:
+                    price:
+                      type: number
+                    size:
+                      type: number
+                examples:
+                  - [
+                      { "price": 172.34, "size": 165 },
+                      { "price": 172.35, "size": 301 },
+                    ]
+              asks:
+                description: |
+                  List of ask orders.
+                  Empty fields are omitted from the json.
+                type: array
+                items:
+                  type: object
+                  parameters:
+                    price:
+                      type: number
+                    size:
+                      type: number
+                examples:
+                  - [
+                      { "price": 172.34, "size": 165 },
+                      { "price": 172.35, "size": 301 },
+                    ]
+            required: [channel, type, time, bids, asks]
+      examples:
+        - summary: Feed data full format.
+          payload:
+            {
+              "type": "DOM_SNAPSHOT",
+              "channel": 1,
+              "time": 1710262466056,
+              "bids":
+                [
+                  { "price": 172.33, "size": 376 },
+                  { "price": 172.32, "size": 381 },
+                  { "price": 172.31, "size": 405 },
+                  { "price": 172.3, "size": 388 },
+                  { "price": 172.29, "size": 356 },
+                ],
+              "asks":
+                [
+                  { "price": 172.34, "size": 165 },
+                  { "price": 172.35, "size": 301 },
+                  { "price": 172.36, "size": 300 },
+                  { "price": 172.37, "size": 490 },
+                  { "price": 172.38, "size": 608 },
+                ],
+            }
+
   schemas:
     Message:
       summary: The minimum unit of information

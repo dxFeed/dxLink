@@ -17,6 +17,7 @@
     "dxlink-core",
     "dxlink-websocket-client",
     "dxlink-feed",
+    "dxlink-dom",
     "dxlink-docs"
   ],
   "scripts": {

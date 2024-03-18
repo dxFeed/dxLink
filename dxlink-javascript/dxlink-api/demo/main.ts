@@ -4,12 +4,13 @@ import {
   FeedDataFormat,
   DXLinkWebSocketClient,
   DXLinkFeed,
+  DXLinkDepthOfMarket,
   type Subscription,
   type TimeSeriesSubscription,
 } from '../src'
 
-async function start() {
-  console.log('Start')
+async function startFeed() {
+  console.log('Start Feed')
 
   const client = new DXLinkWebSocketClient()
   client.connect('wss://demo.dxfeed.com/dxlink-ws')
@@ -18,7 +19,7 @@ async function start() {
 
   feed.addEventListener((events) => {
     // your buisness logic here
-    console.log('Events', events)
+    console.log('Feed Events', events)
   })
 
   feed.configure({
@@ -41,4 +42,25 @@ async function start() {
   // }, 3000)
 }
 
-start()
+async function startDepthOfMarket() {
+  console.log('Start Dom')
+
+  const client = new DXLinkWebSocketClient()
+  client.connect('wss://demo.dxfeed.com/dxlink-ws-dom')
+
+  const dom = new DXLinkDepthOfMarket(client, { symbol: 'AAPL', sources: ['ntv'] })
+
+  dom.addSnapshotListener((time, bids, asks) => {
+    // your buisness logic here
+    console.log('Dom Snapshot', time, bids, asks)
+  })
+
+  dom.configure({
+    acceptAggregationPeriod: 10,
+    acceptDepthLimit: 5,
+  })
+}
+
+startDepthOfMarket()
+
+// startFeed()
