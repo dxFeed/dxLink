@@ -46,7 +46,7 @@ async function startDepthOfMarket() {
   console.log('Start Dom')
 
   const client = new DXLinkWebSocketClient()
-  client.connect('ws://localhost:9959')
+  client.connect('wss://demo.dxfeed.com/dxlink-ws-dom')
 
   const dom = new DXLinkDepthOfMarket(client, { symbol: 'AAPL', sources: ['ntv'] })
 
