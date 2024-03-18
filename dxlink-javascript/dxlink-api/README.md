@@ -36,9 +36,9 @@ Provide auth token if required by the server.
 client.setAuthToken(token)
 ```
 
-### Feed
+### Feed API
 
-Create Feed with delivery contract `AUTO`.
+Create market data feed API with delivery contract `AUTO`.
 
 ```typescript
 const feed = new DXLinkFeed(client, 'AUTO')
@@ -79,5 +79,30 @@ Receive data from the channel.
 ```typescript
 feed.addEventListener(events) => {
   // do something with events
+})
+```
+
+### Depth Of Market API
+
+Create Depth Of Market API with desired symbol and sources.
+
+```typescript
+const dom = new DXLinkDepthOfMarket(client, { symbol: 'AAPL', sources: ['ntv'] })
+```
+
+Configure created `dom`.
+
+```typescript
+dom.configure({
+  acceptAggregationPeriod: 10,
+  acceptDepthLimit: 5,
+})
+```
+
+Receive data from the channel.
+
+```typescript
+dom.addSnapshotListener((time, bids, asks) => {
+  // do something with snapshot
 })
 ```
