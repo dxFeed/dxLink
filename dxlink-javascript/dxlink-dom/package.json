@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-dom",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "private": false,
   "sideEffects": false,
   "description": "dxLink DOM provides access to depth of market service",
@@ -27,7 +27,7 @@
     "test:watch": "tsx watch src/index.test.ts"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.1.3"
+    "@dxfeed/dxlink-core": "0.2.0"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [

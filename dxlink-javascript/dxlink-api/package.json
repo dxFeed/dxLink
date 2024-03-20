@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-api",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "private": false,
   "sideEffects": false,
   "description": "dxLink API provides access to market data from dxFeed services",
@@ -26,9 +26,9 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.1.3",
-    "@dxfeed/dxlink-websocket-client": "0.1.3",
-    "@dxfeed/dxlink-feed": "0.1.3"
+    "@dxfeed/dxlink-core": "0.2.0",
+    "@dxfeed/dxlink-websocket-client": "0.2.0",
+    "@dxfeed/dxlink-feed": "0.2.0"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [
