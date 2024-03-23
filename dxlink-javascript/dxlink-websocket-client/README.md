@@ -13,7 +13,7 @@ npm install @dxfeed/dxlink-websocket-client
 Import library into your project.
 
 ```typescript
-import { DXLinkWebSocket } from '@dxfeed/dxlink-websocket-client'
+import { DXLinkWebSocketClient } from '@dxfeed/dxlink-websocket-client'
 ```
 
 ### Client
@@ -41,7 +41,7 @@ client.setAuthToken(token)
 Open isolated channel to service within single connection.
 
 ```typescript
-const channel = await client.openChannel('FEED', {
+const channel = client.openChannel('FEED', {
   contract: 'AUTO',
 })
 ```
