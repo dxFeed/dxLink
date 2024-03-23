@@ -13,7 +13,7 @@ npm install @dxfeed/dxlink-api
 Import client and feed into your project.
 
 ```typescript
-import { DXLinkWebSocket, DXLinkFeed } from '@dxfeed/dxlink-api'
+import { DXLinkWebSocketClient, DXLinkFeed } from '@dxfeed/dxlink-api'
 ```
 
 ### Client
@@ -77,7 +77,7 @@ feed.removeSubscriptions(sub1)
 Receive data from the channel.
 
 ```typescript
-feed.addEventListener(events) => {
+feed.addEventListener((events) => {
   // do something with events
 })
 ```
