@@ -2,7 +2,7 @@ asyncapi: 2.4.0
 defaultContentType: application/json
 info:
   title: dxLink WebSocket
-  version: ""
+  version: 1.0.2
   description: |
     ## Overview
     dxLink.WebSocket is a WebSocket-based protocol that allows you to receive market data from dxFeed services.
@@ -172,7 +172,7 @@ info:
 
     ## `DOM` service
 
-    `FEED` - provides real-time access to depth of market service.
+    `DOM` - provides real-time access to depth of market service.
 
     To open a channel, the client must send the `CHANNEL_REQUEST` message to the server with the `service` field set to `DOM` and desired parameters.
     The server will respond with the `CHANNEL_OPENED` message.
@@ -180,7 +180,7 @@ info:
     ```json
     {
       "type": "CHANNEL_REQUEST",
-      "channel": 0,
+      "channel": 1,
       "service": "DOM",
       "parameters": {
         "symbol": "AAPL",
@@ -254,6 +254,9 @@ info:
     // Connection establishment
     CLIENT -> { "type": "SETUP", "channel": "0", "keepaliveTimeout": 60, "acceptKeepaliveTimeout": 60, "version": "1.0.0" }
     SERVER <- { "type": "SETUP", "channel": "0", "keepaliveTimeout": 60, "acceptKeepaliveTimeout": 60, "version": "1.0.0" }
+
+    // Indicates that authorization is required
+    SERVER <- { "type": "AUTH_STATE", "state": "UNAUTHORIZED" }
 
     // Authorization
     CLIENT -> { "type": "AUTH", "token": "token#123" }
@@ -1250,6 +1253,22 @@ components:
               "fromTime": 1610000000000,
             }
 
+    JSONDouble:
+      description: Represents a JSON number that can be either a floating-point number or a special value (NaN, Infinity, -Infinity).
+      oneOf:
+        - type: number
+        - type: string
+          const: "NaN"
+        - type: string
+          const: "Infinity"
+        - type: string
+          const: "-Infinity"
+      examples:
+        - 123.45
+        - "NaN"
+        - "Infinity"
+        - "-Infinity"
+
     FeedEvent:
       oneOf:
         - $ref: "#/components/schemas/QuoteEvent"
@@ -1284,6 +1303,9 @@ components:
           type: object
 
     QuoteEvent:
+      description: |
+        Quote event is a snapshot of the best bid and ask prices, and other fields that change with each quote.
+        It represents the most recent information that is available about the best quote on the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1297,23 +1319,26 @@ components:
         bidExchangeCode:
           type: string
         bidPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         bidSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         askTime:
           type: number
         askExchangeCode:
           type: string
         askPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         askSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
           type: number
 
     ProfileEvent:
+      description: |
+        Profile information snapshot that contains security instrument description.
+        It represents the most recent information that is available about the traded security on the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1331,33 +1356,36 @@ components:
         haltEndTime:
           type: number
         highLimitPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         lowLimitPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         high52WeekPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         low52WeekPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         beta:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         earningsPerShare:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dividendFrequency:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         exDividendAmount:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         exDividendDayId:
           type: number
         shares:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         freeFloat:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
           type: number
 
     GreeksEvent:
+      description: |
+        Greeks event is a snapshot of the option price, Black-Scholes volatility and greeks.
+        It represents the most recent information that is available about the corresponding values on the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1371,25 +1399,28 @@ components:
         sequence:
           type: number
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         volatility:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         delta:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         gamma:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         theta:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         rho:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         vega:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
           type: number
 
     SummaryEvent:
+      description: |
+        Summary information snapshot about the trading session including session highs, lows, etc.
+        It represents the most recent information that is available about the trading session in the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1397,23 +1428,23 @@ components:
         dayId:
           type: number
         dayOpenPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayHighPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayLowPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayClosePrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayClosePriceType:
           type: string
         prevDayId:
           type: number
         prevDayClosePrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         prevDayClosePriceType:
           type: string
         prevDayVolume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         openInterest:
           type: number
         eventSymbol:
@@ -1422,6 +1453,9 @@ components:
           type: number
 
     CandleEvent:
+      description: |
+        Candle event with open, high, low, close prices and other information for a specific period.
+        Event symbol of the candle is represented with Candle symbol. Since the Candle is a time-series event, it is typically subscribed by `TimeSeriesSubscription` to specify a subscription time range.
       type: object
       properties:
         eventType:
@@ -1441,27 +1475,30 @@ components:
         count:
           type: number
         open:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         high:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         low:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         close:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         volume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         VWAP:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         bidVolume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         askVolume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         impVolatility:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         openInterest:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
 
     TheoPriceEvent:
+      description: |
+        Theo price is a snapshot of the theoretical option price computation that is periodically performed by `dxPrice` model-free computation.
+        It represents the most recent information that is available about the corresponding values at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1475,23 +1512,28 @@ components:
         sequence:
           type: number
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         underlyingPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         delta:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         gamma:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dividend:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         interest:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
           type: number
 
     UnderlyingEvent:
+      description: |
+        Underlying event is a snapshot of computed values that are available for an option underlying
+        symbol based on the option prices on the market.
+        It represents the most recent information that is available about the corresponding values on
+        the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1505,17 +1547,17 @@ components:
         sequence:
           type: number
         volatility:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         frontVolatility:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         backVolatility:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         callVolume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         putVolume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         putCallRatio:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
@@ -1536,6 +1578,11 @@ components:
           type: object
 
     OptionSaleEvent:
+      description: |
+        Option Sale event represents a trade or another market event with the price
+        (for example, market open/close price, etc.) for each option symbol listed under the specified Underlying.
+        Option Sales are intended to provide information about option trades in a continuous time slice with
+        the additional metrics, like Option Volatility, Option Delta, and Underlying Price.
       type: object
       properties:
         eventType:
@@ -1553,13 +1600,13 @@ components:
         exchangeCode:
           type: string
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         size:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         bidPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         askPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         exchangeSaleConditions:
           type: string
         tradeThroughExempt:
@@ -1575,11 +1622,11 @@ components:
         type:
           type: string
         underlyingPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         volatility:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         delta:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         optionSymbol:
           type: string
         eventSymbol:
@@ -1588,6 +1635,11 @@ components:
           type: number
 
     SeriesEvent:
+      description: |
+        Series event is a snapshot of computed values that are available for all option series for
+        a given underlying symbol based on the option prices on the market.
+        It represents the most recent information that is available about the corresponding values on
+        the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1603,25 +1655,29 @@ components:
       expiration:
         type: number
       volatility:
-        type: number
+        $ref: "#/components/schemas/JSONDouble"
       callVolume:
-        type: number
+        $ref: "#/components/schemas/JSONDouble"
       putVolume:
-        type: number
+        $ref: "#/components/schemas/JSONDouble"
       putCallRatio:
-        type: number
+        $ref: "#/components/schemas/JSONDouble"
       forwardPrice:
-        type: number
+        $ref: "#/components/schemas/JSONDouble"
       dividend:
-        type: number
+        $ref: "#/components/schemas/JSONDouble"
       interest:
-        type: number
+        $ref: "#/components/schemas/JSONDouble"
       eventSymbol:
         type: string
       eventTime:
         type: number
 
     TimeAndSaleEvent:
+      description: |
+        Time and Sale represents a trade or other market event with price, like market open/close price, etc.
+        Time and Sales are intended to provide information about trades in a continuous time slice
+        (unlike `Trade` events which are supposed to provide snapshot about the current last trade).
       type: object
       properties:
         eventType:
@@ -1639,13 +1695,13 @@ components:
         exchangeCode:
           type: string
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         size:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         bidPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         askPrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         exchangeSaleConditions:
           type: string
         tradeThroughExempt:
@@ -1670,6 +1726,9 @@ components:
           type: number
 
     TradeEvent:
+      description: |
+        Trade event is a snapshot of the price and size of the last trade during regular trading hours
+        and an overall day volume and day turnover.
       type: object
       properties:
         eventType:
@@ -1683,17 +1742,17 @@ components:
         exchangeCode:
           type: string
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         change:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         size:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayId:
           type: number
         dayVolume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayTurnover:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         tickDirection:
           type: string
         extendedTradingHours:
@@ -1704,6 +1763,11 @@ components:
           type: number
 
     TradeETHEvent:
+      description: |
+        TradeETH event is a snapshot of the price and size of the last trade during
+        extended trading hours and the extended trading hours day volume and day turnover.
+        This event is defined only for symbols (typically stocks and ETFs) with a designated
+        extended trading hours (ETH, pre market and post market trading sessions).
       type: object
       properties:
         eventType:
@@ -1717,17 +1781,17 @@ components:
         exchangeCode:
           type: string
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         change:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         size:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayId:
           type: number
         dayVolume:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         dayTurnover:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         tickDirection:
           type: string
         extendedTradingHours:
@@ -1738,6 +1802,10 @@ components:
           type: number
 
     OrderEvent:
+      description: |
+        Order event is a snapshot for a full available market depth for a symbol.
+        The collection of order events of a symbol represents the most recent information
+        that is available about orders on the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1765,11 +1833,11 @@ components:
         auxOrderId:
           type: number
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         size:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         executedSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         count:
           type: number
         exchangeCode:
@@ -1781,15 +1849,20 @@ components:
         tradeId:
           type: number
         tradePrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         tradeSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
           type: number
 
     SpreadOrderEvent:
+      description: |
+        Spread order event is a snapshot for a full available market depth for all spreads
+        on a given underlying symbol. The collection of spread order events of a symbol
+        represents the most recent information that is available about spread orders on
+        the market at any given moment of time.
       type: object
       properties:
         eventType:
@@ -1817,11 +1890,11 @@ components:
         auxOrderId:
           type: number
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         size:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         executedSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         count:
           type: number
         exchangeCode:
@@ -1833,25 +1906,30 @@ components:
         tradeId:
           type: number
         tradePrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         tradeSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
           type: number
 
     AnalyticOrderEvent:
+      description: |
+        Represents an extension of Order introducing analytic information, e.g. adding to this order iceberg related
+        information (icebergPeakSize, icebergHiddenSize, icebergExecutedSize).
+        The collection of analytic order events of a symbol represents the most recent analytic information
+        that is available about orders on the market at any given moment of time.
       type: object
       properties:
         eventType:
           const: AnalyticOrder
         icebergPeakSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         icebergHiddenSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         icebergExecutedSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         icebergType:
           type: string
         marketMaker:
@@ -1877,11 +1955,11 @@ components:
         auxOrderId:
           type: number
         price:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         size:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         executedSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         count:
           type: number
         exchangeCode:
@@ -1893,9 +1971,9 @@ components:
         tradeId:
           type: number
         tradePrice:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         tradeSize:
-          type: number
+          $ref: "#/components/schemas/JSONDouble"
         eventSymbol:
           type: string
         eventTime:
