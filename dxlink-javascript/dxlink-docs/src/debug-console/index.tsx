@@ -137,13 +137,13 @@ export function DebugConsole() {
     }
   }, [client, handleDisconnect])
 
-  const handleOpenChannel = async (contract: FeedContract) => {
+  const handleOpenChannel = () => {
     try {
       if (client === undefined) {
         throw new Error('Client must be connected')
       }
 
-      const feed = new DXLinkFeed(client, contract, {
+      const feed = new DXLinkFeed(client, FeedContract.AUTO, {
         logLevel: DXLinkLogLevel.DEBUG,
       })
 
@@ -168,16 +168,15 @@ export function DebugConsole() {
         info={
           connectionDetails !== undefined && (
             <>
-              {
-                <Version level={4}>
-                  <b>Client version</b>: {connectionDetails.clientVersion}
-                </Version>
-              }
-              {connectionDetails.serverVersion !== undefined && (
-                <Version level={4}>
-                  <b>Server version</b>: {connectionDetails.serverVersion}
-                </Version>
-              )}
+              <Version level={4}>
+                <b>Client version</b>: {connectionDetails.clientVersion}
+              </Version>
+              <Version level={4}>
+                <b>Server version</b>:{' '}
+                {connectionDetails.serverVersion !== undefined
+                  ? connectionDetails.serverVersion
+                  : '—'}
+              </Version>
             </>
           )
         }

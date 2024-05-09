@@ -7,7 +7,6 @@ import styled from 'styled-components'
 import { ChannelWidget } from './channel-widget'
 import { FeedChannelManager } from './feed-channel-manager'
 import { ContentTemplate } from '../common/content-template'
-import { Select } from '../common/select'
 
 const Actions = styled.div`
   display: flex;
@@ -15,9 +14,8 @@ const Actions = styled.div`
   justify-content: flex-end;
 `
 
-const ContractSelect = styled(Select)`
-  width: 120px;
-  margin-right: ${unit(1)};
+const ActionButton = styled(Button)`
+  margin-left: ${unit(1)};
 `
 
 const ChannelsGroup = styled.div`
@@ -30,39 +28,24 @@ const ChannelItemGroup = styled.div`
   padding: ${unit(1)} 0;
 `
 
-const CONTRACT_LIST: FeedContract[] = Object.values(FeedContract)
-
 export interface ChannelManagerProps {
   channels: DXLinkFeed<FeedContract>[]
-  onOpenChannel: (contract: FeedContract) => Promise<void>
+  onOpenChannel: () => void
 }
 
 export function ChannelsManager({ channels, onOpenChannel }: ChannelManagerProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const [contract, setContract] = useState<FeedContract>(FeedContract.AUTO)
-
   const handleOpenChannel = () => {
-    if (isLoading) {
-      return
-    }
-
-    setIsLoading(true)
-    onOpenChannel(contract).finally(() => setIsLoading(false))
+    onOpenChannel()
   }
 
   return (
     <ContentTemplate title="Channels">
       <Actions>
-        <ContractSelect
-          value={contract}
-          label="Contract"
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onChange={(e) => setContract(e as any)}
-          options={CONTRACT_LIST}
-        />
-        <Button onClick={handleOpenChannel} disabled={isLoading} color={'secondary'}>
+        <ActionButton color={'secondary'}>Open Candle widget</ActionButton>
+        <ActionButton color={'secondary'}>Open DOM Channel</ActionButton>
+        <ActionButton onClick={handleOpenChannel} color={'secondary'}>
           Open FEED Channel
-        </Button>
+        </ActionButton>
       </Actions>
 
       {channels.length > 0 && (
