@@ -7,6 +7,7 @@ import {
   DXLinkLogLevel,
   DXLinkWebSocketClient,
   FeedContract,
+  DXLinkDepthOfMarket,
 } from '@dxfeed/dxlink-api'
 import { Text } from '@dxfeed/ui-kit/Text'
 import { unit } from '@dxfeed/ui-kit/utils'
@@ -14,7 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 import styled from 'styled-components'
 
 import { Authorization } from './authorization'
-import { ChannelsManager } from './channels-manager'
+import { ChannelsManager, type Channel } from './channels-manager'
 import { type ConnectParams, Connection } from './connection'
 import { Errors } from './errors'
 
@@ -47,7 +48,7 @@ export function DebugConsole() {
   const [client, setClient] = useState<DXLinkWebSocketClient>()
   const [connectionState, setConnectionState] = useState<ConnectionState>(DEFAULT_CONNECTION_STATE)
   const [authState, setAuthState] = useState<DXLinkAuthState | undefined>()
-  const [channels, setChannels] = useState<DXLinkFeed<FeedContract>[]>([])
+  const [channels, setChannels] = useState<Channel[]>([])
 
   const handleError = (error: unknown) => {
     console.error(error)
@@ -137,7 +138,7 @@ export function DebugConsole() {
     }
   }, [client, handleDisconnect])
 
-  const handleOpenChannel = () => {
+  const handleOpenFeed = () => {
     try {
       if (client === undefined) {
         throw new Error('Client must be connected')
@@ -148,6 +149,29 @@ export function DebugConsole() {
       })
 
       setChannels((prev) => [...prev, feed])
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
+  const handleOpenDom = (symbol: string, source: string) => {
+    try {
+      if (client === undefined) {
+        throw new Error('Client must be connected')
+      }
+
+      const dom = new DXLinkDepthOfMarket(
+        client,
+        {
+          symbol,
+          sources: [source],
+        },
+        {
+          logLevel: DXLinkLogLevel.DEBUG,
+        }
+      )
+
+      setChannels((prev) => [...prev, dom])
     } catch (error) {
       handleError(error)
     }
@@ -189,7 +213,11 @@ export function DebugConsole() {
           {authState === 'AUTHORIZED' && (
             <ChannelWrapper>
               {state === DXLinkConnectionState.CONNECTED && (
-                <ChannelsManager channels={channels} onOpenChannel={handleOpenChannel} />
+                <ChannelsManager
+                  channels={channels}
+                  onOpenFeed={handleOpenFeed}
+                  onOpenDom={handleOpenDom}
+                />
               )}
             </ChannelWrapper>
           )}

@@ -1,4 +1,8 @@
-export { DepthOfMarketDataFormat } from './messages'
+export {
+  DepthOfMarketDataFormat,
+  type DepthOfMarketOrder,
+  type DepthOfMarketParameters,
+} from './messages'
 export {
   type DXLinkDepthOfMarketOptions,
   type DepthOfMarketAcceptConfig,

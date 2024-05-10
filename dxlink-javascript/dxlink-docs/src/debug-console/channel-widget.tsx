@@ -35,14 +35,27 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
     channel.close()
   }
 
+  const channelTitle = `Channel #${channel.id} ${channel.service}`
+
   if (state === DXLinkChannelState.CLOSED) {
-    return <ContentTemplate kind={'secondary'} title={`Channel #${channel.id} - CLOSED`} />
+    return (
+      <ContentTemplate
+        kind={'secondary'}
+        title={`${channelTitle} - CLOSED`}
+        actions={<Errors errors={errors} />}
+      />
+    )
   }
+
+  const parameters = Object.entries(channel.parameters).reduce(
+    (acc, [key, value]) => `${acc}${acc != '' ? ', ' : ''}${key}: ${value}`,
+    ''
+  )
 
   return (
     <ContentTemplate
       kind={'secondary'}
-      title={`Channel #${channel.id} - ${channel.parameters.contract}`}
+      title={`${channelTitle} - ${parameters}`}
       actions={
         <>
           <Errors errors={errors} />

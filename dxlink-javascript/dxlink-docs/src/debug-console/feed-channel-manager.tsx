@@ -15,6 +15,7 @@ import styled from 'styled-components'
 import { FeedData } from './feed-data'
 import { FeedEventFieldsView } from './feed-event-fields'
 import { FeedSubscription } from './feed-subscriptions'
+import { FieldWrapper, FormActions } from './forms'
 import { ContentTemplate } from '../common/content-template'
 import { Select } from '../common/select'
 
@@ -29,20 +30,10 @@ const ConfigGroup = styled.div`
   padding-bottom: ${unit(1.5)};
 `
 
-const ConfigGroupActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  width: 100%;
-`
-
 const CurrentConfigGroup = styled.div`
   display: flex;
   padding-left: ${unit(1)};
   width: 50%;
-`
-
-const FieldWrapper = styled.div`
-  padding: ${unit(1.5)} 0;
 `
 
 const DataFormatSelect = styled(Select)`
@@ -183,11 +174,11 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
               />
             </FieldWrapper>
 
-            <ConfigGroupActions>
+            <FormActions>
               <Button type="submit" color={'primary'} kind={'outline'}>
                 Setup
               </Button>
-            </ConfigGroupActions>
+            </FormActions>
           </ContentTemplate>
         </ConfigSetupGroup>
         <CurrentConfigGroup>

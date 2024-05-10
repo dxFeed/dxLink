@@ -12,7 +12,7 @@
   "dependencies": {
     "@asyncapi/react-component": "1.0.0-next.47",
     "@dxfeed/dxlink-api": "*",
-    "@dxfeed/ui-kit": "2.7.0",
+    "@dxfeed/ui-kit": "2.15.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-is": "^18.2.0",

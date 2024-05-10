@@ -154,6 +154,7 @@ export class DXLinkWebSocketChannel implements DXLinkChannel {
   private clear = () => {
     this.messageListeners.clear()
     this.statusListeners.clear()
-    this.errorListeners.clear()
+    // TODO: rethink approach when error came after channel is closed
+    // this.errorListeners.clear()
   }
 }

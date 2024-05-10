@@ -432,6 +432,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
   private requestActiveChannels = (): void => {
     for (const channel of this.channels.values()) {
+      // clear closed channels
       if (channel.getState() === DXLinkChannelState.CLOSED) {
         this.channels.delete(channel.id)
         continue
