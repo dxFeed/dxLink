@@ -65,8 +65,12 @@ export function CandlesSubscription({ onSet }: CandlesSubscriptionProps) {
               onChange={(e) => setSymbol(e.target.value)}
             />
             <HelperMessage state="normal">
-              <a href="https://currentmillis.com/" target="_blank" rel="noreferrer">
-                Milliseconds since epoch
+              <a
+                href="https://kb.dxfeed.com/en/data-access/rest-api.html#candle-symbols"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Candle symbols
               </a>
             </HelperMessage>
           </FieldWrapper>

@@ -188,11 +188,6 @@ export function DebugConsole() {
         logLevel: DXLinkLogLevel.DEBUG,
       })
 
-      candles.setSubscription({
-        symbol: 'AAPL{=d}',
-        fromTime: Date.now() - 1000 * 60 * 60 * 24 * 30,
-      })
-
       setChannels((prev) => [...prev, candles])
     } catch (error) {
       handleError(error)
