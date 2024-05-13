@@ -1,5 +1,5 @@
 import { type DepthOfMarketOrder } from '@dxfeed/dxlink-api'
-import { Table, TableCell, TableHeadCell, TableRow } from '@dxfeed/ui-kit/Table'
+import { Table, TableCell, TableColumn, TableHeadCell, TableRow } from '@dxfeed/ui-kit/Table'
 import { Text } from '@dxfeed/ui-kit/Text'
 import { unit } from '@dxfeed/ui-kit/utils'
 import styled from 'styled-components'
@@ -11,12 +11,10 @@ const EventGroup = styled.div`
 `
 const TableGroup = styled.div`
   display: flex;
-  flex-direction: row;
 `
 
 export const DataTable = styled(Table)`
-  display: table;
-  width: 50%;
+  width: 100%;
 `
 
 export const DataTableRow = styled(TableRow)`
@@ -24,13 +22,11 @@ export const DataTableRow = styled(TableRow)`
 `
 
 const DataTableHeadCell = styled(TableHeadCell)`
-  display: table-cell;
-  padding: ${unit(1.5)};
+  padding: ${unit(1)};
 `
 
 const DataTableCell = styled(TableCell)`
-  display: table-cell;
-  padding: ${unit(1.5)};
+  padding: ${unit(1)};
 `
 
 const NoData = styled(Text)`
@@ -39,6 +35,18 @@ const NoData = styled(Text)`
   padding: ${unit(2)};
   justify-content: center;
   align-items: center;
+`
+
+const Ask = styled(TableColumn)`
+  flex: 1;
+`
+
+const Bid = styled(TableColumn)`
+  flex: 1;
+`
+
+const Price = styled(TableColumn)`
+  width: 20%;
 `
 
 export interface DomSnapshotData {
@@ -73,29 +81,36 @@ export function DomSnapshot({ data }: DomSnapshotProps) {
           kind="primary"
         >
           <TableGroup>
-            <DataTable>
-              <DataTableRow>
-                <DataTableHeadCell>Bid</DataTableHeadCell>
+            <DataTable basedOrientation="column">
+              <Bid>
+                <DataTableHeadCell align="right">Bid Size</DataTableHeadCell>
+                {bids.map((order, idx) => (
+                  <DataTableCell align="right" key={idx}>
+                    {order.size}
+                  </DataTableCell>
+                ))}
+              </Bid>
+              <Price>
                 <DataTableHeadCell>Bid Price</DataTableHeadCell>
-              </DataTableRow>
-              {bids.map((order, idx) => (
-                <DataTableRow key={idx}>
-                  <DataTableCell>{order.size}</DataTableCell>
-                  <DataTableCell>{order.price}</DataTableCell>
-                </DataTableRow>
-              ))}
-            </DataTable>
-            <DataTable>
-              <DataTableRow>
+                {bids.map((order, idx) => (
+                  <DataTableCell key={idx}>{order.price}</DataTableCell>
+                ))}
+              </Price>
+
+              <Price>
                 <DataTableHeadCell>Ask Price</DataTableHeadCell>
-                <DataTableHeadCell>Ask</DataTableHeadCell>
-              </DataTableRow>
-              {asks.map((order, idx) => (
-                <DataTableRow key={idx}>
-                  <DataTableCell>{order.price}</DataTableCell>
-                  <DataTableCell>{order.size}</DataTableCell>
-                </DataTableRow>
-              ))}
+                {asks.map((order, idx) => (
+                  <DataTableCell key={idx}>{order.price}</DataTableCell>
+                ))}
+              </Price>
+              <Ask>
+                <DataTableHeadCell align="left">Ask Size</DataTableHeadCell>
+                {asks.map((order, idx) => (
+                  <DataTableCell align="left" key={idx}>
+                    {order.size}
+                  </DataTableCell>
+                ))}
+              </Ask>
             </DataTable>
           </TableGroup>
         </ContentTemplate>

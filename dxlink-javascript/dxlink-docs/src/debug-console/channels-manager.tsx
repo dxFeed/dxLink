@@ -1,16 +1,14 @@
 import { DXLinkFeed, FeedContract, DXLinkDepthOfMarket } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
-import { Paper } from '@dxfeed/ui-kit/Paper'
 import { Popover } from '@dxfeed/ui-kit/Popover'
-import { TextField } from '@dxfeed/ui-kit/TextField'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { useState } from 'react'
 import styled from 'styled-components'
 
 import { ChannelWidget } from './channel-widget'
 import { DomChannelManager } from './dom-channel-manager'
+import { DomOpenForm } from './dom-open-form'
 import { FeedChannelManager } from './feed-channel-manager'
-import { FieldWrapper, FormActions } from './forms'
 import { ContentTemplate } from '../common/content-template'
 
 const Actions = styled.div`
@@ -38,20 +36,12 @@ export type Channel = DXLinkFeed<FeedContract> | DXLinkDepthOfMarket
 export interface ChannelManagerProps {
   channels: Channel[]
   onOpenFeed: () => void
-  onOpenDom: (symbol: string, source: string) => void
+  onOpenDom: (symbol: string, sources: string) => void
 }
 
 export function ChannelsManager({ channels, onOpenFeed, onOpenDom }: ChannelManagerProps) {
   const [anchorElRef, setAnchorElRef] = useState<HTMLElement | null>(null)
   const [domIsOpen, setDomIsOpen] = useState(false)
-
-  const [domSymbol, setDomSymbol] = useState('')
-  const [domSource, setDomSource] = useState('')
-
-  const handleOpenDom = () => {
-    onOpenDom(domSymbol, domSource)
-    setDomIsOpen(false)
-  }
 
   return (
     <ContentTemplate title="Channels">
@@ -65,40 +55,18 @@ export function ChannelsManager({ channels, onOpenFeed, onOpenDom }: ChannelMana
           setDomIsOpen(false)
         }}
       >
-        <Paper type="outlined">
-          <ContentTemplate title={'DOM parameters'} kind="primary">
-            <FieldWrapper>
-              <TextField
-                label={'Symbol'}
-                value={domSymbol}
-                onChange={(e) => {
-                  setDomSymbol(e.target.value)
-                }}
-              />
-            </FieldWrapper>
-            <FieldWrapper>
-              <TextField
-                label={'Source'}
-                value={domSource}
-                onChange={(e) => {
-                  setDomSource(e.target.value)
-                }}
-              />
-            </FieldWrapper>
-
-            <FormActions>
-              <Button type="submit" color={'primary'} kind={'outline'} onClick={handleOpenDom}>
-                Open
-              </Button>
-            </FormActions>
-          </ContentTemplate>
-        </Paper>
+        <DomOpenForm
+          onOpen={(symbol, sources) => {
+            setDomIsOpen(false)
+            onOpenDom(symbol, sources)
+          }}
+        />
       </Popover>
 
       <Actions ref={setAnchorElRef}>
-        <ActionButton color={'secondary'}>Open Candle Widget</ActionButton>
+        {/* <ActionButton color={'secondary'}>Open Candle Widget</ActionButton> */}
         <ActionButton
-          color={domIsOpen ? 'primary' : 'secondary'}
+          color={domIsOpen ? 'accent' : 'secondary'}
           onClick={() => {
             setDomIsOpen(true)
           }}

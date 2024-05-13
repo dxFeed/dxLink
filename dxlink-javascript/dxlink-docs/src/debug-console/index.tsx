@@ -154,7 +154,7 @@ export function DebugConsole() {
     }
   }
 
-  const handleOpenDom = (symbol: string, source: string) => {
+  const handleOpenDom = (symbol: string, sources: string) => {
     try {
       if (client === undefined) {
         throw new Error('Client must be connected')
@@ -164,7 +164,7 @@ export function DebugConsole() {
         client,
         {
           symbol,
-          sources: [source],
+          sources: sources.split(',').map((s) => s.trim()),
         },
         {
           logLevel: DXLinkLogLevel.DEBUG,
