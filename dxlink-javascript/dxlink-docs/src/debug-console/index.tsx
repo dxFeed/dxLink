@@ -18,6 +18,7 @@ import { Authorization } from './authorization'
 import { ChannelsManager, type Channel } from './channels-manager'
 import { type ConnectParams, Connection } from './connection'
 import { Errors } from './errors'
+import { DXLinkCandles } from '../candles/candles'
 
 const Root = styled.div`
   display: flex;
@@ -177,6 +178,27 @@ export function DebugConsole() {
     }
   }
 
+  const handleOpenCandles = () => {
+    try {
+      if (client === undefined) {
+        throw new Error('Client must be connected')
+      }
+
+      const candles = new DXLinkCandles(client, {
+        logLevel: DXLinkLogLevel.DEBUG,
+      })
+
+      candles.setSubscription({
+        symbol: 'AAPL{=d}',
+        fromTime: Date.now() - 1000 * 60 * 60 * 24 * 30,
+      })
+
+      setChannels((prev) => [...prev, candles])
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
   const state = connectionState.state
   const connectionDetails = connectionState?.details
   const serverKeepaliveTimeout = connectionDetails?.serverKeepaliveTimeout
@@ -217,6 +239,7 @@ export function DebugConsole() {
                   channels={channels}
                   onOpenFeed={handleOpenFeed}
                   onOpenDom={handleOpenDom}
+                  onOpenCandles={handleOpenCandles}
                 />
               )}
             </ChannelWrapper>

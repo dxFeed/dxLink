@@ -5,10 +5,12 @@ import { unit } from '@dxfeed/ui-kit/utils'
 import { useState } from 'react'
 import styled from 'styled-components'
 
+import { CandlesChannelManager } from './candles-channel-manager'
 import { ChannelWidget } from './channel-widget'
 import { DomChannelManager } from './dom-channel-manager'
 import { DomOpenForm } from './dom-open-form'
 import { FeedChannelManager } from './feed-channel-manager'
+import { DXLinkCandles } from '../candles/candles'
 import { ContentTemplate } from '../common/content-template'
 
 const Actions = styled.div`
@@ -31,15 +33,21 @@ const ChannelItemGroup = styled.div`
   padding: ${unit(1)} 0;
 `
 
-export type Channel = DXLinkFeed<FeedContract> | DXLinkDepthOfMarket
+export type Channel = DXLinkFeed<FeedContract> | DXLinkDepthOfMarket | DXLinkCandles
 
 export interface ChannelManagerProps {
   channels: Channel[]
   onOpenFeed: () => void
   onOpenDom: (symbol: string, sources: string) => void
+  onOpenCandles: () => void
 }
 
-export function ChannelsManager({ channels, onOpenFeed, onOpenDom }: ChannelManagerProps) {
+export function ChannelsManager({
+  channels,
+  onOpenFeed,
+  onOpenDom,
+  onOpenCandles,
+}: ChannelManagerProps) {
   const [anchorElRef, setAnchorElRef] = useState<HTMLElement | null>(null)
   const [domIsOpen, setDomIsOpen] = useState(false)
 
@@ -64,7 +72,9 @@ export function ChannelsManager({ channels, onOpenFeed, onOpenDom }: ChannelMana
       </Popover>
 
       <Actions ref={setAnchorElRef}>
-        {/* <ActionButton color={'secondary'}>Open Candle Widget</ActionButton> */}
+        <ActionButton color={'secondary'} onClick={onOpenCandles}>
+          Open Candle Widget
+        </ActionButton>
         <ActionButton
           color={domIsOpen ? 'accent' : 'secondary'}
           onClick={() => {
@@ -85,6 +95,7 @@ export function ChannelsManager({ channels, onOpenFeed, onOpenDom }: ChannelMana
               <ChannelWidget channel={channel.getChannel()}>
                 {channel instanceof DXLinkFeed && <FeedChannelManager channel={channel} />}
                 {channel instanceof DXLinkDepthOfMarket && <DomChannelManager channel={channel} />}
+                {channel instanceof DXLinkCandles && <CandlesChannelManager channel={channel} />}
               </ChannelWidget>
             </ChannelItemGroup>
           ))}
