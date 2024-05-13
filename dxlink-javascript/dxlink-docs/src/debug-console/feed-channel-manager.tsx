@@ -170,6 +170,7 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
                 label={'Accept event fields'}
                 description={'Specify the fields, separated by commas (,)'}
                 value={acceptEventFields}
+                placement="right"
                 onChange={setAcceptEventFields}
               />
             </FieldWrapper>
@@ -197,7 +198,12 @@ export function FeedChannelManager({ channel }: FeedChannelmanagerProps) {
             </FieldWrapper>
 
             <FieldWrapper>
-              <FeedEventFieldsView label={'Event fields'} value={config?.eventFields} readOnly />
+              <FeedEventFieldsView
+                label={'Event fields'}
+                value={config?.eventFields}
+                readOnly
+                placement="left"
+              />
             </FieldWrapper>
           </ContentTemplate>
         </CurrentConfigGroup>

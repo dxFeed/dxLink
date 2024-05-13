@@ -22,11 +22,13 @@ const Wrapper = styled.div<{ kind: Required<ContentTemplateProps>['kind'] }>`
 const Header = styled.div`
   display: flex;
   justify-content: space-between;
+  min-height: ${unit(5)};
 `
 
 const Title = styled(Text)`
   display: flex;
   padding: ${unit(1)} ${unit(1.5)};
+  align-items: center;
   color: ${({ theme }) => theme.palette.secondary.main};
 `
 

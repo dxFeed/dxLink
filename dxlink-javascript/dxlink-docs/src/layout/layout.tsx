@@ -13,6 +13,7 @@ const Content = styled.div`
   width: 100%;
   max-width: calc(100%);
   padding: ${unit(3)};
+  padding-bottom: ${unit(10)};
   margin: 0 auto;
 
   @media (min-width: 768px) {

@@ -108,6 +108,18 @@ export function FeedSubscription({ onAdd, onRemove, onReset, contract }: FeedSub
               label="Event type"
               onChange={setEventType}
               options={EVENT_TYPES}
+              description={
+                <>
+                  Detailed information{' '}
+                  <a
+                    href="https://kb.dxfeed.com/en/data-model/dxfeed-api-market-events.html#event-types"
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    kb.dxfeed.com
+                  </a>
+                </>
+              }
             />
           </FieldTypeGroup>
           <ParamTextField>
@@ -153,8 +165,21 @@ export function FeedSubscription({ onAdd, onRemove, onReset, contract }: FeedSub
                   <OrderSourceSelect
                     label={'Source'}
                     value={source}
+                    placement="left"
                     onChange={(value) => setSource(value)}
                     options={FEED_ORDER_SOURCE}
+                    description={
+                      <>
+                        Detailed information{' '}
+                        <a
+                          href="https://kb.dxfeed.com/en/data-model/qd-model-of-market-events.html#order-x"
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          kb.dxfeed.com
+                        </a>
+                      </>
+                    }
                   />
                 )}
               </OrderSourceWrapper>

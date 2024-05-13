@@ -76,11 +76,7 @@ export function FeedData({ eventFields, data }: FeedDataProps) {
                 <DataTable>
                   <DataTableRow>
                     {fields.map((eventField) => (
-                      <DataTableHeadCell key={eventField}>
-                        <Tooltip content={eventField} placement={'top'}>
-                          {eventField}
-                        </Tooltip>
-                      </DataTableHeadCell>
+                      <DataTableHeadCell key={eventField}>{eventField}</DataTableHeadCell>
                     ))}
                   </DataTableRow>
                   {symbols.map((symbol) => (
@@ -90,7 +86,7 @@ export function FeedData({ eventFields, data }: FeedDataProps) {
                         return (
                           <DataTableCell key={eventField}>
                             <Tooltip content={value} placement={'top'}>
-                              {value}
+                              {(trigger) => <span {...trigger}>{value}</span>}
                             </Tooltip>
                           </DataTableCell>
                         )
@@ -111,11 +107,7 @@ export function FeedData({ eventFields, data }: FeedDataProps) {
               <DataTable>
                 <DataTableRow>
                   {Object.keys(unknownData).map((eventField) => (
-                    <DataTableHeadCell key={eventField}>
-                      <Tooltip content={eventField} placement={'top'}>
-                        {eventField}
-                      </Tooltip>
-                    </DataTableHeadCell>
+                    <DataTableHeadCell key={eventField}>{eventField}</DataTableHeadCell>
                   ))}
                 </DataTableRow>
                 <DataTableRow>
@@ -124,7 +116,7 @@ export function FeedData({ eventFields, data }: FeedDataProps) {
                     return (
                       <DataTableCell key={eventField}>
                         <Tooltip content={value} placement={'top'}>
-                          {value}
+                          {(trigger) => <span {...trigger}>{value}</span>}
                         </Tooltip>
                       </DataTableCell>
                     )

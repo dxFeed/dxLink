@@ -23,12 +23,18 @@ const Field = styled.div`
   padding: ${unit(0.5)} ${unit(1.5)};
 `
 
+const Description = styled.div`
+  padding: ${unit(1)} ${unit(2)};
+  ${(p) => p.theme.typography.body.regular[3]};
+`
+
 export interface FeedEventFieldsProps {
   label: string
   description?: string
   value?: FeedEventFields
   onChange?: (value: FeedEventFields) => void
   readOnly?: boolean
+  placement?: 'right' | 'left'
 }
 
 export function FeedEventFieldsView({
@@ -37,6 +43,7 @@ export function FeedEventFieldsView({
   value,
   onChange,
   readOnly,
+  placement,
 }: FeedEventFieldsProps) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -57,8 +64,14 @@ export function FeedEventFieldsView({
       isOpen={isOpen}
       selectedValue={label}
       onOpen={handleDropdownOpen}
+      paperProps={{
+        maxHeight: 440,
+      }}
       onClose={handleDropdownClose}
-      head={description}
+      head={label}
+      placement={placement}
+      overflowMode="tethered"
+      footer={description && <Description>{description}</Description>}
     >
       {!readOnly && (
         <Field>
