@@ -712,7 +712,13 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
     }
 
     // Send the config to the channel if there is event fields to send or if it is forced to send
-    if (force || acceptEventFields !== undefined) {
+    // or if the aggregation period or data format was changed
+    if (
+      force ||
+      acceptEventFields !== undefined ||
+      acceptAggregationPeriod !== this.config.aggregationPeriod ||
+      acceptDataFormat !== this.config.dataFormat
+    ) {
       this.channel.send({
         type: 'FEED_SETUP',
         acceptAggregationPeriod,
