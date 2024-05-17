@@ -51,8 +51,8 @@ export interface DXLinkCandleSubscription {
   readonly fromTime: number
 }
 
-export type DXLinkCandleSnapshot = {
-  isFirst: boolean
+export type DXLinkCandleData = {
+  isSnapshot: boolean
   events: ReadonlyArray<Readonly<DXLinkCandleEvent>>
 }
 
@@ -104,7 +104,7 @@ export class DXLinkCandles {
   private pQueue: DXLinkCandleEvent[] = [] // pending queue
   private events = new SortedList<DXLinkCandleEvent>((a, b) => a.index - b.index) // events accumulator
 
-  private listeners = new Set<(snapshot: DXLinkCandleSnapshot) => void>() // listeners
+  private listeners = new Set<(data: DXLinkCandleData) => void>() // listeners
 
   constructor(
     private readonly client: DXLinkClient,
@@ -158,16 +158,15 @@ export class DXLinkCandles {
     })
   }
 
-  addListener(listener: (snapshot: DXLinkCandleSnapshot) => void) {
+  addListener(listener: (snapshot: DXLinkCandleData) => void) {
     this.listeners.add(listener)
   }
 
-  removeListener(listener: (snapshot: DXLinkCandleSnapshot) => void) {
+  removeListener(listener: (snapshot: DXLinkCandleData) => void) {
     this.listeners.delete(listener)
   }
 
   private processEvent = (event: DXLinkCandleEvent) => {
-    let isFirstSnapshot = false
     const eventFlags = parseEventFlags(event)
     // Process snapshot start and clear params
     if (eventFlags.snapshotBegin) {
@@ -191,10 +190,10 @@ export class DXLinkCandles {
     }
 
     // If the snapshot
+    const isCompleteSnapshot = this.isCompleteSnapshot
     if (this.isCompleteSnapshot) {
       this.isCompleteSnapshot = false
       this.events.clear() // remove any unprocessed leftovers on new snapshot
-      isFirstSnapshot = true
     }
 
     // process pending queue
@@ -219,7 +218,7 @@ export class DXLinkCandles {
     if (hasChanged) {
       for (const listener of this.listeners) {
         listener({
-          isFirst: isFirstSnapshot,
+          isSnapshot: isCompleteSnapshot,
           events: this.events.toArray(),
         })
       }

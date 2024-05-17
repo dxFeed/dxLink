@@ -14,7 +14,6 @@ export interface ContentTemplateProps {
 const Wrapper = styled.div<{ kind: Required<ContentTemplateProps>['kind'] }>`
   display: flex;
   flex-direction: column;
-  // height: 100%;
   width: 100%;
   background-color: ${({ theme, kind }) => theme.background[kind].main};
 `

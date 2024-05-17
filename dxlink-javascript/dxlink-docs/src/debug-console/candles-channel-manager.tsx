@@ -5,7 +5,7 @@ import styled from 'styled-components'
 
 import { candleChartColors } from './candles-chart'
 import { CandlesSubscription } from './candles-subscription'
-import type { DXLinkCandleSnapshot, DXLinkCandles } from '../candles/candles'
+import type { DXLinkCandleData, DXLinkCandles } from '../candles/candles'
 import { ContentTemplate } from '../common/content-template'
 
 const ChartContainer = styled.div`
@@ -34,7 +34,7 @@ interface CandlesChannelManagerProps {
 }
 
 export function CandlesChannelManager({ channel }: CandlesChannelManagerProps) {
-  const [snapshot, setSnapshot] = useState<DXLinkCandleSnapshot>()
+  const [data, setData] = useState<DXLinkCandleData>()
   const [chart, setChart] = useState<Chart>()
 
   const ref = useRef<HTMLDivElement>(null)
@@ -49,27 +49,22 @@ export function CandlesChannelManager({ channel }: CandlesChannelManagerProps) {
       },
     })
 
-    const listener = (snapshot: DXLinkCandleSnapshot) => {
-      setSnapshot(snapshot)
-    }
-    channel.addListener(listener)
+    channel.addListener(setData)
 
     setChart(chartInstance)
 
     return () => {
       chartInstance.destroy()
-      channel.removeListener(listener)
+      channel.removeListener(setData)
     }
   }, [channel])
 
   useEffect(() => {
-    if (!snapshot || !chart) {
+    if (!data || !chart) {
       return
     }
 
-    const symbol = snapshot?.events[0]?.eventSymbol ?? 'N/A'
-    console.log('Candles snapshot:', symbol)
-    const candles = snapshot.events.map((event) => ({
+    const candles = data.events.map((event) => ({
       hi: Number(event.high),
       lo: Number(event.low),
       open: Number(event.open),
@@ -79,11 +74,14 @@ export function CandlesChannelManager({ channel }: CandlesChannelManagerProps) {
       idx: event.index,
     }))
 
-    chart.watermarkComponent.setWaterMarkData({
-      firstRow: symbol,
-    })
+    // If it's a snapshot, we need to set data instead of updating it
+    if (data.isSnapshot) {
+      const symbol = data?.events[0]?.eventSymbol ?? 'N/A'
 
-    if (snapshot.isFirst) {
+      chart.watermarkComponent.setWaterMarkData({
+        firstRow: symbol,
+      })
+
       chart.setData({
         candles,
         instrument: {
@@ -95,11 +93,8 @@ export function CandlesChannelManager({ channel }: CandlesChannelManagerProps) {
 
     chart.updateData({
       candles,
-      instrument: {
-        symbol,
-      },
     })
-  }, [snapshot, chart])
+  }, [data, chart])
 
   return (
     <>
@@ -107,7 +102,7 @@ export function CandlesChannelManager({ channel }: CandlesChannelManagerProps) {
         <CandlesSubscription onSet={channel.setSubscription} />{' '}
       </Group>
 
-      <ChartGroup available={snapshot !== undefined}>
+      <ChartGroup available={data !== undefined}>
         <ContentTemplate title={'Chart'}>
           <ChartContainer ref={ref} />
           <Powered>
