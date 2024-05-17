@@ -1,5 +1,16 @@
 # @dxfeed/dxlink-websocket-client
 
+## 0.3.0
+
+### Minor Changes
+
+- Bugfix: channel errors were not propagated after the closing
+
+### Patch Changes
+
+- Updated dependencies
+  - @dxfeed/dxlink-core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
