@@ -669,7 +669,9 @@ components:
               type:
                 const: CHANNEL_OPENED
               service:
-                const: "FEED"
+                enum:
+                  - FEED
+                  - DOM
               parameters:
                 description: Parameters of operated channel.
                 type: object
