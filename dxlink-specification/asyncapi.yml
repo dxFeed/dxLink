@@ -885,7 +885,7 @@ components:
                       Empty fields are omitted from the json.
                     type: array
                     items:
-                      - $ref: "#/components/schemas/FeedEvent"
+                      $ref: "#/components/schemas/FeedEvent"
                     examples:
                       - [
                           {
