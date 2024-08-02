@@ -1,0 +1,67 @@
+{
+  "name": "@dxfeed/dxlink-script",
+  "version": "0.0.0-alpha.0",
+  "private": false,
+  "sideEffects": false,
+  "description": "dxLink SCRIPT TBD",
+  "source": "src/index.ts",
+  "exports": {
+    "types": "./build/index.d.ts",
+    "require": "./build/index.js",
+    "default": "./build/index.module.js"
+  },
+  "main": "build/index.js",
+  "module": "build/index.module.js",
+  "types": "build/index.d.ts",
+  "browserslist": [
+    "last 1 year"
+  ],
+  "minify": {
+    "mangle": false
+  },
+  "scripts": {
+    "prepublishOnly": "npm run build && npm run test",
+    "build": "microbundle -f esm,cjs",
+    "lint": "eslint src",
+    "test": "tsx src/index.test.ts",
+    "test:watch": "tsx watch src/index.test.ts"
+  },
+  "dependencies": {
+    "@dxfeed/dxlink-core": "0.3.0"
+  },
+  "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
+  "maintainers": [
+    {
+      "name": "Fyzu",
+      "url": "https://github.com/fyzu"
+    }
+  ],
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/dxfeed/dxlink.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dxfeed/dxlink/issues"
+  },
+  "homepage": "https://dxfeed.com/",
+  "keywords": [
+    "api",
+    "feed",
+    "client",
+    "financial-data",
+    "market-data",
+    "market-data-feeds",
+    "market-api",
+    "stock-market",
+    "stock-price-data",
+    "real-time-data",
+    "historical-data",
+    "dxfeed",
+    "dxlink"
+  ],
+  "files": [
+    "/build",
+    "/package.json"
+  ]
+}
