@@ -79,10 +79,12 @@ const getConnectionUrl = (location: Location) => {
   return `ws${location.protocol.startsWith('https') ? 's' : ''}://${location.host}${pathname}`
 }
 
-const DEFAULT_URL =
-  process.env.NODE_ENV === 'production'
-    ? getConnectionUrl(window.location)
-    : getConnectionUrl(new URL('wss://demo.dxfeed.com/dxlink-ws') as unknown as Location)
+const DEFAULT_URL = 'ws://localhost:9959'
+
+// const DEFAULT_URL =
+//   process.env.NODE_ENV === 'production'
+//     ? getConnectionUrl(window.location)
+//     : getConnectionUrl(new URL('wss://demo.dxfeed.com/dxlink-ws') as unknown as Location)
 
 export function Connection({
   state,
