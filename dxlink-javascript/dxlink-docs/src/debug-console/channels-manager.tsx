@@ -10,7 +10,9 @@ import { ChannelWidget } from './channel-widget'
 import { DomChannelManager } from './dom-channel-manager'
 import { DomOpenForm } from './dom-open-form'
 import { FeedChannelManager } from './feed-channel-manager'
+import { ScriptCandlesChannelManager } from './script-candles-channel-manager'
 import { DXLinkCandles } from '../candles/candles'
+import { DXLinkScriptCandles } from '../candles/script-candles'
 import { ContentTemplate } from '../common/content-template'
 
 const Actions = styled.div`
@@ -33,13 +35,18 @@ const ChannelItemGroup = styled.div`
   padding: ${unit(1)} 0;
 `
 
-export type Channel = DXLinkFeed<FeedContract> | DXLinkDepthOfMarket | DXLinkCandles
+export type Channel =
+  | DXLinkFeed<FeedContract>
+  | DXLinkDepthOfMarket
+  | DXLinkCandles
+  | DXLinkScriptCandles
 
 export interface ChannelManagerProps {
   channels: Channel[]
   onOpenFeed: () => void
   onOpenDom: (symbol: string, sources: string) => void
   onOpenCandles: () => void
+  onOpenScriptCandles: () => void
 }
 
 export function ChannelsManager({
@@ -47,6 +54,7 @@ export function ChannelsManager({
   onOpenFeed,
   onOpenDom,
   onOpenCandles,
+  onOpenScriptCandles,
 }: ChannelManagerProps) {
   const [anchorElRef, setAnchorElRef] = useState<HTMLElement | null>(null)
   const [domIsOpen, setDomIsOpen] = useState(false)
@@ -73,7 +81,10 @@ export function ChannelsManager({
 
       <Actions ref={setAnchorElRef}>
         <ActionButton color={'secondary'} onClick={onOpenCandles}>
-          Open Candle Widget
+          Candle Widget
+        </ActionButton>
+        <ActionButton color={'secondary'} onClick={onOpenScriptCandles}>
+          Script Channel
         </ActionButton>
         <ActionButton
           color={domIsOpen ? 'accent' : 'secondary'}
@@ -81,10 +92,10 @@ export function ChannelsManager({
             setDomIsOpen(true)
           }}
         >
-          Open DOM Channel
+          DOM Channel
         </ActionButton>
         <ActionButton onClick={onOpenFeed} color={'secondary'}>
-          Open FEED Channel
+          FEED Channel
         </ActionButton>
       </Actions>
 
@@ -96,6 +107,9 @@ export function ChannelsManager({
                 {channel instanceof DXLinkFeed && <FeedChannelManager channel={channel} />}
                 {channel instanceof DXLinkDepthOfMarket && <DomChannelManager channel={channel} />}
                 {channel instanceof DXLinkCandles && <CandlesChannelManager channel={channel} />}
+                {channel instanceof DXLinkScriptCandles && (
+                  <ScriptCandlesChannelManager channel={channel} />
+                )}
               </ChannelWidget>
             </ChannelItemGroup>
           ))}
