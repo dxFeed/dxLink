@@ -14,7 +14,7 @@ export class SortedList<T> {
       return
     }
 
-    this.items.splice(mid, 0, item)
+    this.items[mid] = item
   }
 
   public indexOf(item: T): number {
