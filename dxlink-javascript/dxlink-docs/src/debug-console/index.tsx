@@ -8,6 +8,7 @@ import {
   DXLinkWebSocketClient,
   FeedContract,
   DXLinkDepthOfMarket,
+  DXLinkChart,
 } from '@dxfeed/dxlink-api'
 import { Text } from '@dxfeed/ui-kit/Text'
 import { unit } from '@dxfeed/ui-kit/utils'
@@ -19,7 +20,7 @@ import { ChannelsManager, type Channel } from './channels-manager'
 import { type ConnectParams, Connection } from './connection'
 import { Errors } from './errors'
 import { DXLinkCandles } from '../candles/candles'
-import { DXLinkScriptCandles } from '../candles/script-candles'
+import { ChartHolder } from '../chart-wrapper'
 
 const Root = styled.div`
   display: flex;
@@ -195,15 +196,15 @@ export function DebugConsole() {
     }
   }
 
-  const handleOpenScriptCandles = () => {
+  const handleOpenChart = () => {
     try {
       if (client === undefined) {
         throw new Error('Client must be connected')
       }
 
-      const script = new DXLinkScriptCandles(client)
+      const chart = new ChartHolder(client)
 
-      setChannels((prev) => [...prev, script])
+      setChannels((prev) => [...prev, chart])
     } catch (error) {
       handleError(error)
     }
@@ -250,7 +251,7 @@ export function DebugConsole() {
                   onOpenFeed={handleOpenFeed}
                   onOpenDom={handleOpenDom}
                   onOpenCandles={handleOpenCandles}
-                  onOpenScriptCandles={handleOpenScriptCandles}
+                  onOpenChart={handleOpenChart}
                 />
               )}
             </ChannelWrapper>

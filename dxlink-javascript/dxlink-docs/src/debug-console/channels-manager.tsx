@@ -1,4 +1,4 @@
-import { DXLinkFeed, FeedContract, DXLinkDepthOfMarket } from '@dxfeed/dxlink-api'
+import { DXLinkFeed, FeedContract, DXLinkDepthOfMarket, DXLinkChart } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { Popover } from '@dxfeed/ui-kit/Popover'
 import { unit } from '@dxfeed/ui-kit/utils'
@@ -12,7 +12,7 @@ import { DomOpenForm } from './dom-open-form'
 import { FeedChannelManager } from './feed-channel-manager'
 import { ScriptCandlesChannelManager } from './script-candles-channel-manager'
 import { DXLinkCandles } from '../candles/candles'
-import { DXLinkScriptCandles } from '../candles/script-candles'
+import type { ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'
 
 const Actions = styled.div`
@@ -35,26 +35,21 @@ const ChannelItemGroup = styled.div`
   padding: ${unit(1)} 0;
 `
 
-export type Channel =
-  | DXLinkFeed<FeedContract>
-  | DXLinkDepthOfMarket
-  | DXLinkCandles
-  | DXLinkScriptCandles
+export type Channel = DXLinkFeed<FeedContract> | DXLinkDepthOfMarket | DXLinkCandles | ChartHolder
 
 export interface ChannelManagerProps {
   channels: Channel[]
   onOpenFeed: () => void
   onOpenDom: (symbol: string, sources: string) => void
   onOpenCandles: () => void
-  onOpenScriptCandles: () => void
+  onOpenChart: () => void
 }
 
 export function ChannelsManager({
   channels,
   onOpenFeed,
   onOpenDom,
-  onOpenCandles,
-  onOpenScriptCandles,
+  onOpenChart,
 }: ChannelManagerProps) {
   const [anchorElRef, setAnchorElRef] = useState<HTMLElement | null>(null)
   const [domIsOpen, setDomIsOpen] = useState(false)
@@ -80,11 +75,8 @@ export function ChannelsManager({
       </Popover>
 
       <Actions ref={setAnchorElRef}>
-        <ActionButton color={'secondary'} onClick={onOpenCandles}>
-          Candle Widget
-        </ActionButton>
-        <ActionButton color={'secondary'} onClick={onOpenScriptCandles}>
-          Script Channel
+        <ActionButton color={'secondary'} onClick={onOpenChart}>
+          CHART Channel
         </ActionButton>
         <ActionButton
           color={domIsOpen ? 'accent' : 'secondary'}
@@ -101,13 +93,13 @@ export function ChannelsManager({
 
       {channels.length > 0 && (
         <ChannelsGroup>
-          {channels.map((channel) => (
-            <ChannelItemGroup key={channel.id}>
+          {channels.map((channel, index) => (
+            <ChannelItemGroup key={channel.id ?? index}>
               <ChannelWidget channel={channel.getChannel()}>
                 {channel instanceof DXLinkFeed && <FeedChannelManager channel={channel} />}
                 {channel instanceof DXLinkDepthOfMarket && <DomChannelManager channel={channel} />}
                 {channel instanceof DXLinkCandles && <CandlesChannelManager channel={channel} />}
-                {channel instanceof DXLinkScriptCandles && (
+                {channel instanceof DXLinkChart && (
                   <ScriptCandlesChannelManager channel={channel} />
                 )}
               </ChannelWidget>

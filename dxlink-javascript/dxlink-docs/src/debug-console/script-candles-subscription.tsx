@@ -1,3 +1,4 @@
+import type { DXLinkChartIndicatorsParameters, DXLinkChartSubscription } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
 import { TextField } from '@dxfeed/ui-kit/TextField'
@@ -7,7 +8,6 @@ import AceEditor from 'react-ace'
 import styled from 'styled-components'
 
 import { DxScriptMode } from './ace-dxscript-mode'
-import type { DXLinkCandleSubscription } from '../candles/candles'
 import { ContentTemplate } from '../common/content-template'
 
 import 'ace-builds/src-noconflict/mode-python'
@@ -39,7 +39,10 @@ const ActionGroup = styled.div`
 `
 
 export interface ScriptCandlesSubscriptionProps {
-  onSet(subscription: DXLinkCandleSubscription, script: string): void
+  onSet(
+    subscription: DXLinkChartSubscription,
+    indicatorsParameters: DXLinkChartIndicatorsParameters
+  ): void
 }
 
 const mode = new DxScriptMode()
@@ -56,7 +59,7 @@ out open = open`)
         symbol,
         fromTime: Number(fromTime),
       },
-      script
+      {}
     )
   }
 

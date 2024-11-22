@@ -1,9 +1,9 @@
 {
-  "name": "@dxfeed/dxlink-script",
+  "name": "@dxfeed/dxlink-chart",
   "version": "0.0.0-alpha.0",
   "private": false,
   "sideEffects": false,
-  "description": "dxLink SCRIPT TBD",
+  "description": "dxLink CHART TBD",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",

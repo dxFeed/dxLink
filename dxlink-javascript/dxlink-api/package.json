@@ -29,7 +29,8 @@
     "@dxfeed/dxlink-core": "0.3.0",
     "@dxfeed/dxlink-websocket-client": "0.3.0",
     "@dxfeed/dxlink-feed": "0.3.0",
-    "@dxfeed/dxlink-dom": "0.3.0"
+    "@dxfeed/dxlink-dom": "0.3.0",
+    "@dxfeed/dxlink-chart": "0.0.0-alpha.0"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [

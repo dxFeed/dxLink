@@ -7,35 +7,40 @@ import { Errors } from './errors'
 import { ContentTemplate } from '../common/content-template'
 
 interface ChannelWidgetProps {
-  channel: DXLinkChannel
+  channel?: DXLinkChannel
   children: ReactNode
 }
 
 export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
-  const [state, setState] = useState(channel.getState())
+  const [state, setState] = useState(channel?.getState() ?? DXLinkChannelState.REQUESTED)
   const [errors, setErrors] = useState<DXLinkError[]>([])
 
   useEffect(() => {
+    const innerChannel = channel
+    if (innerChannel === undefined) {
+      return
+    }
+
     const stateListener = (_state: DXLinkChannelState) => {
-      setState(channel.getState())
+      setState(innerChannel.getState())
     }
     const errorListener = (error: DXLinkError) => {
       setErrors((errors) => [...errors, error])
     }
-    channel.addStateChangeListener(stateListener)
-    channel.addErrorListener(errorListener)
+    innerChannel.addStateChangeListener(stateListener)
+    innerChannel.addErrorListener(errorListener)
     return () => {
       setErrors([])
-      channel.removeStateChangeListener(stateListener)
-      channel.removeErrorListener(errorListener)
+      innerChannel.removeStateChangeListener(stateListener)
+      innerChannel.removeErrorListener(errorListener)
     }
   }, [channel])
 
   const handleClose = () => {
-    channel.close()
+    channel?.close()
   }
 
-  const channelTitle = `Channel #${channel.id} ${channel.service}`
+  const channelTitle = `Channel #${channel?.id ?? '-'} ${channel?.service ?? 'CHART'}`
 
   if (state === DXLinkChannelState.CLOSED) {
     return (
@@ -47,10 +52,12 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
     )
   }
 
-  const parameters = Object.entries(channel.parameters).reduce(
-    (acc, [key, value]) => `${acc}${acc != '' ? ', ' : ''}${key}: ${value}`,
-    ''
-  )
+  const parameters = channel
+    ? Object.entries(channel.parameters).reduce(
+        (acc, [key, value]) => `${acc}${acc != '' ? ', ' : ''}${key}: ${value}`,
+        ''
+      )
+    : ''
 
   return (
     <ContentTemplate
