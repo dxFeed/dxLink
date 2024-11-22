@@ -1,11 +1,12 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
+import type { DXLinkChart, DXLinkChartCandle, DXLinkChartIndicatorsData } from '@dxfeed/dxlink-api'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { candleChartColors } from './candles-chart'
 import { ScriptCandlesSubscription } from './script-candles-subscription'
-import type { DXLinkScriptCandles, DXLinkCandleData } from '../candles/script-candles'
+import { SortedList } from '../candles/sorted-list'
 import { ContentTemplate } from '../common/content-template'
 
 const ChartContainer = styled.div`
@@ -30,7 +31,7 @@ const Powered = styled.div`
 `
 
 interface ScriptCandlesChannelManagerProps {
-  channel: DXLinkScriptCandles
+  channel: DXLinkChart
 }
 
 const stringToColour = (str: string) => {
@@ -50,8 +51,14 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
   const [available, setAvailable] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const handleDataUpdate = (data: DXLinkCandleData, chart: Chart) => {
-    const candles = data.events.map((event) => ({
+  const handleDataUpdate = (
+    events: DXLinkChartCandle[],
+    indicators: DXLinkChartIndicatorsData,
+    reset: boolean,
+    pending: boolean,
+    chart: Chart
+  ) => {
+    const candles = events.map((event) => ({
       hi: Number(event.high),
       lo: Number(event.low),
       open: Number(event.open),
@@ -61,33 +68,38 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
       idx: event.index,
     }))
 
-    const results = data.events.reduce<Record<string, { timestamp: number; close: number }[]>>(
-      (result, event) => {
-        const timestamp = event.time
+    const results = Object.keys(indicators).reduce<
+      Record<string, { timestamp: number; idx: number; close: number }[]>
+    >((result, indicatorKey) => {
+      const outs = indicators[indicatorKey]!
 
-        Object.keys(event.result).forEach((key) => {
-          const value = Number(event.result[key])
-          if (value !== undefined) {
-            result[key] = result[key] ?? []
-            const prevResult = result[key][result[key].length - 1]
-            if (Number.isNaN(value)) {
-              console.warn('NaN value', timestamp, key)
-              result[key].push({ timestamp, close: prevResult?.close ?? 0 })
-              return
+      Object.keys(outs).forEach((key) => {
+        const values = outs![key]!
+
+        result[key] = values.reduce<{ timestamp: number; idx: number; close: number }[]>(
+          (values, value, index) => {
+            const candle = candles[index]
+            if (candle === undefined) {
+              console.error('Illegal state, candle not found')
+              return values
             }
-            result[key].push({ timestamp, close: value })
-          }
-        })
 
-        return result
-      },
-      {}
-    )
+            values.push({ timestamp: candle.timestamp, idx: candle.idx, close: Number(value) })
+
+            return values
+          },
+          []
+        )
+      })
+
+      return result
+    }, {})
+
     const resultKeys = Object.keys(results)
 
     // If it's a snapshot, we need to set data instead of updating it
-    if (data.isSnapshot) {
-      const symbol = data?.events[0]?.eventSymbol ?? 'N/A'
+    if (isSnapshot) {
+      const symbol = events[0]?.eventSymbol ?? 'N/A'
 
       chart.watermarkComponent.setWaterMarkData({
         firstRow: symbol,
@@ -150,8 +162,18 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
         const pane = chart.paneManager.panes[key]
         if (pane === undefined) return
 
-        pane.dataSeries[0]?.setDataPoints(results[key]!)
+        const points = pane.dataSeries[0]?.dataPoints ?? []
+        const sortedPoints = SortedList.from(points, (a, b) => a.timestamp - b.timestamp)
+
+        for (const point of results[key]!) {
+          sortedPoints.insert(point)
+        }
+
+        const newPoints = Array.from(sortedPoints.toArray())
+
+        pane.dataSeries[0]?.setDataPoints(newPoints)
         pane.yAxis.model.fancyLabelsModel.updateLabels()
+        console.log('last indicator value', key, newPoints[newPoints.length - 1])
       } catch (e) {
         console.error(e)
       }
@@ -168,11 +190,17 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
       },
     })
 
-    const listener = (data: DXLinkCandleData) => handleDataUpdate(data, chart)
-    channel.addListener(listener)
+    const listener = (
+      events: DXLinkChartCandle[],
+      indicators: DXLinkChartIndicatorsData,
+      reset: boolean,
+      pending: boolean
+    ) => handleDataUpdate(events, indicators, reset, pending, chart)
+
+    channel.addDataListener(listener)
 
     return () => {
-      channel.removeListener(listener)
+      channel.removeDataListener(listener)
       chart.destroy()
     }
   }, [channel])
@@ -180,7 +208,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
   return (
     <>
       <Group>
-        <ScriptCandlesSubscription onSet={channel.set} />{' '}
+        <ScriptCandlesSubscription onSet={channel.setSubscription} />{' '}
       </Group>
 
       <ChartGroup available={available}>
