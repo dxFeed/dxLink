@@ -6,8 +6,20 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { Errors } from './errors'
 import { ContentTemplate } from '../common/content-template'
 
+export interface ChannelInfo {
+  id?: DXLinkChannel['id']
+  service: DXLinkChannel['service']
+  parameters?: DXLinkChannel['parameters']
+  addStateChangeListener: DXLinkChannel['addStateChangeListener']
+  addErrorListener: DXLinkChannel['addErrorListener']
+  removeErrorListener: DXLinkChannel['removeErrorListener']
+  removeStateChangeListener: DXLinkChannel['removeStateChangeListener']
+  getState: DXLinkChannel['getState']
+  close: DXLinkChannel['close']
+}
+
 interface ChannelWidgetProps {
-  channel?: DXLinkChannel
+  channel: ChannelInfo
   children: ReactNode
 }
 
@@ -16,23 +28,19 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
   const [errors, setErrors] = useState<DXLinkError[]>([])
 
   useEffect(() => {
-    const innerChannel = channel
-    if (innerChannel === undefined) {
-      return
-    }
-
     const stateListener = (_state: DXLinkChannelState) => {
-      setState(innerChannel.getState())
+      console.log('Channel state changed', channel.getState())
+      setState(channel.getState())
     }
     const errorListener = (error: DXLinkError) => {
       setErrors((errors) => [...errors, error])
     }
-    innerChannel.addStateChangeListener(stateListener)
-    innerChannel.addErrorListener(errorListener)
+    channel.addStateChangeListener(stateListener)
+    channel.addErrorListener(errorListener)
     return () => {
       setErrors([])
-      innerChannel.removeStateChangeListener(stateListener)
-      innerChannel.removeErrorListener(errorListener)
+      channel.removeStateChangeListener(stateListener)
+      channel.removeErrorListener(errorListener)
     }
   }, [channel])
 
@@ -40,7 +48,7 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
     channel?.close()
   }
 
-  const channelTitle = `Channel #${channel?.id ?? '-'} ${channel?.service ?? 'CHART'}`
+  const channelTitle = `Channel #${channel?.id ?? '-'} ${channel.service}`
 
   if (state === DXLinkChannelState.CLOSED) {
     return (
@@ -53,10 +61,12 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
   }
 
   const parameters = channel
-    ? Object.entries(channel.parameters).reduce(
-        (acc, [key, value]) => `${acc}${acc != '' ? ', ' : ''}${key}: ${value}`,
-        ''
-      )
+    ? channel.parameters
+      ? Object.entries(channel.parameters).reduce(
+          (acc, [key, value]) => `${acc}${acc != '' ? ', ' : ''}${key}: ${value}`,
+          ''
+        )
+      : ''
     : ''
 
   return (

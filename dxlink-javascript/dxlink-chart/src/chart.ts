@@ -136,10 +136,12 @@ export class DXLinkChart implements DXLinkChartRequester {
   setup(setup: DXLinkChartSetup): void {
     this.lastSetup = setup
 
-    this.channel.send({
-      type: 'CHART_SETUP',
-      ...setup,
-    } satisfies DXLinkChartSetupMessage)
+    if (this.channel.getState() === DXLinkChannelState.OPENED) {
+      this.channel.send({
+        type: 'CHART_SETUP',
+        ...setup,
+      } satisfies DXLinkChartSetupMessage)
+    }
   }
 
   getConfig = () => this.lastConfig
@@ -162,10 +164,12 @@ export class DXLinkChart implements DXLinkChartRequester {
       indicatorsParameters,
     }
 
-    this.channel.send({
-      type: 'CHART_SUBSCRIPTION',
-      ...this.lastSubscription,
-    } satisfies DXLinkChartSubscriptionMessage)
+    if (this.channel.getState() === DXLinkChannelState.OPENED) {
+      this.channel.send({
+        type: 'CHART_SUBSCRIPTION',
+        ...this.lastSubscription,
+      } satisfies DXLinkChartSubscriptionMessage)
+    }
   }
 
   removeIndicators = (indicators: string[]) => {
@@ -245,7 +249,7 @@ export class DXLinkChart implements DXLinkChartRequester {
   }
 
   /**
-   * Reconfigure the SCRIPT channel after the channel re-open.
+   * Reconfigure the CHART channel after the channel re-open.
    */
   private reconfigure() {
     if (this.lastSubscription) {

@@ -84,7 +84,7 @@ const getConnectionUrl = (location: Location) => {
 const DEFAULT_URL =
   process.env.NODE_ENV === 'production'
     ? getConnectionUrl(window.location)
-    : getConnectionUrl(new URL('wss://demo.dxfeed.com/dxlink-ws') as unknown as Location)
+    : getConnectionUrl(new URL('ws://localhost:9959/') as unknown as Location)
 
 export function Connection({
   state,

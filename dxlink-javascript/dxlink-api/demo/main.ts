@@ -72,7 +72,7 @@ async function startChart() {
   const indicators: DXLinkChartIndicators = {
     indicator1: {
       lang: 'dxScript',
-      content: 'in depth = 14; out avg = sma(depth, close)',
+      content: 'in depth = 14; out avg = sma(close, depth)',
     },
   }
 

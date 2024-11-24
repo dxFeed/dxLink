@@ -1,12 +1,19 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
-import type { DXLinkChart, DXLinkChartCandle, DXLinkChartIndicatorsData } from '@dxfeed/dxlink-api'
+import type {
+  DXLinkChart,
+  DXLinkChartCandle,
+  DXLinkChartIndicatorsData,
+  DXLinkChartSubscription,
+} from '@dxfeed/dxlink-api'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { candleChartColors } from './candles-chart'
 import { ScriptCandlesSubscription } from './script-candles-subscription'
+import type { DXLinkCandleSubscription } from '../candles/candles'
 import { SortedList } from '../candles/sorted-list'
+import type { ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'
 
 const ChartContainer = styled.div`
@@ -31,7 +38,7 @@ const Powered = styled.div`
 `
 
 interface ScriptCandlesChannelManagerProps {
-  channel: DXLinkChart
+  channel: ChartHolder
 }
 
 const stringToColour = (str: string) => {
@@ -50,12 +57,12 @@ const stringToColour = (str: string) => {
 export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelManagerProps) {
   const [available, setAvailable] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<Chart>()
 
   const handleDataUpdate = (
     events: DXLinkChartCandle[],
-    indicators: DXLinkChartIndicatorsData,
-    reset: boolean,
-    pending: boolean,
+    indicators: DXLinkChartIndicatorsData[],
+    snapshot: boolean,
     chart: Chart
   ) => {
     const candles = events.map((event) => ({
@@ -68,37 +75,39 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
       idx: event.index,
     }))
 
-    const results = Object.keys(indicators).reduce<
-      Record<string, { timestamp: number; idx: number; close: number }[]>
-    >((result, indicatorKey) => {
-      const outs = indicators[indicatorKey]!
+    const results: Record<string, { timestamp: number; idx: number; close: number }[]> = {}
+    for (const data of indicators) {
+      for (const outs of Object.values(data)) {
+        Object.keys(outs).forEach((key) => {
+          const values = outs[key]!
 
-      Object.keys(outs).forEach((key) => {
-        const values = outs![key]!
+          const base = results[key] ?? []
+          const offset = base.length
 
-        result[key] = values.reduce<{ timestamp: number; idx: number; close: number }[]>(
-          (values, value, index) => {
-            const candle = candles[index]
-            if (candle === undefined) {
-              console.error('Illegal state, candle not found')
+          results[key] = values.reduce<{ timestamp: number; idx: number; close: number }[]>(
+            (values, value, index) => {
+              const candle = candles[offset + index]
+              if (candle === undefined) {
+                console.error('Illegal state, candle not found')
+                return values
+              }
+
+              values.push({ timestamp: candle.timestamp, idx: candle.idx, close: Number(value) })
+
               return values
-            }
+            },
+            base
+          )
+        })
+      }
+    }
 
-            values.push({ timestamp: candle.timestamp, idx: candle.idx, close: Number(value) })
-
-            return values
-          },
-          []
-        )
-      })
-
-      return result
-    }, {})
+    console.log('Candles', candles, 'Indicators', results)
 
     const resultKeys = Object.keys(results)
 
     // If it's a snapshot, we need to set data instead of updating it
-    if (isSnapshot) {
+    if (snapshot) {
       const symbol = events[0]?.eventSymbol ?? 'N/A'
 
       chart.watermarkComponent.setWaterMarkData({
@@ -190,25 +199,24 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
       },
     })
 
-    const listener = (
-      events: DXLinkChartCandle[],
-      indicators: DXLinkChartIndicatorsData,
-      reset: boolean,
-      pending: boolean
-    ) => handleDataUpdate(events, indicators, reset, pending, chart)
-
-    channel.addDataListener(listener)
+    chartRef.current = chart
 
     return () => {
-      channel.removeDataListener(listener)
+      console.log('Destroy chart')
       chart.destroy()
     }
   }, [channel])
 
+  const handleSet = (sub: DXLinkChartSubscription, indicator: string) => {
+    channel.update(sub, indicator, (candles, indicators, snapshot) => {
+      handleDataUpdate(candles, indicators, snapshot, chartRef.current!)
+    })
+  }
+
   return (
     <>
       <Group>
-        <ScriptCandlesSubscription onSet={channel.setSubscription} />{' '}
+        <ScriptCandlesSubscription onSet={handleSet} />{' '}
       </Group>
 
       <ChartGroup available={available}>
