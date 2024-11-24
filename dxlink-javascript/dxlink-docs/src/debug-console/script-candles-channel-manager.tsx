@@ -1,6 +1,5 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
 import type {
-  DXLinkChart,
   DXLinkChartCandle,
   DXLinkChartIndicatorsData,
   DXLinkChartSubscription,
@@ -11,7 +10,6 @@ import styled from 'styled-components'
 
 import { candleChartColors } from './candles-chart'
 import { ScriptCandlesSubscription } from './script-candles-subscription'
-import type { DXLinkCandleSubscription } from '../candles/candles'
 import { SortedList } from '../candles/sorted-list'
 import type { ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'

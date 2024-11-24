@@ -11,8 +11,6 @@ import {
 
 import type { ChannelInfo } from './debug-console/channel-widget'
 
-const globalId = 0
-
 export type ChartHolderListener = (
   candles: DXLinkChartCandle[],
   indicators: DXLinkChartIndicatorsData[],

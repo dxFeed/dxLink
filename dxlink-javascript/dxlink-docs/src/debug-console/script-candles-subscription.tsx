@@ -1,4 +1,4 @@
-import type { DXLinkChartIndicatorsParameters, DXLinkChartSubscription } from '@dxfeed/dxlink-api'
+import type { DXLinkChartSubscription } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
 import { TextField } from '@dxfeed/ui-kit/TextField'
