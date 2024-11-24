@@ -27,7 +27,8 @@ export interface DXLinkChartIndicatorsParameters {
 }
 
 export interface DXLinkChartIndicatorParameterMeta {
-  type: 'number' | 'string' | 'boolean'
+  type: 'number' | 'double' | 'string' | 'boolean'
+  default: number | string | boolean
   name: string
 }
 

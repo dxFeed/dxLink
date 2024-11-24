@@ -8,7 +8,6 @@ import {
   DXLinkWebSocketClient,
   FeedContract,
   DXLinkDepthOfMarket,
-  DXLinkChart,
 } from '@dxfeed/dxlink-api'
 import { Text } from '@dxfeed/ui-kit/Text'
 import { unit } from '@dxfeed/ui-kit/utils'

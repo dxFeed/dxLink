@@ -12,7 +12,7 @@ import { DomOpenForm } from './dom-open-form'
 import { FeedChannelManager } from './feed-channel-manager'
 import { ScriptCandlesChannelManager } from './script-candles-channel-manager'
 import { DXLinkCandles } from '../candles/candles'
-import type { ChartHolder } from '../chart-wrapper'
+import { ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'
 
 const Actions = styled.div`
@@ -99,7 +99,7 @@ export function ChannelsManager({
                 {channel instanceof DXLinkFeed && <FeedChannelManager channel={channel} />}
                 {channel instanceof DXLinkDepthOfMarket && <DomChannelManager channel={channel} />}
                 {channel instanceof DXLinkCandles && <CandlesChannelManager channel={channel} />}
-                {channel instanceof DXLinkChart && (
+                {channel instanceof ChartHolder && (
                   <ScriptCandlesChannelManager channel={channel} />
                 )}
               </ChannelWidget>

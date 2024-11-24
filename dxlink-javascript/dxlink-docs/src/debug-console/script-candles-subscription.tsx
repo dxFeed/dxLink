@@ -39,10 +39,7 @@ const ActionGroup = styled.div`
 `
 
 export interface ScriptCandlesSubscriptionProps {
-  onSet(
-    subscription: DXLinkChartSubscription,
-    indicatorsParameters: DXLinkChartIndicatorsParameters
-  ): void
+  onSet(subscription: DXLinkChartSubscription, indicator: string): void
 }
 
 const mode = new DxScriptMode()
@@ -59,7 +56,7 @@ out open = open`)
         symbol,
         fromTime: Number(fromTime),
       },
-      {}
+      script
     )
   }
 
