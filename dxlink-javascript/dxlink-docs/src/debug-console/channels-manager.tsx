@@ -1,4 +1,4 @@
-import { DXLinkFeed, FeedContract, DXLinkDepthOfMarket, DXLinkChart } from '@dxfeed/dxlink-api'
+import { DXLinkFeed, FeedContract, DXLinkDepthOfMarket } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { Popover } from '@dxfeed/ui-kit/Popover'
 import { unit } from '@dxfeed/ui-kit/utils'
