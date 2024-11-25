@@ -78,6 +78,11 @@ async function startChart() {
 
   const chart = new DXLinkChart(client, indicators)
 
+  chart.addIndicatorsStateChangeListener((indicators) => {
+    // your buisness logic here
+    console.log('Indicators State', indicators)
+  })
+
   chart.addDataListener((candles, indicators, reset, pending) => {
     // your buisness logic here
     console.log('Chart Data', candles, indicators, reset, pending)

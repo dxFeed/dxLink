@@ -22,6 +22,7 @@ import {
   type DXLinkChartSetupMessage,
   type DXLinkChartSubscription,
   type DXLinkChartSubscriptionMessage,
+  type DXLinkChartIndicatorsStates,
 } from './messages'
 
 export type DXLinkChartDataListener = (
@@ -30,6 +31,8 @@ export type DXLinkChartDataListener = (
   reset: boolean,
   pending: boolean
 ) => void
+
+export type DXLinkChartIndicatorsStateListener = (indicators: DXLinkChartIndicatorsStates) => void
 
 /**
  * dxLink Chart service.
@@ -56,7 +59,7 @@ export interface DXLinkChartRequester {
 
   getConfig(): DXLinkChartConfig | null
 
-  getIndicators(): DXLinkChartIndicators | null
+  getIndicators(): DXLinkChartIndicatorsStates | null
 
   /**
    * Add a listener for the Chart channel events received from the channel.
@@ -66,6 +69,15 @@ export interface DXLinkChartRequester {
    * Remove a listener for the Chart channel events received from the channel.
    */
   removeDataListener(listener: DXLinkChartDataListener): void
+
+  /**
+   * Add a listener for the Chart indicators state changes received from the channel.
+   */
+  addIndicatorsStateChangeListener(listener: DXLinkChartIndicatorsStateListener): void
+  /**
+   * Remove a listener for the Chart indicators state changes received from the channel.
+   */
+  removeIndicatorsStateChangeListener(listener: DXLinkChartIndicatorsStateListener): void
 
   /**
    * Close the Chart channel.
@@ -95,9 +107,9 @@ export class DXLinkChart implements DXLinkChartRequester {
   public readonly id: number
 
   private readonly dataListeners = new Set<DXLinkChartDataListener>()
+  private readonly indicatorsStateListeners = new Set<DXLinkChartIndicatorsStateListener>()
 
   private readonly logger: DXLinkLogger
-
   private readonly channel: DXLinkChannel
 
   private lastSubscription: {
@@ -105,10 +117,9 @@ export class DXLinkChart implements DXLinkChartRequester {
     indicatorsParameters: DXLinkChartIndicatorsParameters
   } | null = null
   private lastSetup: DXLinkChartSetup | null = null
-
   private lastConfig: DXLinkChartConfig | null = null
 
-  private indicators: DXLinkChartIndicators | null = null
+  private indicators: DXLinkChartIndicatorsStates | null = null
 
   /**
    * Allows to create {@link DXLinkChart} instance with the specified {@link ChartContract} for the given {@link DXLinkWebSocketClient}.
@@ -133,7 +144,12 @@ export class DXLinkChart implements DXLinkChartRequester {
   removeStateChangeListener = (listener: DXLinkChannelStateChangeListener) =>
     this.channel.removeStateChangeListener(listener)
 
-  setup(setup: DXLinkChartSetup): void {
+  addIndicatorsStateChangeListener = (listener: DXLinkChartIndicatorsStateListener) =>
+    this.indicatorsStateListeners.add(listener)
+  removeIndicatorsStateChangeListener = (listener: DXLinkChartIndicatorsStateListener) =>
+    this.indicatorsStateListeners.delete(listener)
+
+  setup = (setup: DXLinkChartSetup) => {
     this.lastSetup = setup
 
     if (this.channel.getState() === DXLinkChannelState.OPENED) {
@@ -196,12 +212,22 @@ export class DXLinkChart implements DXLinkChartRequester {
         case 'CHART_DATA':
           this.processData(message)
           return
-        case 'CHART_CONFIG':
+        case 'CHART_CONFIG': {
           this.lastConfig = message
           return
-        case 'CHART_INDICATORS':
-          this.indicators = message.indicators
+        }
+        case 'CHART_INDICATORS': {
+          const indicators = message.indicators
+
+          if (this.indicators !== indicators) {
+            this.indicators = indicators
+
+            for (const listener of this.indicatorsStateListeners) {
+              listener(this.indicators)
+            }
+          }
           return
+        }
       }
     }
 

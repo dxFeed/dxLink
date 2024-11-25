@@ -51,7 +51,7 @@ export interface DXLinkChartIndicatorsStates {
 
 export interface DXLinkChartIndicatorsMessage {
   type: 'CHART_INDICATORS'
-  indicators: DXLinkChartIndicators
+  indicators: DXLinkChartIndicatorsStates
 }
 
 export interface DXLinkChartSubscriptionMessage {
