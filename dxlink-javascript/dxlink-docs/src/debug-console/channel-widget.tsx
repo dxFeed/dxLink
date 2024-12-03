@@ -26,11 +26,13 @@ interface ChannelWidgetProps {
 export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
   const [state, setState] = useState(channel?.getState() ?? DXLinkChannelState.REQUESTED)
   const [errors, setErrors] = useState<DXLinkError[]>([])
+  const [id, setId] = useState(channel.id)
 
   useEffect(() => {
     const stateListener = (_state: DXLinkChannelState) => {
       console.log('Channel state changed', channel.getState())
       setState(channel.getState())
+      setId(channel.id)
     }
     const errorListener = (error: DXLinkError) => {
       setErrors((errors) => [...errors, error])
@@ -48,7 +50,7 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
     channel.close()
   }
 
-  const channelTitle = `Channel ${channel.id ? `#${channel.id}` : ''} ${channel.service}`
+  const channelTitle = `Channel ${id ? `#${id}` : ''} ${channel.service}`
 
   if (state === DXLinkChannelState.CLOSED) {
     return (

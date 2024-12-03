@@ -95,7 +95,7 @@ export interface DXLinkChartOptions {
   logLevel: DXLinkLogLevel
 }
 
-const CHART_SERVICE_NAME = 'CHART'
+const SERVICE_NAME = 'INDICHART'
 
 /**
  * dxLink Chart service implementation.
@@ -125,7 +125,7 @@ export class DXLinkChart implements DXLinkChartRequester {
    * Allows to create {@link DXLinkChart} instance with the specified {@link ChartContract} for the given {@link DXLinkWebSocketClient}.
    */
   constructor(client: DXLinkClient, indicators: DXLinkChartIndicators) {
-    this.channel = client.openChannel(CHART_SERVICE_NAME, {
+    this.channel = client.openChannel(SERVICE_NAME, {
       indicators,
     })
     this.id = this.channel.id
@@ -154,7 +154,7 @@ export class DXLinkChart implements DXLinkChartRequester {
 
     if (this.channel.getState() === DXLinkChannelState.OPENED) {
       this.channel.send({
-        type: 'CHART_SETUP',
+        type: 'INDICHART_SETUP',
         ...setup,
       } satisfies DXLinkChartSetupMessage)
     }
@@ -182,7 +182,7 @@ export class DXLinkChart implements DXLinkChartRequester {
 
     if (this.channel.getState() === DXLinkChannelState.OPENED) {
       this.channel.send({
-        type: 'CHART_SUBSCRIPTION',
+        type: 'INDICHART_SUBSCRIPTION',
         ...this.lastSubscription,
       } satisfies DXLinkChartSubscriptionMessage)
     }
@@ -190,7 +190,7 @@ export class DXLinkChart implements DXLinkChartRequester {
 
   removeIndicators = (indicators: string[]) => {
     this.channel.send({
-      type: 'CHART_REMOVE_INDICATORS',
+      type: 'INDICHART_REMOVE_INDICATORS',
       indicators,
     })
   }
@@ -209,14 +209,14 @@ export class DXLinkChart implements DXLinkChartRequester {
     // Parse message
     if (isChartInboundMessage(message)) {
       switch (message.type) {
-        case 'CHART_DATA':
+        case 'INDICHART_DATA':
           this.processData(message)
           return
-        case 'CHART_CONFIG': {
+        case 'INDICHART_CONFIG': {
           this.lastConfig = message
           return
         }
-        case 'CHART_INDICATORS': {
+        case 'INDICHART_INDICATORS': {
           const indicators = message.indicators
 
           if (this.indicators !== indicators) {
@@ -280,14 +280,14 @@ export class DXLinkChart implements DXLinkChartRequester {
   private reconfigure() {
     if (this.lastSubscription) {
       this.channel.send({
-        type: 'CHART_SUBSCRIPTION',
+        type: 'INDICHART_SUBSCRIPTION',
         ...this.lastSubscription,
       } satisfies DXLinkChartSubscriptionMessage)
     }
 
     if (this.lastSetup) {
       this.channel.send({
-        type: 'CHART_SETUP',
+        type: 'INDICHART_SETUP',
         ...this.lastSetup,
       } satisfies DXLinkChartSetupMessage)
     }

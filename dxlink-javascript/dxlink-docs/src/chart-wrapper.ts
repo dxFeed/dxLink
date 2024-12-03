@@ -19,7 +19,7 @@ export type ChartHolderListener = (
 ) => void
 
 export class ChartHolder implements ChannelInfo {
-  service = 'CHART'
+  service = 'INDICHART'
 
   private closed = false
   private chart: DXLinkChart | null = null

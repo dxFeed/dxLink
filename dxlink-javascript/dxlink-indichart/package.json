@@ -1,9 +1,9 @@
 {
-  "name": "@dxfeed/dxlink-chart",
-  "version": "0.0.0-alpha.2",
+  "name": "@dxfeed/dxlink-indichart",
+  "version": "0.0.0",
   "private": false,
   "sideEffects": false,
-  "description": "dxLink CHART TBD",
+  "description": "dxLink INDICHART for receiving candle and indicator data",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",
