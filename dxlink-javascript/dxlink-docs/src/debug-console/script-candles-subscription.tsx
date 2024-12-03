@@ -235,7 +235,7 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
   }
 
   return (
-    <ContentTemplate title="Manage CHART channel">
+    <ContentTemplate title="Manage channel">
       <div>
         <FieldsGroup>
           <FieldWrapper>

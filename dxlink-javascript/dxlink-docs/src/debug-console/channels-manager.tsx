@@ -76,7 +76,7 @@ export function ChannelsManager({
 
       <Actions ref={setAnchorElRef}>
         <ActionButton color={'secondary'} onClick={onOpenChart}>
-          CHART Channel
+          INDICHART Channel
         </ActionButton>
         <ActionButton
           color={domIsOpen ? 'accent' : 'secondary'}
@@ -94,7 +94,7 @@ export function ChannelsManager({
       {channels.length > 0 && (
         <ChannelsGroup>
           {channels.map((channel, index) => (
-            <ChannelItemGroup key={channel.id ?? index}>
+            <ChannelItemGroup key={index}>
               <ChannelWidget channel={channel.getChannel()}>
                 {channel instanceof DXLinkFeed && <FeedChannelManager channel={channel} />}
                 {channel instanceof DXLinkDepthOfMarket && <DomChannelManager channel={channel} />}

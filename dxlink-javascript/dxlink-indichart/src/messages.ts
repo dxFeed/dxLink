@@ -50,12 +50,12 @@ export interface DXLinkChartIndicatorsStates {
 }
 
 export interface DXLinkChartIndicatorsMessage {
-  readonly type: 'CHART_INDICATORS'
+  readonly type: 'INDICHART_INDICATORS'
   readonly indicators: DXLinkChartIndicatorsStates
 }
 
 export interface DXLinkChartSubscriptionMessage {
-  readonly type: 'CHART_SUBSCRIPTION'
+  readonly type: 'INDICHART_SUBSCRIPTION'
   readonly subscription: DXLinkChartSubscription
   readonly indicatorsParameters: DXLinkChartIndicatorsParameters
 }
@@ -67,7 +67,7 @@ export interface DXLinkChartSetup {
 }
 
 export interface DXLinkChartSetupMessage extends DXLinkChartSetup {
-  readonly type: 'CHART_SETUP'
+  readonly type: 'INDICHART_SETUP'
 }
 
 export interface DXLinkChartConfig {
@@ -77,7 +77,7 @@ export interface DXLinkChartConfig {
 }
 
 export interface DXLinkChartConfigMessage extends DXLinkChartConfig {
-  readonly type: 'CHART_CONFIG'
+  readonly type: 'INDICHART_CONFIG'
 }
 
 export interface DXLinkChartCandle {
@@ -102,7 +102,7 @@ export interface DXLinkChartIndicatorsData {
 }
 
 export interface DXLinkChartDataMessage {
-  readonly type: 'CHART_DATA'
+  readonly type: 'INDICHART_DATA'
   readonly reset?: boolean
   readonly pending?: boolean
   readonly candles: DXLinkChartCandle[]
@@ -110,7 +110,7 @@ export interface DXLinkChartDataMessage {
 }
 
 export interface DXLinkChartIndicatorsRemoveMessage {
-  readonly type: 'CHART_INDICATORS_REMOVE'
+  readonly type: 'INDICHART_INDICATORS_REMOVE'
   readonly indicators: string[]
 }
 
@@ -127,6 +127,6 @@ export type ChartOutboundMessage =
 export const isChartInboundMessage = (
   message: DXLinkChannelMessage
 ): message is ChartInboundMessage =>
-  message.type === 'CHART_DATA' ||
-  message.type === 'CHART_INDICATORS' ||
-  message.type === 'CHART_CONFIG'
+  message.type === 'INDICHART_DATA' ||
+  message.type === 'INDICHART_INDICATORS' ||
+  message.type === 'INDICHART_CONFIG'
