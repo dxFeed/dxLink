@@ -1,6 +1,7 @@
 import {
   type DXLinkChannelStateChangeListener,
   type DXLinkChartCandle,
+  type DXLinkChartIndicator,
   type DXLinkChartIndicatorsData,
   type DXLinkChartSubscription,
   type DXLinkClient,
@@ -73,21 +74,30 @@ export class ChartHolder implements ChannelInfo {
 
   update = (
     subscription: DXLinkChartSubscription,
-    indicator: string,
-    listener: ChartHolderListener
+    indicator: DXLinkChartIndicator,
+    listener: ChartHolderListener,
+    errorListener: (error: string) => void
   ): DXLinkChart => {
     this.clear()
     this.listener = listener
 
     const chart = new DXLinkChart(this.client, {
-      current: {
-        lang: 'dxScript',
-        content: indicator,
-      },
+      current: indicator,
     })
 
     this.errorListeners.forEach((l) => chart.getChannel().addErrorListener(l))
     this.stateListeners.forEach((l) => chart.getChannel().addStateChangeListener(l))
+
+    chart.addIndicatorsStateChangeListener((indicators) => {
+      const indi = indicators.current
+      if (indi === undefined) {
+        return
+      }
+
+      if (!indi.enabled) {
+        errorListener(indi.error ?? 'Unknown error')
+      }
+    })
 
     chart.addDataListener(this.dataListener)
     chart.setSubscription(subscription, {})
@@ -116,7 +126,6 @@ export class ChartHolder implements ChannelInfo {
       this.stateListeners.forEach((l) => chart.getChannel().removeStateChangeListener(l))
       chart.removeDataListener(this.dataListener)
       chart.close()
-      this.chart = null
       this.listener = null
     }
 

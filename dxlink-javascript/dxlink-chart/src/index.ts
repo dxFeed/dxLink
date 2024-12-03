@@ -5,6 +5,7 @@ export {
   type DXLinkChartOptions,
 } from './chart'
 export {
+  type JSONNumber,
   type DXLinkChartCandle,
   type DXLinkChartSubscription,
   type DXLinkChartConfig,
@@ -13,6 +14,7 @@ export {
   type DXLinkChartIndicator,
   type DXLinkChartIndicatorsParameters,
   type DXLinkChartIndicatorsData,
+  type DXLinkChartIndicatorsDataValue,
   type DXLinkChartIndicatorsStates,
   type DXLinkChartIndicatorState,
   type DXLinkChartIndicatorEnabled,
