@@ -1,16 +1,16 @@
 import type { DXLinkChannelMessage } from '@dxfeed/dxlink-core'
 
 export interface DXLinkChartIndicator {
-  lang: string
-  content: string
+  readonly lang: string
+  readonly content: string
 }
 
 export interface DXLinkChartIndicators {
-  [key: string]: DXLinkChartIndicator
+  readonly [key: string]: DXLinkChartIndicator
 }
 
 export interface DXLinkChartChannelParameters {
-  indicators: DXLinkChartIndicators
+  readonly indicators: DXLinkChartIndicators
 }
 
 export type JSONNumber = number | 'NaN' | 'Infinity' | '-Infinity'
@@ -21,37 +21,37 @@ export interface DXLinkChartSubscription {
 }
 
 export interface DXLinkChartIndicatorsParameters {
-  [key: string]: {
-    [key: string]: number
+  readonly [key: string]: {
+    readonly [key: string]: number | string | boolean
   }
 }
 
 export interface DXLinkChartIndicatorParameterMeta {
-  type: 'number' | 'double' | 'string' | 'boolean'
-  default: number | string | boolean
-  name: string
+  readonly type: 'number' | 'double' | 'string' | 'boolean'
+  readonly default: number | string | boolean
+  readonly name: string
 }
 
 export interface DXLinkChartIndicatorEnabled {
-  enabled: true
-  inParameters: DXLinkChartIndicatorParameterMeta[]
-  outParameters: DXLinkChartIndicatorParameterMeta[]
+  readonly enabled: true
+  readonly inParameters: DXLinkChartIndicatorParameterMeta[]
+  readonly outParameters: DXLinkChartIndicatorParameterMeta[]
 }
 
 export interface DXLinkChartIndicatorDisabled {
-  enabled: true
+  enabled: false
   error: string
 }
 
 export type DXLinkChartIndicatorState = DXLinkChartIndicatorEnabled | DXLinkChartIndicatorDisabled
 
 export interface DXLinkChartIndicatorsStates {
-  [key: string]: DXLinkChartIndicatorState
+  readonly [key: string]: DXLinkChartIndicatorState
 }
 
 export interface DXLinkChartIndicatorsMessage {
-  type: 'CHART_INDICATORS'
-  indicators: DXLinkChartIndicatorsStates
+  readonly type: 'CHART_INDICATORS'
+  readonly indicators: DXLinkChartIndicatorsStates
 }
 
 export interface DXLinkChartSubscriptionMessage {
@@ -91,20 +91,22 @@ export interface DXLinkChartCandle {
   readonly volume: JSONNumber
 }
 
+export type DXLinkChartIndicatorsDataValue = JSONNumber | string | boolean
+
 export interface DXLinkChartIndicatorsData {
   // Indicator name
-  [key: string]: {
+  readonly [key: string]: {
     // Outputs of the indicator
-    [key: string]: JSONNumber[]
+    readonly [key: string]: DXLinkChartIndicatorsDataValue[]
   }
 }
 
 export interface DXLinkChartDataMessage {
   readonly type: 'CHART_DATA'
-  reset?: boolean
-  pending?: boolean
-  candles: DXLinkChartCandle[]
-  indicators: DXLinkChartIndicatorsData
+  readonly reset?: boolean
+  readonly pending?: boolean
+  readonly candles: DXLinkChartCandle[]
+  readonly indicators: DXLinkChartIndicatorsData
 }
 
 export interface DXLinkChartIndicatorsRemoveMessage {

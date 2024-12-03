@@ -45,10 +45,10 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
   }, [channel])
 
   const handleClose = () => {
-    channel?.close()
+    channel.close()
   }
 
-  const channelTitle = `Channel #${channel?.id ?? '-'} ${channel.service}`
+  const channelTitle = `Channel ${channel.id ? `#${channel.id}` : ''} ${channel.service}`
 
   if (state === DXLinkChannelState.CLOSED) {
     return (

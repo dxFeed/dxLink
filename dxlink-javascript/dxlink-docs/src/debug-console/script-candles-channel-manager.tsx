@@ -1,6 +1,7 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
 import type {
   DXLinkChartCandle,
+  DXLinkChartIndicator,
   DXLinkChartIndicatorsData,
   DXLinkChartSubscription,
 } from '@dxfeed/dxlink-api'
@@ -54,6 +55,7 @@ const stringToColour = (str: string) => {
 
 export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelManagerProps) {
   const [available, setAvailable] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<Chart>()
 
@@ -148,10 +150,10 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
         series.setDataPoints(results[key]!)
       }
 
-      chart.paneManager.panesOrder.forEach((pane) => {
+      Object.keys(chart.paneManager.panes).forEach((pane) => {
         if (!resultKeys.includes(pane) && pane !== 'CHART') {
           chart.paneManager.removePane(pane)
-          console.log('Remove pane', pane)
+          console.log('Remove pane', pane, resultKeys)
         }
       })
 
@@ -200,21 +202,27 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     chartRef.current = chart
 
     return () => {
-      console.log('Destroy chart')
       chart.destroy()
     }
   }, [channel])
 
-  const handleSet = (sub: DXLinkChartSubscription, indicator: string) => {
-    channel.update(sub, indicator, (candles, indicators, snapshot) => {
-      handleDataUpdate(candles, indicators, snapshot, chartRef.current!)
-    })
+  const handleSet = (sub: DXLinkChartSubscription, indicator: DXLinkChartIndicator) => {
+    setError(undefined)
+
+    channel.update(
+      sub,
+      indicator,
+      (candles, indicators, snapshot) => {
+        handleDataUpdate(candles, indicators, snapshot, chartRef.current!)
+      },
+      setError
+    )
   }
 
   return (
     <>
       <Group>
-        <ScriptCandlesSubscription onSet={handleSet} />{' '}
+        <ScriptCandlesSubscription onSet={handleSet} error={error} />{' '}
       </Group>
 
       <ChartGroup available={available}>
