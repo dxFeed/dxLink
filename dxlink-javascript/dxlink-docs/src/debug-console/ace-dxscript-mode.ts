@@ -9,7 +9,7 @@ const TextMode = ace.require('ace/mode/text').Mode
 const MatchingBraceOutdent = ace.require('ace/mode/matching_brace_outdent').MatchingBraceOutdent
 const CstyleBehaviour = ace.require('ace/mode/behaviour/cstyle').CstyleBehaviour
 const CstyleFoldMode = ace.require('ace/mode/folding/cstyle').FoldMode
-const JavaScriptHighlightRules = ace.require('ace/mode/text_highlight_rules').TextHighlightRules
+const TextHighlightRules = ace.require('ace/mode/text_highlight_rules').TextHighlightRules
 const langTools = ace.require('ace/ext/language_tools')
 
 const dxScriptCompletions = [
@@ -105,7 +105,7 @@ langTools.addCompleter({
   },
 })
 
-class DxScriptHighlightRules extends JavaScriptHighlightRules {
+class DxScriptHighlightRules extends TextHighlightRules {
   constructor() {
     super()
 

@@ -12,32 +12,34 @@ import {
 
 import {
   isChartInboundMessage,
-  type DXLinkChartCandle,
-  type DXLinkChartConfig,
-  type DXLinkChartDataMessage,
-  type DXLinkChartIndicators,
-  type DXLinkChartIndicatorsParameters,
-  type DXLinkChartIndicatorsData,
-  type DXLinkChartSetup,
-  type DXLinkChartSetupMessage,
-  type DXLinkChartSubscription,
-  type DXLinkChartSubscriptionMessage,
-  type DXLinkChartIndicatorsStates,
+  type DXLinkIndiChartCandle,
+  type DXLinkIndiChartConfig,
+  type DXLinkIndiChartDataMessage,
+  type DXLinkIndiChartIndicators,
+  type DXLinkIndiChartIndicatorsParameters,
+  type DXLinkIndiChartIndicatorsData,
+  type DXLinkIndiChartSetup,
+  type DXLinkIndiChartSetupMessage,
+  type DXLinkIndiChartSubscription,
+  type DXLinkIndiChartSubscriptionMessage,
+  type DXLinkIndiChartIndicatorsStates,
 } from './messages'
 
-export type DXLinkChartDataListener = (
-  candles: DXLinkChartCandle[],
-  indicators: DXLinkChartIndicatorsData,
+export type DXLinkIndiChartDataListener = (
+  candles: DXLinkIndiChartCandle[],
+  indicators: DXLinkIndiChartIndicatorsData,
   reset: boolean,
   pending: boolean
 ) => void
 
-export type DXLinkChartIndicatorsStateListener = (indicators: DXLinkChartIndicatorsStates) => void
+export type DXLinkIndiChartIndicatorsStateListener = (
+  indicators: DXLinkIndiChartIndicatorsStates
+) => void
 
 /**
  * dxLink Chart service.
  */
-export interface DXLinkChartRequester {
+export interface DXLinkIndiChartRequester {
   /**
    * Unique identifier of the Chart channel.
    */
@@ -51,33 +53,33 @@ export interface DXLinkChartRequester {
   getChannel(): DXLinkChannel
 
   setSubscription(
-    subscription: DXLinkChartSubscription,
-    indicatorsParameters: DXLinkChartIndicatorsParameters
+    subscription: DXLinkIndiChartSubscription,
+    indicatorsParameters: DXLinkIndiChartIndicatorsParameters
   ): void
 
-  setup(setup: DXLinkChartSetup): void
+  setup(setup: DXLinkIndiChartSetup): void
 
-  getConfig(): DXLinkChartConfig | null
+  getConfig(): DXLinkIndiChartConfig | null
 
-  getIndicators(): DXLinkChartIndicatorsStates | null
+  getIndicators(): DXLinkIndiChartIndicatorsStates | null
 
   /**
    * Add a listener for the Chart channel events received from the channel.
    */
-  addDataListener(listener: DXLinkChartDataListener): void
+  addDataListener(listener: DXLinkIndiChartDataListener): void
   /**
    * Remove a listener for the Chart channel events received from the channel.
    */
-  removeDataListener(listener: DXLinkChartDataListener): void
+  removeDataListener(listener: DXLinkIndiChartDataListener): void
 
   /**
    * Add a listener for the Chart indicators state changes received from the channel.
    */
-  addIndicatorsStateChangeListener(listener: DXLinkChartIndicatorsStateListener): void
+  addIndicatorsStateChangeListener(listener: DXLinkIndiChartIndicatorsStateListener): void
   /**
    * Remove a listener for the Chart indicators state changes received from the channel.
    */
-  removeIndicatorsStateChangeListener(listener: DXLinkChartIndicatorsStateListener): void
+  removeIndicatorsStateChangeListener(listener: DXLinkIndiChartIndicatorsStateListener): void
 
   /**
    * Close the Chart channel.
@@ -86,9 +88,9 @@ export interface DXLinkChartRequester {
 }
 
 /**
- * Options for the {@link DXLinkChart} instance.
+ * Options for the {@link DXLinkIndiChart} instance.
  */
-export interface DXLinkChartOptions {
+export interface DXLinkIndiChartOptions {
   /**
    * Log level for the Chart.
    */
@@ -98,33 +100,33 @@ export interface DXLinkChartOptions {
 const SERVICE_NAME = 'INDICHART'
 
 /**
- * dxLink Chart service implementation.
+ * dxLink Indi Chart service implementation.
  */
-export class DXLinkChart implements DXLinkChartRequester {
+export class DXLinkIndiChart implements DXLinkIndiChartRequester {
   /**
    * Unique identifier of the Chart channel.
    */
   public readonly id: number
 
-  private readonly dataListeners = new Set<DXLinkChartDataListener>()
-  private readonly indicatorsStateListeners = new Set<DXLinkChartIndicatorsStateListener>()
+  private readonly dataListeners = new Set<DXLinkIndiChartDataListener>()
+  private readonly indicatorsStateListeners = new Set<DXLinkIndiChartIndicatorsStateListener>()
 
   private readonly logger: DXLinkLogger
   private readonly channel: DXLinkChannel
 
   private lastSubscription: {
-    subscription: DXLinkChartSubscription
-    indicatorsParameters: DXLinkChartIndicatorsParameters
+    subscription: DXLinkIndiChartSubscription
+    indicatorsParameters: DXLinkIndiChartIndicatorsParameters
   } | null = null
-  private lastSetup: DXLinkChartSetup | null = null
-  private lastConfig: DXLinkChartConfig | null = null
+  private lastSetup: DXLinkIndiChartSetup | null = null
+  private lastConfig: DXLinkIndiChartConfig | null = null
 
-  private indicators: DXLinkChartIndicatorsStates | null = null
+  private indicators: DXLinkIndiChartIndicatorsStates | null = null
 
   /**
-   * Allows to create {@link DXLinkChart} instance with the specified {@link ChartContract} for the given {@link DXLinkWebSocketClient}.
+   * Allows to create {@link DXLinkIndiChart} instance with the specified {@link ChartContract} for the given {@link DXLinkWebSocketClient}.
    */
-  constructor(client: DXLinkClient, indicators: DXLinkChartIndicators) {
+  constructor(client: DXLinkClient, indicators: DXLinkIndiChartIndicators) {
     this.channel = client.openChannel(SERVICE_NAME, {
       indicators,
     })
@@ -133,7 +135,7 @@ export class DXLinkChart implements DXLinkChartRequester {
     this.channel.addStateChangeListener(this.processStatus)
     this.channel.addErrorListener(this.processError)
 
-    this.logger = new Logger(`${DXLinkChart.name}#${this.id}`, DXLinkLogLevel.WARN)
+    this.logger = new Logger(`${DXLinkIndiChart.name}#${this.id}`, DXLinkLogLevel.WARN)
   }
 
   getChannel = () => this.channel
@@ -144,19 +146,19 @@ export class DXLinkChart implements DXLinkChartRequester {
   removeStateChangeListener = (listener: DXLinkChannelStateChangeListener) =>
     this.channel.removeStateChangeListener(listener)
 
-  addIndicatorsStateChangeListener = (listener: DXLinkChartIndicatorsStateListener) =>
+  addIndicatorsStateChangeListener = (listener: DXLinkIndiChartIndicatorsStateListener) =>
     this.indicatorsStateListeners.add(listener)
-  removeIndicatorsStateChangeListener = (listener: DXLinkChartIndicatorsStateListener) =>
+  removeIndicatorsStateChangeListener = (listener: DXLinkIndiChartIndicatorsStateListener) =>
     this.indicatorsStateListeners.delete(listener)
 
-  setup = (setup: DXLinkChartSetup) => {
+  setup = (setup: DXLinkIndiChartSetup) => {
     this.lastSetup = setup
 
     if (this.channel.getState() === DXLinkChannelState.OPENED) {
       this.channel.send({
         type: 'INDICHART_SETUP',
         ...setup,
-      } satisfies DXLinkChartSetupMessage)
+      } satisfies DXLinkIndiChartSetupMessage)
     }
   }
 
@@ -172,8 +174,8 @@ export class DXLinkChart implements DXLinkChartRequester {
   }
 
   setSubscription = (
-    subscription: DXLinkChartSubscription,
-    indicatorsParameters: DXLinkChartIndicatorsParameters
+    subscription: DXLinkIndiChartSubscription,
+    indicatorsParameters: DXLinkIndiChartIndicatorsParameters
   ) => {
     this.lastSubscription = {
       subscription,
@@ -184,7 +186,7 @@ export class DXLinkChart implements DXLinkChartRequester {
       this.channel.send({
         type: 'INDICHART_SUBSCRIPTION',
         ...this.lastSubscription,
-      } satisfies DXLinkChartSubscriptionMessage)
+      } satisfies DXLinkIndiChartSubscriptionMessage)
     }
   }
 
@@ -195,10 +197,10 @@ export class DXLinkChart implements DXLinkChartRequester {
     })
   }
 
-  addDataListener = (listener: DXLinkChartDataListener) => {
+  addDataListener = (listener: DXLinkIndiChartDataListener) => {
     this.dataListeners.add(listener)
   }
-  removeDataListener = (listener: DXLinkChartDataListener) => {
+  removeDataListener = (listener: DXLinkIndiChartDataListener) => {
     this.dataListeners.delete(listener)
   }
 
@@ -237,7 +239,7 @@ export class DXLinkChart implements DXLinkChartRequester {
   /**
    * Process data received from the channel.
    */
-  private processData = (message: DXLinkChartDataMessage) => {
+  private processData = (message: DXLinkIndiChartDataMessage) => {
     // Notify listeners
     for (const listener of this.dataListeners) {
       try {
@@ -282,14 +284,14 @@ export class DXLinkChart implements DXLinkChartRequester {
       this.channel.send({
         type: 'INDICHART_SUBSCRIPTION',
         ...this.lastSubscription,
-      } satisfies DXLinkChartSubscriptionMessage)
+      } satisfies DXLinkIndiChartSubscriptionMessage)
     }
 
     if (this.lastSetup) {
       this.channel.send({
         type: 'INDICHART_SETUP',
         ...this.lastSetup,
-      } satisfies DXLinkChartSetupMessage)
+      } satisfies DXLinkIndiChartSetupMessage)
     }
   }
 }

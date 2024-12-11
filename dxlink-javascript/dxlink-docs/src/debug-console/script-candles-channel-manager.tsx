@@ -1,9 +1,9 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
 import type {
-  DXLinkChartCandle,
-  DXLinkChartIndicator,
-  DXLinkChartIndicatorsData,
-  DXLinkChartSubscription,
+  DXLinkIndiChartCandle,
+  DXLinkIndiChartIndicator,
+  DXLinkIndiChartIndicatorsData,
+  DXLinkIndiChartSubscription,
 } from '@dxfeed/dxlink-api'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { useEffect, useRef, useState } from 'react'
@@ -60,8 +60,8 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
   const chartRef = useRef<Chart>()
 
   const handleDataUpdate = (
-    events: DXLinkChartCandle[],
-    indicators: DXLinkChartIndicatorsData[],
+    events: DXLinkIndiChartCandle[],
+    indicators: DXLinkIndiChartIndicatorsData[],
     snapshot: boolean,
     chart: Chart
   ) => {
@@ -206,7 +206,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     }
   }, [channel])
 
-  const handleSet = (sub: DXLinkChartSubscription, indicator: DXLinkChartIndicator) => {
+  const handleSet = (sub: DXLinkIndiChartSubscription, indicator: DXLinkIndiChartIndicator) => {
     setError(undefined)
 
     channel.update(
