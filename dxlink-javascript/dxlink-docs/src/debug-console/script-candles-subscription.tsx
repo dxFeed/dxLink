@@ -1,4 +1,4 @@
-import type { DXLinkChartIndicator, DXLinkChartSubscription, DXLinkError } from '@dxfeed/dxlink-api'
+import type { DXLinkIndiChartIndicator, DXLinkIndiChartSubscription } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
 import { IconButton } from '@dxfeed/ui-kit/IconButton'
@@ -7,7 +7,7 @@ import { TextField } from '@dxfeed/ui-kit/TextField'
 import { ToggleButton } from '@dxfeed/ui-kit/ToggleButton'
 import { Tooltip } from '@dxfeed/ui-kit/Tooltip'
 import { unit } from '@dxfeed/ui-kit/utils'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import AceEditor from 'react-ace'
 import styled from 'styled-components'
 
@@ -16,7 +16,6 @@ import { DxScriptIcon, ErrorIcon, JSIcon } from './icons'
 import { ContentTemplate } from '../common/content-template'
 import 'ace-builds/src-noconflict/mode-python'
 import 'ace-builds/src-noconflict/theme-textmate'
-import { Errors } from './errors'
 
 const FieldsGroup = styled.div`
   display: grid;
@@ -64,6 +63,11 @@ const CodeEditorGroup = styled.div`
 `
 const CodeEditorInput = styled.div`
   width: 100%;
+
+  .ace_custom-keyword {
+    color: #ff6347; /* Красный цвет для подсветки */
+    font-weight: bold;
+  }
 `
 
 const CodeEditorHelp = styled.div`
@@ -100,7 +104,7 @@ const JSLogo = styled(JSIcon)`
 
 export interface ScriptCandlesSubscriptionProps {
   error?: string
-  onSet(subscription: DXLinkChartSubscription, indicator: DXLinkChartIndicator): void
+  onSet(subscription: DXLinkIndiChartSubscription, indicator: DXLinkIndiChartIndicator): void
 }
 
 const mode = new DxScriptMode()
@@ -188,27 +192,20 @@ output.gap = Math.max(v, 0)`,
     {
       label: 'RSI',
       content: `input.n = 14
-
-let c = close
-let u = ResultSeries.diff("u", () => c.last() - c.last(1))
-let d = ResultSeries.diff("d", () => c.last(1) - c.last())
-
+let u = ResultSeries.apply("u", () => Math.max(0, close.last() - close.last(1)))
+let d = ResultSeries.apply("d", () => Math.max(0, close.last(1) - close.last()))
 let uw = wima("uw", u, input.n)
 let dw = wima("dw", d, input.n)
-
-output.rsi = (dw === 0) ? 100 : 100 - (100 / (1 + uw / dw))
+output.rsi = dw === 0 ? 100 : 100 - (100 / (1 + uw / dw))
 
 function wima(name, runtimeSeries, n) {
-    const lastWima = global.getOrDefault(name, NaN);
-    let wima
-    if (!isNaN(lastWima)) {
-        let x = runtimeSeries.last()
-        wima = !isNaN(x) ? (lastWima * (n - 1) + x) / n : lastWima
-    } else {
-        wima = sma(runtimeSeries, n)
-    }
-    global[name] = wima
-    return wima
+  const lastWima = global[name] ?? NaN;
+  let value = runtimeSeries.last();
+  let wima = isNaN(lastWima)
+    ? sma(runtimeSeries, n)
+    : (lastWima * (n - 1) + value) / n;
+  global[name] = wima;
+  return wima;
 }`,
     },
   ],
@@ -218,6 +215,7 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
   const [symbol, setSymbol] = useState('AAPL{=d}')
   const [fromTime, setFromTime] = useState('0')
   const [script, setScript] = useState<string>(SCRIPT_EXAMPLES.dxScript[0]!.content)
+  const lastExampleRef = useRef(0)
 
   const [lang, setLang] = useState<Lang>('dxScript')
 
@@ -279,7 +277,8 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
                 key={item.id}
                 onPressedChange={() => {
                   const lang = item.id
-                  setScript(SCRIPT_EXAMPLES[lang][0]!.content)
+                  const example = lastExampleRef.current
+                  setScript(SCRIPT_EXAMPLES[lang][example]!.content)
                   setLang(item.id)
                 }}
                 pressed={item.id === lang}
@@ -315,7 +314,7 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
               highlightActiveLine={true}
               value={script}
               width="100%"
-              height="250px"
+              height="320px"
               setOptions={{
                 enableBasicAutocompletion: true,
                 enableLiveAutocompletion: true,
@@ -327,11 +326,12 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
           </CodeEditorInput>
           <CodeEditorHelp>
             <ExamplesText>Try examples:</ExamplesText>
-            {SCRIPT_EXAMPLES[lang].map((item) => (
+            {SCRIPT_EXAMPLES[lang].map((item, index) => (
               <ExampleButton
                 kind="ghost"
                 key={item.label}
                 onClick={() => {
+                  lastExampleRef.current = index
                   setScript(item.content)
                 }}
               >

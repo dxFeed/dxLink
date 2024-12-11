@@ -1,20 +1,20 @@
 import {
   type DXLinkChannelStateChangeListener,
-  type DXLinkChartCandle,
-  type DXLinkChartIndicator,
-  type DXLinkChartIndicatorsData,
-  type DXLinkChartSubscription,
+  type DXLinkIndiChartCandle,
+  type DXLinkIndiChartIndicator,
+  type DXLinkIndiChartIndicatorsData,
+  type DXLinkIndiChartSubscription,
   type DXLinkClient,
   type DXLinkErrorListener,
   DXLinkChannelState,
-  DXLinkChart,
+  DXLinkIndiChart,
 } from '@dxfeed/dxlink-api'
 
 import type { ChannelInfo } from './debug-console/channel-widget'
 
 export type ChartHolderListener = (
-  candles: DXLinkChartCandle[],
-  indicators: DXLinkChartIndicatorsData[],
+  candles: DXLinkIndiChartCandle[],
+  indicators: DXLinkIndiChartIndicatorsData[],
   snapshot: boolean
 ) => void
 
@@ -22,13 +22,13 @@ export class ChartHolder implements ChannelInfo {
   service = 'INDICHART'
 
   private closed = false
-  private chart: DXLinkChart | null = null
+  private chart: DXLinkIndiChart | null = null
   private listener: ChartHolderListener | null = null
 
   private snapshot: boolean = false
 
-  private pendingCandles: DXLinkChartCandle[] = []
-  private pendingIndicators: DXLinkChartIndicatorsData[] = []
+  private pendingCandles: DXLinkIndiChartCandle[] = []
+  private pendingIndicators: DXLinkIndiChartIndicatorsData[] = []
 
   private errorListeners: DXLinkErrorListener[] = []
   private stateListeners: DXLinkChannelStateChangeListener[] = []
@@ -73,15 +73,15 @@ export class ChartHolder implements ChannelInfo {
   }
 
   update = (
-    subscription: DXLinkChartSubscription,
-    indicator: DXLinkChartIndicator,
+    subscription: DXLinkIndiChartSubscription,
+    indicator: DXLinkIndiChartIndicator,
     listener: ChartHolderListener,
     errorListener: (error: string) => void
-  ): DXLinkChart => {
+  ): DXLinkIndiChart => {
     this.clear()
     this.listener = listener
 
-    const chart = new DXLinkChart(this.client, {
+    const chart = new DXLinkIndiChart(this.client, {
       current: indicator,
     })
 
@@ -107,7 +107,7 @@ export class ChartHolder implements ChannelInfo {
     return chart
   }
 
-  getChart = (): DXLinkChart | null => {
+  getChart = (): DXLinkIndiChart | null => {
     return this.chart
   }
 
@@ -143,8 +143,8 @@ export class ChartHolder implements ChannelInfo {
   }
 
   private dataListener = (
-    candles: DXLinkChartCandle[],
-    indicators: DXLinkChartIndicatorsData,
+    candles: DXLinkIndiChartCandle[],
+    indicators: DXLinkIndiChartIndicatorsData,
     reset: boolean,
     pending: boolean
   ) => {

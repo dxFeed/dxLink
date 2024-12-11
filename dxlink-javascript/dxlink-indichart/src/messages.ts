@@ -1,86 +1,88 @@
 import type { DXLinkChannelMessage } from '@dxfeed/dxlink-core'
 
-export interface DXLinkChartIndicator {
+export interface DXLinkIndiChartIndicator {
   readonly lang: string
   readonly content: string
 }
 
-export interface DXLinkChartIndicators {
-  readonly [key: string]: DXLinkChartIndicator
+export interface DXLinkIndiChartIndicators {
+  readonly [key: string]: DXLinkIndiChartIndicator
 }
 
-export interface DXLinkChartChannelParameters {
-  readonly indicators: DXLinkChartIndicators
+export interface DXLinkIndiChartChannelParameters {
+  readonly indicators: DXLinkIndiChartIndicators
 }
 
 export type JSONNumber = number | 'NaN' | 'Infinity' | '-Infinity'
 
-export interface DXLinkChartSubscription {
+export interface DXLinkIndiChartSubscription {
   readonly symbol: string
   readonly fromTime: number
 }
 
-export interface DXLinkChartIndicatorsParameters {
+export interface DXLinkIndiChartIndicatorsParameters {
   readonly [key: string]: {
     readonly [key: string]: number | string | boolean
   }
 }
 
-export interface DXLinkChartIndicatorParameterMeta {
+export interface DXLinkIndiChartIndicatorParameterMeta {
   readonly type: 'number' | 'double' | 'string' | 'boolean'
   readonly default: number | string | boolean
   readonly name: string
 }
 
-export interface DXLinkChartIndicatorEnabled {
+export interface DXLinkIndiChartIndicatorEnabled {
   readonly enabled: true
-  readonly inParameters: DXLinkChartIndicatorParameterMeta[]
-  readonly outParameters: DXLinkChartIndicatorParameterMeta[]
+  readonly inParameters: DXLinkIndiChartIndicatorParameterMeta[]
+  readonly outParameters: DXLinkIndiChartIndicatorParameterMeta[]
 }
 
-export interface DXLinkChartIndicatorDisabled {
+export interface DXLinkIndiChartIndicatorDisabled {
   enabled: false
   error: string
 }
 
-export type DXLinkChartIndicatorState = DXLinkChartIndicatorEnabled | DXLinkChartIndicatorDisabled
+export type DXLinkIndiChartIndicatorState =
+  | DXLinkIndiChartIndicatorEnabled
+  | DXLinkIndiChartIndicatorDisabled
 
-export interface DXLinkChartIndicatorsStates {
-  readonly [key: string]: DXLinkChartIndicatorState
+export interface DXLinkIndiChartIndicatorsStates {
+  readonly [key: string]: DXLinkIndiChartIndicatorState
 }
 
-export interface DXLinkChartIndicatorsMessage {
+export interface DXLinkIndiChartIndicatorsMessage {
   readonly type: 'INDICHART_INDICATORS'
-  readonly indicators: DXLinkChartIndicatorsStates
+  readonly indicators: DXLinkIndiChartIndicatorsStates
 }
 
-export interface DXLinkChartSubscriptionMessage {
+export interface DXLinkIndiChartSubscriptionMessage {
   readonly type: 'INDICHART_SUBSCRIPTION'
-  readonly subscription: DXLinkChartSubscription
-  readonly indicatorsParameters: DXLinkChartIndicatorsParameters
+  readonly subscription: DXLinkIndiChartSubscription
+  readonly indicatorsParameters: DXLinkIndiChartIndicatorsParameters
 }
 
-export interface DXLinkChartSetup {
+export interface DXLinkIndiChartSetup {
   readonly acceptAggregationPeriod: number
   readonly acceptDataFormat: 'FULL'
   readonly acceptCandleFields: string[]
 }
 
-export interface DXLinkChartSetupMessage extends DXLinkChartSetup {
+export interface DXLinkIndiChartSetupMessage extends DXLinkIndiChartSetup {
   readonly type: 'INDICHART_SETUP'
 }
 
-export interface DXLinkChartConfig {
+export interface DXLinkIndiChartConfig {
   readonly aggregationPeriod: number
   readonly dataFormat: 'FULL'
   readonly candleFields: string[]
 }
 
-export interface DXLinkChartConfigMessage extends DXLinkChartConfig {
+export interface DXLinkIndiChartConfigMessage extends DXLinkIndiChartConfig {
   readonly type: 'INDICHART_CONFIG'
 }
 
-export interface DXLinkChartCandle {
+export interface DXLinkIndiChartCandle {
   readonly eventSymbol: string
   readonly index: number
   readonly time: number
@@ -91,38 +93,38 @@ export interface DXLinkChartCandle {
   readonly volume: JSONNumber
 }
 
-export type DXLinkChartIndicatorsDataValue = JSONNumber | string | boolean
+export type DXLinkIndiChartIndicatorsDataValue = JSONNumber | string | boolean
 
-export interface DXLinkChartIndicatorsData {
+export interface DXLinkIndiChartIndicatorsData {
   // Indicator name
   readonly [key: string]: {
     // Outputs of the indicator
-    readonly [key: string]: DXLinkChartIndicatorsDataValue[]
+    readonly [key: string]: DXLinkIndiChartIndicatorsDataValue[]
   }
 }
 
-export interface DXLinkChartDataMessage {
+export interface DXLinkIndiChartDataMessage {
   readonly type: 'INDICHART_DATA'
   readonly reset?: boolean
   readonly pending?: boolean
-  readonly candles: DXLinkChartCandle[]
-  readonly indicators: DXLinkChartIndicatorsData
+  readonly candles: DXLinkIndiChartCandle[]
+  readonly indicators: DXLinkIndiChartIndicatorsData
 }
 
-export interface DXLinkChartIndicatorsRemoveMessage {
+export interface DXLinkIndiChartIndicatorsRemoveMessage {
   readonly type: 'INDICHART_INDICATORS_REMOVE'
   readonly indicators: string[]
 }
 
 export type ChartInboundMessage =
-  | DXLinkChartIndicatorsMessage
-  | DXLinkChartConfigMessage
-  | DXLinkChartDataMessage
+  | DXLinkIndiChartIndicatorsMessage
+  | DXLinkIndiChartConfigMessage
+  | DXLinkIndiChartDataMessage
 
 export type ChartOutboundMessage =
-  | DXLinkChartSubscriptionMessage
-  | DXLinkChartSetupMessage
-  | DXLinkChartIndicatorsRemoveMessage
+  | DXLinkIndiChartSubscriptionMessage
+  | DXLinkIndiChartSetupMessage
+  | DXLinkIndiChartIndicatorsRemoveMessage
 
 export const isChartInboundMessage = (
   message: DXLinkChannelMessage
