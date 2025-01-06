@@ -10,7 +10,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@asyncapi/react-component": "1.0.0-next.47",
+    "@asyncapi/react-component": "2.5.0",
     "@devexperts/dxcharts-lite": "2.5.3",
     "@dxfeed/dxlink-api": "*",
     "@dxfeed/ui-kit": "2.15.2",
