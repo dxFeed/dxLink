@@ -2,8 +2,12 @@ import type { DXLinkIndiChartIndicator, DXLinkIndiChartSubscription } from '@dxf
 import { Button } from '@dxfeed/ui-kit/Button'
 import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
 import { IconButton } from '@dxfeed/ui-kit/IconButton'
+import { Search } from '@dxfeed/ui-kit/Icons'
+import { Menu, MenuItem } from '@dxfeed/ui-kit/Menu'
+import { Notification } from '@dxfeed/ui-kit/Notification'
 import { Text } from '@dxfeed/ui-kit/Text'
 import { TextField } from '@dxfeed/ui-kit/TextField'
+import { TextInput } from '@dxfeed/ui-kit/TextInput'
 import { ToggleButton } from '@dxfeed/ui-kit/ToggleButton'
 import { Tooltip } from '@dxfeed/ui-kit/Tooltip'
 import { unit } from '@dxfeed/ui-kit/utils'
@@ -13,6 +17,13 @@ import styled from 'styled-components'
 
 import { DxScriptMode } from './ace-dxscript-mode'
 import { DxScriptIcon, ErrorIcon, JSIcon } from './icons'
+import {
+  INDICHART_DXSCRIPT_INDICATORS,
+  INDICHART_INDICATOR_EXAMPLES,
+  INDICHART_INDICATROS,
+  INDICHART_JS_INDICATORS,
+  type Lang,
+} from './indichart-indicators'
 import { ContentTemplate } from '../common/content-template'
 import 'ace-builds/src-noconflict/mode-python'
 import 'ace-builds/src-noconflict/theme-textmate'
@@ -52,8 +63,14 @@ const LangButton = styled(ToggleButton)`
   display: flex;
   align-items: center;
 `
-const ExamplesText = styled(Text)``
-const ExampleButton = styled(Button)``
+
+const ExampleButton = styled(Button)`
+  margin-top: ${unit(1)};
+`
+
+const ExampleItem = styled(MenuItem)`
+  cursor: pointer;
+`
 
 const CodeEditorGroup = styled.div`
   display: flex;
@@ -72,6 +89,8 @@ const CodeEditorInput = styled.div`
 
 const CodeEditorHelp = styled.div`
   width: 100%;
+  display: flex;
+  justify-content: end;
 `
 
 const Actions = styled.div`
@@ -102,14 +121,24 @@ const JSLogo = styled(JSIcon)`
   margin-bottom: 2px;
 `
 
+const ExampleText = styled(Text)`
+  display: flex;
+  flex-grow: 1;
+  justify-content: space-between;
+  min-width: 300px;
+`
+
+const ExampleDoc = styled.a`
+  margin-left: ${unit(2)};
+`
+
 export interface ScriptCandlesSubscriptionProps {
   error?: string
   onSet(subscription: DXLinkIndiChartSubscription, indicator: DXLinkIndiChartIndicator): void
+  onReset(): void
 }
 
 const mode = new DxScriptMode()
-
-type Lang = 'dxScript' | 'js'
 
 const LANGS = [
   {
@@ -130,94 +159,20 @@ const LANGS = [
   },
 ] as const
 
-const SCRIPT_EXAMPLES = {
-  dxScript: [
-    {
-      label: 'SMA',
-      content: `in n = 1
-out sma = sma(candle.open, n)`,
-    },
-    {
-      label: 'GAP',
-      content: `def o = candle.open
-def po = candle.open[1]
-def c = candle.close
-def pc = candle.close[1]
-def v =
-if (pc >= po)
-  if (c >= o) max(o - pc, po - c) else max(c - pc, po - o)
-else
-  if (c >= o) max(o - po, pc - c) else max(c - po, pc - o)
-out gap = max(v, 0)`,
-    },
-    {
-      label: 'RSI',
-      content: `in n = 14
-def c = candle.close
-def u = if (c > c[1]) c - c[1] else 0
-def d = if (c < c[1]) c[1] - c else 0
-def uw = u.wima(n)
-def dw = d.wima(n)
-out rsi = if (dw == 0) 100 else 100 - (100 / (1 + uw / dw))
-
-fun wima {
-    in x: number
-    in n: const number
-    def w = if (x.isNotNaN) (w[1] * (n - 1) + x) / n else w[1] default x.sma(n)
-    out = w
-}`,
-    },
-  ],
-  js: [
-    {
-      label: 'SMA',
-      content: `input.n = 1
-output.sma = sma(open, input.n)`,
-    },
-    {
-      label: 'GAP',
-      content: `const o = open.last()
-const po = open.last(1)
-const c = close.last()
-const pc = close.last(1)
-
-let v
-if (pc >= po) {
-    v = (c >= o) ? Math.max(o - pc, po - c) : Math.max(c - pc, po - o)
-} else {
-    v = (c >= o) ? Math.max(o - po, pc - c) : Math.max(c - po, pc - o)
-}
-output.gap = Math.max(v, 0)`,
-    },
-    {
-      label: 'RSI',
-      content: `input.n = 14
-let u = ResultSeries.apply("u", () => Math.max(0, close.last() - close.last(1)))
-let d = ResultSeries.apply("d", () => Math.max(0, close.last(1) - close.last()))
-let uw = wima("uw", u, input.n)
-let dw = wima("dw", d, input.n)
-output.rsi = dw === 0 ? 100 : 100 - (100 / (1 + uw / dw))
-
-function wima(name, runtimeSeries, n) {
-  const lastWima = global[name] ?? NaN;
-  let value = runtimeSeries.last();
-  let wima = isNaN(lastWima)
-    ? sma(runtimeSeries, n)
-    : (lastWima * (n - 1) + value) / n;
-  global[name] = wima;
-  return wima;
-}`,
-    },
-  ],
-}
-
-export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscriptionProps) {
+export function ScriptCandlesSubscription({
+  onSet,
+  onReset,
+  error,
+}: ScriptCandlesSubscriptionProps) {
   const [symbol, setSymbol] = useState('AAPL{=d}')
   const [fromTime, setFromTime] = useState('0')
-  const [script, setScript] = useState<string>(SCRIPT_EXAMPLES.dxScript[0]!.content)
-  const lastExampleRef = useRef(0)
 
+  const [exampleId, setExampleId] = useState<string>(INDICHART_INDICATOR_EXAMPLES[0]!.id)
   const [lang, setLang] = useState<Lang>('dxScript')
+  const [script, setScript] = useState<string>(INDICHART_INDICATROS[lang][exampleId]!)
+  const [search, setSearch] = useState('')
+
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
 
   const handleSet = () => {
     onSet(
@@ -231,6 +186,12 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
       }
     )
   }
+
+  const examples = search
+    ? INDICHART_INDICATOR_EXAMPLES.filter((item) =>
+        item.id.toLowerCase().includes(search.toLowerCase())
+      )
+    : INDICHART_INDICATOR_EXAMPLES
 
   return (
     <ContentTemplate title="Manage channel">
@@ -277,8 +238,7 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
                 key={item.id}
                 onPressedChange={() => {
                   const lang = item.id
-                  const example = lastExampleRef.current
-                  setScript(SCRIPT_EXAMPLES[lang][example]!.content)
+                  setScript(INDICHART_INDICATROS[lang][exampleId] ?? '')
                   setLang(item.id)
                 }}
                 pressed={item.id === lang}
@@ -325,23 +285,58 @@ export function ScriptCandlesSubscription({ onSet, error }: ScriptCandlesSubscri
             />
           </CodeEditorInput>
           <CodeEditorHelp>
-            <ExamplesText>Try examples:</ExamplesText>
-            {SCRIPT_EXAMPLES[lang].map((item, index) => (
-              <ExampleButton
-                kind="ghost"
-                key={item.label}
-                onClick={() => {
-                  lastExampleRef.current = index
-                  setScript(item.content)
-                }}
-              >
-                {item.label}
-              </ExampleButton>
-            ))}
+            <ExampleButton color="secondary" onClick={(event) => setAnchorEl(event.currentTarget)}>
+              Try examples
+            </ExampleButton>
+            <Menu
+              anchorEl={anchorEl}
+              isOpen={!!anchorEl}
+              placement="left-end"
+              onClose={() => setAnchorEl(null)}
+              head={
+                <TextInput
+                  size="medium"
+                  leftIcon={<Search />}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              }
+            >
+              {examples.length > 0 ? (
+                examples.map((example) => (
+                  <ExampleItem
+                    onClick={() => {
+                      setAnchorEl(null)
+                      setExampleId(example.id)
+                      setScript(INDICHART_INDICATROS[lang][example.id] ?? '')
+                    }}
+                    key={example.id}
+                  >
+                    <ExampleText color="inherit">
+                      <Text color="inherit">{example.id}</Text>
+                      {example.docUrl && (
+                        <ExampleDoc href={example.docUrl} target="blank" rel="noreferrer">
+                          [Docs]
+                        </ExampleDoc>
+                      )}
+                    </ExampleText>
+                  </ExampleItem>
+                ))
+              ) : (
+                <ExampleText color="inherit">
+                  <Notification>Nothing found</Notification>
+                </ExampleText>
+              )}
+            </Menu>
           </CodeEditorHelp>
         </CodeEditorGroup>
 
         <Actions>
+          <ActionGroup>
+            <Button type="button" onClick={onReset} color={'accent'}>
+              Reset
+            </Button>
+          </ActionGroup>
           <ActionGroup>
             <Button type="submit" kind={'outline'} onClick={handleSet}>
               Re-Open Channel
