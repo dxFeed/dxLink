@@ -219,10 +219,15 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     )
   }
 
+  const handleReset = () => {
+    channel.clear()
+    setAvailable(false)
+  }
+
   return (
     <>
       <Group>
-        <ScriptCandlesSubscription onSet={handleSet} error={error} />{' '}
+        <ScriptCandlesSubscription onSet={handleSet} onReset={handleReset} error={error} />{' '}
       </Group>
 
       <ChartGroup available={available}>

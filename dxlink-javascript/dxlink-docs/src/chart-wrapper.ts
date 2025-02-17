@@ -119,7 +119,7 @@ export class ChartHolder implements ChannelInfo {
     return this.chart?.id
   }
 
-  private clear = () => {
+  public clear = () => {
     const chart = this.chart
     if (chart !== null) {
       this.errorListeners.forEach((l) => chart.getChannel().removeErrorListener(l))
