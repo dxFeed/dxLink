@@ -7,6 +7,8 @@ import {
   DXLinkDepthOfMarket,
   type Subscription,
   type TimeSeriesSubscription,
+  DXLinkIndiChart,
+  type DXLinkIndiChartIndicators,
 } from '../src'
 
 async function startFeed() {
@@ -61,6 +63,40 @@ async function startDepthOfMarket() {
   })
 }
 
-startDepthOfMarket()
+async function startChart() {
+  console.log('Start Chart')
+
+  const client = new DXLinkWebSocketClient()
+  client.connect('ws://localhost:9959/')
+
+  const indicators: DXLinkIndiChartIndicators = {
+    indicator1: {
+      lang: 'dxScript',
+      content: 'in depth = 14; out avg = sma(close, depth)',
+    },
+  }
+
+  const chart = new DXLinkIndiChart(client, indicators)
+
+  chart.addIndicatorsStateChangeListener((indicators) => {
+    // your buisness logic here
+    console.log('Indicators State', indicators)
+  })
+
+  chart.addDataListener((candles, indicators, reset, pending) => {
+    // your buisness logic here
+    console.log('Chart Data', candles, indicators, reset, pending)
+  })
+
+  chart.setSubscription(
+    {
+      symbol: 'AAPL{=d}',
+      fromTime: 0,
+    },
+    {}
+  )
+}
+
+startChart()
 
 // startFeed()

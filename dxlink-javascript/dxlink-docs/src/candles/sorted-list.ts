@@ -7,6 +7,14 @@ export class SortedList<T> {
     this.comparator = comparator
   }
 
+  public static from<T>(array: T[], comparator: (a: T, b: T) => number): SortedList<T> {
+    const sortedList = new SortedList(comparator)
+    for (const item of array) {
+      sortedList.insert(item)
+    }
+    return sortedList
+  }
+
   public insert(item: T): void {
     const [mid, low] = this.search(item)
     if (mid === -1) {
@@ -15,6 +23,7 @@ export class SortedList<T> {
     }
 
     this.items[mid] = item
+    // this.items.splice(mid, 0, item)
   }
 
   public indexOf(item: T): number {

@@ -19,6 +19,7 @@ import { ChannelsManager, type Channel } from './channels-manager'
 import { type ConnectParams, Connection } from './connection'
 import { Errors } from './errors'
 import { DXLinkCandles } from '../candles/candles'
+import { ChartHolder } from '../chart-wrapper'
 
 const Root = styled.div`
   display: flex;
@@ -194,6 +195,20 @@ export function DebugConsole() {
     }
   }
 
+  const handleOpenChart = () => {
+    try {
+      if (client === undefined) {
+        throw new Error('Client must be connected')
+      }
+
+      const chart = new ChartHolder(client)
+
+      setChannels((prev) => [...prev, chart])
+    } catch (error) {
+      handleError(error)
+    }
+  }
+
   const state = connectionState.state
   const connectionDetails = connectionState?.details
   const serverKeepaliveTimeout = connectionDetails?.serverKeepaliveTimeout
@@ -235,6 +250,7 @@ export function DebugConsole() {
                   onOpenFeed={handleOpenFeed}
                   onOpenDom={handleOpenDom}
                   onOpenCandles={handleOpenCandles}
+                  onOpenChart={handleOpenChart}
                 />
               )}
             </ChannelWrapper>
