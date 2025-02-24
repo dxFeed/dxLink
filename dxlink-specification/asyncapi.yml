@@ -36,6 +36,27 @@ info:
 
     The main channel performs the exchange of protocol messages that pertain to the entire connection (not to a specific channel). This main channel is identified by a channel ID `0`.
 
+    ## Error Handling
+    If an error occurs, the server will send an `ERROR` message to the client.
+    The client does not need to respond to the error message, as it is for informational purposes only.
+
+    The server can send the following error types:
+    - `UNSUPPORTED_PROTOCOL` - The server does not support the protocol version.
+    - `TIMEOUT` - the server did not receive the expected message within the allotted time period and considered that the connection was lost.
+    - `UNAUTHORIZED` - the client was not authorized for that action.
+    - `INVALID_MESSAGE` - the server was unable to parse the received message(s).
+    - `BAD_ACTION` - the server detected a protocol violation in the previously received message(s).
+    - `UNKNOWN` - an error occurred that does not fit into any of the previously described types.
+
+    Example of an error message:
+    ```json
+    {
+      "type": "ERROR",
+      "channel": 0,
+      "error": "TIMEOUT",
+      "message": "The timeout has been reached. The message was last received 60 seconds ago."
+    }
+
     ## Connection
     The connection is established by sending a WebSocket connection request to the server.
 
