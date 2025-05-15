@@ -57,17 +57,16 @@ out UpperLevel = 50
 out LowerLevel = -50
 out Zero = 0`,
 
-  'Commodity Channel Index (CCI)': `in n = 20
-def c = close
-def diff = c - c[1]
-def increment = max(diff, 0)
-def decrement = max(diff * -1, 0)
-def sumInc = increment.sum(n)
-def sumDec = decrement.sum(n)
-out CMO = (sumInc - sumDec) / (sumInc + sumDec) * 100
-out UpperLevel = 50
-out LowerLevel = -50
-out Zero = 0`,
+  'Commodity Channel Index (CCI)': `in n = 14;
+in overBought: const number = 100
+in overSold: const number = -100
+
+def x = (high + low + close)
+def ld = linerDev(x, n); // JavaImpl
+out cci = (x - sma(x, n)) / ld / 0.015;
+out OverBought = overBought
+out Zero = 0
+out OverSold = overSold`,
 
   Momentum: `in n = 12
 out momentum = close - close[n]`,
@@ -118,46 +117,48 @@ out wma = wma(open, n)`,
 }
 
 export const INDICHART_JS_INDICATORS = {
-  'Accumulation Distribution (ADL)': `const h = high.last()
-const l = low.last()
-const c = close.last()
-const vol = volume.last()
+  'Accumulation Distribution (ADL)': `const h = high.get()
+const l = low.get()
+const c = close.get()
+const vol = volume.get()
 
-const moneyFlowMultiplier = h !== l ? (c - l - (h - c)) / (h - l) : 1.0
-const moneyFlowVolume = moneyFlowMultiplier * vol
+const moneyFlowMultiplier = (h !== l) ? ((c - l) - (h - c)) / (h - l) : 1.0;
+const moneyFlowVolume = moneyFlowMultiplier * vol;
 
-let computeStep = (prev) => prev + moneyFlowVolume
-output.adl = cumulativeSum(0, computeStep)
-output.zero = 0`,
+const adl = useSeries(moneyFlowVolume)
+useOutput("adl", adl.cumulativeSum())
+useOutput("zero", 0)`,
 
-  Aroon: `input.n = 25
-input.overBought = 70
-input.overSold = 30
+  Aroon: `const n = useInput("n",25)
+const overBought = useInput("overBought", 70)
+const overSold = useInput("overSold", 30)
 
-let h = high
-let l = low
-output.aroonUp = aroonUp(h, input.n)
-output.aroonDown = aroonDown(l, input.n)
-output.overBought = input.overBought
-output.overSold = input.overSold
+let h = useSeries(high.get())
+let l = useSeries(low.get())
+useOutput("aroonUp", aroonUp(h, n))
+useOutput("aroonDown", aroonDown(l, n))
+useOutput("overBought", overBought)
+useOutput("overSold", overSold)
 
 function aroonUp(x, n) {
-    return ((n - 1) - indexOfMaximum(x, n)) / (n - 1) * 100
+    // return (n - x.indexOfMaximum(n)) / n * 100
+    return (n - indexOfMaximum(x, n)) / n * 100
 }
 
 function aroonDown(x, n) {
-    return ((n - 1) - indexOfMinimum(x, n)) / (n - 1) * 100
+    // return (n - x.indexOfMinimum(n)) / n * 100
+    return (n - indexOfMinimum(x, n)) / n * 100
 }
 
 function indexOfMaximum(x, n) {
-    if (!rangeCheck(x, n)) {
-        return NaN;
+    if (isNaN(x.get(n - 1))) {
+        return n;
     }
     let indexMaxVal = 0
-    let maxVal = x.last(0)
+    let maxVal = x.get(0)
     for (let i = 1; i < n; ++i) {
-        let v = x.last(i)
-        if (!isNaN(v) && v > maxVal) {
+        let v = x.get(i)
+        if (v > maxVal) {
             maxVal = v
             indexMaxVal = i
         }
@@ -166,62 +167,62 @@ function indexOfMaximum(x, n) {
 }
 
 function indexOfMinimum(x, n) {
-    if (!rangeCheck(x, n)) {
-        return NaN;
+    if (isNaN(x.get(n - 1))) {
+        return n;
     }
     let indexMinVal = 0
-    let minVal = x.last(0)
+    let minVal = x.get(0)
     for (let i = 1; i < n; ++i) {
-        let v = x.last(i)
-        if (!isNaN(v) && v < minVal) {
+        let v = x.get(i)
+        if (v < minVal) {
             minVal = v
             indexMinVal = i
         }
     }
     return indexMinVal
-}`,
+}
+`,
 
-  'Awesome Oscillator (AO)': `let mid  = ResultSeries.apply("ao", () => { return (high.last() + low.last()) / 2 })
-output.awesome = sma(mid, 5) - sma(mid, 34);
-output.zero = 0`,
+  'Awesome Oscillator (AO)': `const mid = useSeries((high.get() + low.get()) / 2)
 
-  'Chande Momentum Oscillator (CMO)': `input.n = 20
-let c = close
-let diff = c.last() - c.last(1)
-let inc = ResultSeries.apply("inc", () => { return Math.max(diff, 0) })
-let dec = ResultSeries.apply("dec", () => { return Math.max(diff * -1, 0) })
-let sumInc = sum(inc, input.n)
-let sumDec = sum(dec, input.n)
-output.CMO = (sumInc - sumDec) / (sumInc + sumDec) * 100
-output.UpperLevel = 50
-output.LowerLevel = -50
-output.Zero = 0`,
+useOutput("awesome", mid.sma(5) - mid.sma(34))
+useOutput("zero", 0)
+`,
 
-  'Commodity Channel Index (CCI)': `input.n = 14;
-input.overBought = 100
-input.overSold = -100
+  'Chande Momentum Oscillator (CMO)': `const n = useInput("n", 20)
 
-let x =  ResultSeries.apply("sum", () => { return high.last() + low.last() + close.last() })
-let ld = linerDev(x, input.n);
-output.cci = (x.last() - sma(x, input.n)) / ld / 0.015;
-output.OverBought = input.overBought
-output.OverSold = input.overSold
-output.Zero = 0
+let diff = close.get() - close.get(1)
+let inc = useSeries(Math.max(diff, 0))
+let dec = useSeries(Math.max(diff * -1, 0))
+let sumInc = inc.sum(n)
+let sumDec = dec.sum(n)
+
+useOutput("CMO", (sumInc - sumDec) / (sumInc + sumDec) * 100)
+useOutput("UpperLevel", 50)
+useOutput("LowerLevel", -50)
+useOutput("Zero", 0)`,
+
+  'Commodity Channel Index (CCI)': `const n = useInput("n", 14);
+const overBought = useInput("overBought", 100)
+const overSold = useInput("overSold", -100)
+
+let x = useSeries(high.get() + low.get() + close.get())
+let ld = linerDev(x, n);
+useOutput("cci", (x.get() - x.sma(n)) / ld / 0.015)
+useOutput("OverBought", overBought)
+useOutput("OverSold", overSold)
+useOutput("Zero", 0)
 
 function avg(x, n) {
-    if (!rangeCheck(x, n)) {
-        return NaN
-    }
-
     let sum = 0;
     for (let i = 0; i < n; ++i) {
-        sum += x.last(i);
+        sum += x.get(i);
     }
     return sum / n;
 }
 
 function linerDev(x, n) {
-    if (!rangeCheck(x, n)) {
+    if (isNaN(x.get(n - 1))) {
         return NaN
     }
 
@@ -229,75 +230,57 @@ function linerDev(x, n) {
 
     let sumDiff = 0.0;
     for (let i = 0; i < n; ++i) {
-        sumDiff += Math.abs(x.last(i) - average);
+        sumDiff += Math.abs(x.get(i) - average);
     }
     return sumDiff / n;
 }`,
 
-  Momentum: `input.n = 12
-output.momentum = close.last() - close.last(input.n)`,
+  Momentum: `const n = useInput("n", 12)
+useOutput("momentum", close.get() - close.get(n))`,
 
-  'Money Flow (MFI)': `input.n = 14
-input.OverBought = 80
-input.OverSold = 20
-const n = input.n
-const overBought = input.OverBought
-const overSold = input.OverSold
+  'Money Flow (MFI)': `const n = useInput("n", 14)
+const overBought = useInput("OverBought", 80)
+const overSold = useInput("OverSold", 20)
 
-let tp = ResultSeries.apply("tp", () => { return (high.last() + low.last() + close.last()) / 3 })
-let positiveMoneyFlow = ResultSeries.apply("pf", () => {
-    if (tp.last() > tp.last(1)) {
-        return tp.last() * volume.last();
-    } else {
-        return isNaN(tp.last(1)) ? NaN : 0;
-    }
-})
-let negativeMoneyFlow = ResultSeries.apply("nf", () => {
-    if (tp.last() < tp.last(1)) {
-        return tp.last() * volume.last()
-    } else {
-        return isNaN(tp.last(1)) ? NaN : 0
-    }
-})
-let sumPositiveMoneyFlow = sum(positiveMoneyFlow, n)
-let sumNegativeMoneyFlow = sum(negativeMoneyFlow, n)
-output.MFidx = 100 - (100 / (1 + sumPositiveMoneyFlow / sumNegativeMoneyFlow))
-output.OverBought = overBought
-output.OverSold = overSold`,
+let tp = useSeries((high.get() + low.get() + close.get()) / 3)
+let positiveMoneyFlow = useSeries((tp.get() > tp.get(1)) ? tp.get() * volume.get() : 0)
+let negativeMoneyFlow = useSeries((tp.get() < tp.get(1)) ? tp.get() * volume.get() : 0)
+let sumPositiveMoneyFlow = positiveMoneyFlow.sum(n)
+let sumNegativeMoneyFlow = negativeMoneyFlow.sum(n)
+useOutput("MFidx", 100 - (100 / (1 + sumPositiveMoneyFlow / sumNegativeMoneyFlow)))
+useOutput("OverBought", overBought)
+useOutput("OverSold",  overSold)`,
 
-  'On Balance Volume (OBV)': `let diff = close.last() - close.last(1)
-let v = (diff > 0) ? volume.last() : ((diff < 0) ? -volume.last() : 0)
-let computationStep = (prev) => { return prev + v }
-output.obv =  cumulativeSum(v, computationStep)`,
+  'On Balance Volume (OBV)': `let diff = close.get() - close.get(1)
+let v = useSeries((diff > 0) ? volume.get() : ((diff < 0) ? -volume.get() : 0))
+useOutput("obv", v.cumulativeSum())`,
 
-  'Price Volume Trend (PVT)': `let prevClose = close.last(1)
-let currentClose = close.last()
-let v = isNaN(prevClose) ? 0 : (currentClose - prevClose) / prevClose * volume.last()
-let computationStep = (prev) => { return prev + v }
-output.pvt = cumulativeSum(v, computationStep)`,
+  'Price Volume Trend (PVT)': `let prevClose = close.get(1)
+let currentClose = close.get()
+let v = useSeries((currentClose - prevClose) / prevClose * volume.get())
+useOutput("pvt", v.cumulativeSum())`,
 
-  'Rate of Change (ROC)': `input.n = 12
-let prevClose = close.last(input.n)
-let currentClose = close.last()
-output.roc = ((currentClose - prevClose) / prevClose) * 100
-output.zero = 0`,
+  'Rate of Change (ROC)': `const n = useInput("n", 12)
+let prevClose = close.get(n)
+let currentClose = close.get()
+useOutput("roc", ((currentClose - prevClose) / prevClose) * 100)
+useOutput("zero", 0)`,
 
-  'Relative Vigor Index (RVI)': `let nominator = close.last() - open.last()
-let denominator = high.last() - low.last()
-output.rvi = nominator / denominator`,
+  'Relative Vigor Index (RVI)': `let nominator = close.get() - open.get()
+let denominator = high.get() - low.get()
+useOutput("rvi", nominator / denominator)`,
 
-  'Simple Moving Average': `input.n = 1
-output.sma = sma(open, input.n)`,
+  'Simple Moving Average': `const n = useInput("n", 5)
 
-  'Smoothed Moving Average': `input.n = 9
-const n = input.n
+useOutput("sma", open.sma(n))`,
 
-let initValue = sma(close, n)
-let computeStep = (prev) => { return (prev * (n - 1) + close.last()) / n }
-output.SMMA = cumulativeSum(initValue, computeStep)`,
+  'Smoothed Moving Average': `const n = useInput("n", 9)
 
-  'Weighted Moving Average': `input.n = 1
-output.wma = wma(open, input.n)`,
+let series = useSeries(close.get())
+useOutput("SMMA", series.wima(n))`,
+
+  'Weighted Moving Average': `const n = useInput("n", 1)
+useOutput("wma", useSeries(open.get()).wma(n))`,
 }
 
 export const INDICHART_INDICATROS: Record<Lang, Record<string, string>> = {
