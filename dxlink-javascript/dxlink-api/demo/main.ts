@@ -67,7 +67,7 @@ async function startChart() {
   console.log('Start Chart')
 
   const client = new DXLinkWebSocketClient()
-  client.connect('ws://localhost:9959/')
+  client.connect('wss://demo.dxfeed.com/market-data/dxlink-ws')
 
   const indicators: DXLinkIndiChartIndicators = {
     indicator1: {
