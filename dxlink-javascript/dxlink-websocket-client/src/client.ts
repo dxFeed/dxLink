@@ -105,7 +105,12 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     this.logger = new Logger(this.constructor.name, this.config.logLevel)
   }
 
-  connect = (url: string) => {
+  /**
+   * Connect to the remote dxLink WebSocket endpoint.
+   * @param url URL to connect to.
+   * @param protocols WebSocket constructor `protocols` param.
+   */
+  connect = (url: string, protocols?: string | string[]) => {
     // Do nothing if already connected to the same url
     if (this.connector?.getUrl() === url) return
 
@@ -117,7 +122,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     // Immediately set connection state to CONNECTING
     this.setConnectionState(DXLinkConnectionState.CONNECTING)
 
-    this.connector = new WebSocketConnector(url)
+    this.connector = new WebSocketConnector(url, protocols)
     this.connector.setOpenListener(this.processTransportOpen)
     this.connector.setMessageListener(this.processMessage)
     this.connector.setCloseListener(this.processTransportClose)
@@ -128,7 +133,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
   reconnect = () => {
     if (
-      this.config.maxReconnectAttempts > 0 &&
+      this.config.maxReconnectAttempts >= 0 &&
       this.reconnectAttempts >= this.config.maxReconnectAttempts
     ) {
       this.logger.warn('Max reconnect attempts reached')
