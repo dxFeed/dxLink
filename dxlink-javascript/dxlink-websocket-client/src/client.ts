@@ -128,7 +128,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
   reconnect = () => {
     if (
-      this.config.maxReconnectAttempts > 0 &&
+      this.config.maxReconnectAttempts >= 0 &&
       this.reconnectAttempts >= this.config.maxReconnectAttempts
     ) {
       this.logger.warn('Max reconnect attempts reached')
