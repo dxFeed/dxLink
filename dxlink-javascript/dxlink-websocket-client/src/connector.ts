@@ -15,12 +15,12 @@ export class WebSocketConnector {
   private closeListener: CloseListener | undefined = undefined
   private messageListener: ((message: Message) => void) | undefined = undefined
 
-  constructor(private readonly url: string) {}
+  constructor(private readonly url: string, private readonly protocols?: string | string[]) {}
 
   start() {
     if (this.socket !== undefined) return
 
-    this.socket = new WebSocket(this.url)
+    this.socket = new WebSocket(this.url, this.protocols)
 
     this.socket.addEventListener('open', this.handleOpen)
     this.socket.addEventListener('error', this.handleError)
