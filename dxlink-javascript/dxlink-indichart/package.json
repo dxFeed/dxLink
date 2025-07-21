@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-indichart",
-  "version": "0.0.0-alpha.0",
+  "version": "0.3.0",
   "private": false,
   "sideEffects": false,
   "description": "dxLink INDICHART for receiving candle and indicator data",

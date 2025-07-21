@@ -63,8 +63,8 @@ async function startDepthOfMarket() {
   })
 }
 
-async function startChart() {
-  console.log('Start Chart')
+async function startIndichart() {
+  console.log('Start Indichart')
 
   const client = new DXLinkWebSocketClient()
   client.connect('wss://demo.dxfeed.com/market-data/dxlink-ws')
@@ -97,6 +97,6 @@ async function startChart() {
   )
 }
 
-startChart()
+startIndichart()
 
 // startFeed()
