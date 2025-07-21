@@ -17,11 +17,11 @@ import {
 
 import { DXLinkWebSocketChannel } from './channel'
 import type { DXLinkWebSocketClientConfig } from './config'
-import { WebSocketConnector } from './connector'
+import { type DXLinkWebSocketConnector, DefaultDXLinkWebSocketConnector } from './connector'
 import {
   type AuthStateMessage,
   type ErrorMessage,
-  type Message,
+  type DXLinkWebSocketMessage,
   type SetupMessage,
   isChannelLifecycleMessage,
   isChannelMessage,
@@ -51,7 +51,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
   private readonly scheduler = new Scheduler()
 
-  private connector: WebSocketConnector | undefined
+  private connector: DXLinkWebSocketConnector | undefined
 
   private connectionState: DXLinkConnectionState = DXLinkConnectionState.NOT_CONNECTED
   private connectionDetails: DXLinkConnectionDetails = DEFAULT_CONNECTION_DETAILS
@@ -99,6 +99,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
       actionTimeout: 10,
       logLevel: DXLinkLogLevel.WARN,
       maxReconnectAttempts: -1,
+      connectorFactory: (url) => new DefaultDXLinkWebSocketConnector(url),
       ...config,
     }
 
@@ -117,7 +118,8 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     // Immediately set connection state to CONNECTING
     this.setConnectionState(DXLinkConnectionState.CONNECTING)
 
-    this.connector = new WebSocketConnector(url)
+    // Create new connector
+    this.connector = this.config.connectorFactory(url)
     this.connector.setOpenListener(this.processTransportOpen)
     this.connector.setMessageListener(this.processMessage)
     this.connector.setCloseListener(this.processTransportClose)
@@ -268,7 +270,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     }
   }
 
-  private sendMessage = (message: Message): void => {
+  private sendMessage = (message: DXLinkWebSocketMessage): void => {
     this.connector?.sendMessage(message)
 
     this.scheduleKeepalive()
@@ -302,7 +304,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     }
   }
 
-  private processMessage = (message: Message): void => {
+  private processMessage = (message: DXLinkWebSocketMessage): void => {
     this.lastReceivedMillis = Date.now()
 
     // Send keepalive message if no messages sent for a while (keepaliveInterval)

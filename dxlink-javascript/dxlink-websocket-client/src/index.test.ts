@@ -2,11 +2,11 @@ import { test } from 'uvu'
 import * as assert from 'uvu/assert'
 
 import { DXLinkWebSocketChannel } from './channel'
-import type { Message } from './messages'
+import type { DXLinkWebSocketMessage } from './messages'
 
 test(`Channel`, () => {
   let requestCalled = false
-  const sendMessage = (message: Message) => {
+  const sendMessage = (message: DXLinkWebSocketMessage) => {
     if (message.type === 'CHANNEL_REQUEST') {
       requestCalled = true
     }
