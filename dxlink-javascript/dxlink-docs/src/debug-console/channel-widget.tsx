@@ -6,18 +6,33 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { Errors } from './errors'
 import { ContentTemplate } from '../common/content-template'
 
+export interface ChannelInfo {
+  id?: DXLinkChannel['id']
+  service: DXLinkChannel['service']
+  parameters?: DXLinkChannel['parameters']
+  addStateChangeListener: DXLinkChannel['addStateChangeListener']
+  addErrorListener: DXLinkChannel['addErrorListener']
+  removeErrorListener: DXLinkChannel['removeErrorListener']
+  removeStateChangeListener: DXLinkChannel['removeStateChangeListener']
+  getState: DXLinkChannel['getState']
+  close: DXLinkChannel['close']
+}
+
 interface ChannelWidgetProps {
-  channel: DXLinkChannel
+  channel: ChannelInfo
   children: ReactNode
 }
 
 export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
-  const [state, setState] = useState(channel.getState())
+  const [state, setState] = useState(channel?.getState() ?? DXLinkChannelState.REQUESTED)
   const [errors, setErrors] = useState<DXLinkError[]>([])
+  const [id, setId] = useState(channel.id)
 
   useEffect(() => {
     const stateListener = (_state: DXLinkChannelState) => {
+      console.log('Channel state changed', channel.getState())
       setState(channel.getState())
+      setId(channel.id)
     }
     const errorListener = (error: DXLinkError) => {
       setErrors((errors) => [...errors, error])
@@ -35,7 +50,7 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
     channel.close()
   }
 
-  const channelTitle = `Channel #${channel.id} ${channel.service}`
+  const channelTitle = `Channel ${id ? `#${id}` : ''} ${channel.service}`
 
   if (state === DXLinkChannelState.CLOSED) {
     return (
@@ -47,10 +62,14 @@ export function ChannelWidget({ channel, children }: ChannelWidgetProps) {
     )
   }
 
-  const parameters = Object.entries(channel.parameters).reduce(
-    (acc, [key, value]) => `${acc}${acc != '' ? ', ' : ''}${key}: ${value}`,
-    ''
-  )
+  const parameters = channel
+    ? channel.parameters
+      ? Object.entries(channel.parameters).reduce(
+          (acc, [key, value]) => `${acc}${acc != '' ? ', ' : ''}${key}: ${value}`,
+          ''
+        )
+      : ''
+    : ''
 
   return (
     <ContentTemplate

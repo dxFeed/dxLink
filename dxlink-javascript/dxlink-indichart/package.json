@@ -1,9 +1,9 @@
 {
-  "name": "@dxfeed/dxlink-api",
+  "name": "@dxfeed/dxlink-indichart",
   "version": "0.3.0",
   "private": false,
   "sideEffects": false,
-  "description": "dxLink API provides access to market data from dxFeed services",
+  "description": "dxLink INDICHART for receiving candle and indicator data",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",
@@ -20,17 +20,14 @@
     "mangle": false
   },
   "scripts": {
-    "start": "vite ./demo",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && npm run test",
     "build": "microbundle -f esm,cjs",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "tsx src/index.test.ts",
+    "test:watch": "tsx watch src/index.test.ts"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.3.0",
-    "@dxfeed/dxlink-websocket-client": "0.3.0",
-    "@dxfeed/dxlink-feed": "0.3.0",
-    "@dxfeed/dxlink-dom": "0.3.0",
-    "@dxfeed/dxlink-indichart": "0.3.0"
+    "@dxfeed/dxlink-core": "0.3.0"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [
@@ -48,10 +45,6 @@
     "url": "https://github.com/dxfeed/dxlink/issues"
   },
   "homepage": "https://dxfeed.com/",
-  "files": [
-    "/build",
-    "/package.json"
-  ],
   "keywords": [
     "api",
     "feed",
@@ -66,5 +59,9 @@
     "historical-data",
     "dxfeed",
     "dxlink"
+  ],
+  "files": [
+    "/build",
+    "/package.json"
   ]
 }

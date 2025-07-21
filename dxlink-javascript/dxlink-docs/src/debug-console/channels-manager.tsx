@@ -10,7 +10,9 @@ import { ChannelWidget } from './channel-widget'
 import { DomChannelManager } from './dom-channel-manager'
 import { DomOpenForm } from './dom-open-form'
 import { FeedChannelManager } from './feed-channel-manager'
+import { ScriptCandlesChannelManager } from './script-candles-channel-manager'
 import { DXLinkCandles } from '../candles/candles'
+import { ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'
 
 const Actions = styled.div`
@@ -33,20 +35,21 @@ const ChannelItemGroup = styled.div`
   padding: ${unit(1)} 0;
 `
 
-export type Channel = DXLinkFeed<FeedContract> | DXLinkDepthOfMarket | DXLinkCandles
+export type Channel = DXLinkFeed<FeedContract> | DXLinkDepthOfMarket | DXLinkCandles | ChartHolder
 
 export interface ChannelManagerProps {
   channels: Channel[]
   onOpenFeed: () => void
   onOpenDom: (symbol: string, sources: string) => void
   onOpenCandles: () => void
+  onOpenChart: () => void
 }
 
 export function ChannelsManager({
   channels,
   onOpenFeed,
   onOpenDom,
-  onOpenCandles,
+  onOpenChart,
 }: ChannelManagerProps) {
   const [anchorElRef, setAnchorElRef] = useState<HTMLElement | null>(null)
   const [domIsOpen, setDomIsOpen] = useState(false)
@@ -72,8 +75,8 @@ export function ChannelsManager({
       </Popover>
 
       <Actions ref={setAnchorElRef}>
-        <ActionButton color={'secondary'} onClick={onOpenCandles}>
-          Open Candle Widget
+        <ActionButton color={'secondary'} onClick={onOpenChart}>
+          INDICHART Channel
         </ActionButton>
         <ActionButton
           color={domIsOpen ? 'accent' : 'secondary'}
@@ -81,21 +84,24 @@ export function ChannelsManager({
             setDomIsOpen(true)
           }}
         >
-          Open DOM Channel
+          DOM Channel
         </ActionButton>
         <ActionButton onClick={onOpenFeed} color={'secondary'}>
-          Open FEED Channel
+          FEED Channel
         </ActionButton>
       </Actions>
 
       {channels.length > 0 && (
         <ChannelsGroup>
-          {channels.map((channel) => (
-            <ChannelItemGroup key={channel.id}>
+          {channels.map((channel, index) => (
+            <ChannelItemGroup key={index}>
               <ChannelWidget channel={channel.getChannel()}>
                 {channel instanceof DXLinkFeed && <FeedChannelManager channel={channel} />}
                 {channel instanceof DXLinkDepthOfMarket && <DomChannelManager channel={channel} />}
                 {channel instanceof DXLinkCandles && <CandlesChannelManager channel={channel} />}
+                {channel instanceof ChartHolder && (
+                  <ScriptCandlesChannelManager channel={channel} />
+                )}
               </ChannelWidget>
             </ChannelItemGroup>
           ))}
