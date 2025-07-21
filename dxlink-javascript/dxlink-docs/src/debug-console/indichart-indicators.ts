@@ -5,7 +5,7 @@ export interface IndichartIndicatorExample {
 
 export type Lang = 'dxScript' | 'js'
 
-export const INDICHART_DXSCRIPT_INDICATORS = {
+const INDICHART_DXSCRIPT_INDICATORS = {
   'Accumulation Distribution (ADL)': `def h = high
 def l = low
 def c = close
@@ -116,7 +116,7 @@ out SMMA = (SMMA[1] * (n - 1) + close) / n default initialSMMA`,
 out wma = wma(open, n)`,
 }
 
-export const INDICHART_JS_INDICATORS = {
+const INDICHART_JS_INDICATORS = {
   'Accumulation Distribution (ADL)': `const h = high.get()
 const l = low.get()
 const c = close.get()

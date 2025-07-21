@@ -11,17 +11,15 @@ import { TextInput } from '@dxfeed/ui-kit/TextInput'
 import { ToggleButton } from '@dxfeed/ui-kit/ToggleButton'
 import { Tooltip } from '@dxfeed/ui-kit/Tooltip'
 import { unit } from '@dxfeed/ui-kit/utils'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import AceEditor from 'react-ace'
 import styled from 'styled-components'
 
 import { DxScriptMode } from './ace-dxscript-mode'
 import { DxScriptIcon, ErrorIcon, JSIcon } from './icons'
 import {
-  INDICHART_DXSCRIPT_INDICATORS,
   INDICHART_INDICATOR_EXAMPLES,
   INDICHART_INDICATROS,
-  INDICHART_JS_INDICATORS,
   type Lang,
 } from './indichart-indicators'
 import { ContentTemplate } from '../common/content-template'
