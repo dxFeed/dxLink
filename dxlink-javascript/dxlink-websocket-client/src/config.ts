@@ -1,5 +1,7 @@
 import type { DXLinkLogLevel } from '@dxfeed/dxlink-core'
 
+import type { DXLinkWebSocketConnector } from './connector'
+
 /**
  * Options for {@link DXLinkWebSocketClient}.
  */
@@ -32,4 +34,12 @@ export interface DXLinkWebSocketClientConfig {
    * If 0, then reconnect attempts are not limited.
    */
   readonly maxReconnectAttempts: number
+  /**
+   * Factory function to create a WebSocket connector.
+   * This function should return an instance of {@link DXLinkWebSocketConnector} for the given URL.
+   * This allows for custom WebSocket implementations or configurations.
+   * @param url The URL to connect to.
+   * @returns {@link DXLinkWebSocketConnector} instance
+   */
+  readonly connectorFactory: (url: string) => DXLinkWebSocketConnector
 }

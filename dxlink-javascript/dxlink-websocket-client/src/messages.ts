@@ -84,7 +84,7 @@ export type ConnectionMessage =
   | AuthStateMessage
   | ErrorMessage
 
-export type Message =
+export type DXLinkWebSocketMessage =
   | SetupMessage
   | KeepaliveMessage
   | AuthMessage
@@ -97,7 +97,9 @@ export type Message =
   | ChannelPayloadMessage
   | ChannelErrorMessage
 
-export const isConnectionMessage = (message: Message): message is ConnectionMessage =>
+export const isConnectionMessage = (
+  message: DXLinkWebSocketMessage
+): message is ConnectionMessage =>
   message.channel === 0 &&
   (message.type === 'SETUP' ||
     message.type === 'KEEPALIVE' ||
@@ -114,7 +116,7 @@ export type ChannelLifecycleMessage =
 
 export type ChannelMessage = ChannelLifecycleMessage | ChannelPayloadMessage
 
-export const isChannelMessage = (message: Message): message is ChannelMessage =>
+export const isChannelMessage = (message: DXLinkWebSocketMessage): message is ChannelMessage =>
   message.channel !== 0
 
 export const isChannelLifecycleMessage = (
