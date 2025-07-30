@@ -1,10 +1,4 @@
-export interface IndichartIndicatorExample {
-  id: string
-  docUrl?: string
-}
-
-export type Lang = 'dxScript' | 'js'
-
+/* eslint-disable no-undef */
 const INDICHART_DXSCRIPT_INDICATORS = {
   'Accumulation Distribution (ADL)': `def h = high
 def l = low
@@ -283,16 +277,60 @@ useOutput("SMMA", series.wima(n))`,
 useOutput("wma", useSeries(open.get()).wma(n))`,
 }
 
-export const INDICHART_INDICATROS = window.INDICHART_INDICATROS || {
-  dxScript: {},
-  js: {},
+// Exporting the indicators for use in the application
+window['INDICHART_INDICATROS'] = {
+  dxScript: INDICHART_DXSCRIPT_INDICATORS,
+  js: INDICHART_JS_INDICATORS,
 }
-
-export const INDICHART_INDICATOR_EXAMPLES = window.INDICHART_INDICATOR_EXAMPLES || []
-
-declare global {
-  interface Window {
-    INDICHART_INDICATOR_EXAMPLES?: IndichartIndicatorExample[]
-    INDICHART_INDICATROS?: Record<Lang, Record<string, string>>
-  }
-}
+window['INDICHART_INDICATOR_EXAMPLES'] = [
+  {
+    id: 'Accumulation Distribution (ADL)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/accumulationdistribution',
+  },
+  { id: 'Aroon', docUrl: 'https://devexperts.com/dxcharts/kb/docs/aroon-indicator' },
+  {
+    id: 'Awesome Oscillator (AO)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/awesome-oscillator-ao',
+  },
+  {
+    id: 'Chande Momentum Oscillator (CMO)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/chandle-momentum-oscillator',
+  },
+  {
+    id: 'Commodity Channel Index (CCI)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/commodity-channel-index',
+  },
+  { id: 'Momentum', docUrl: 'https://devexperts.com/dxcharts/kb/docs/momentum' },
+  {
+    id: 'Money Flow (MFI)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/money-flow-index-mfi',
+  },
+  {
+    id: 'On Balance Volume (OBV)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/on-balance-volume',
+  },
+  {
+    id: 'Price Volume Trend (PVT)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/price-and-volume-trend',
+  },
+  {
+    id: 'Rate of Change (ROC)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/rate-of-change',
+  },
+  {
+    id: 'Relative Vigor Index (RVI)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/relative-vigor-index',
+  },
+  {
+    id: 'Simple Moving Average',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/simple-moving-average-sma',
+  },
+  {
+    id: 'Smoothed Moving Average',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/smoothed-simple-moving-average',
+  },
+  {
+    id: 'Weighted Moving Average',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/weighted-moving-average-wma',
+  },
+]
