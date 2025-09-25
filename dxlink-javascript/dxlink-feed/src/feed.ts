@@ -207,6 +207,10 @@ export interface DXLinkFeedRequester<Contract extends FeedContract = FeedContrac
  */
 export interface DXLinkFeedOptions {
   /**
+   * Space to be used for the feed channel.
+   */
+  space?: string
+  /**
    * Time in milliseconds to wait for more pending subscriptions before sending them to the channel.
    */
   batchSubscriptionsTime: number
@@ -304,7 +308,7 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
       ...options,
     }
 
-    this.channel = client.openChannel(FEED_SERVICE_NAME, { contract })
+    this.channel = client.openChannel(FEED_SERVICE_NAME, { contract, space: options.space, })
     this.id = this.channel.id
     this.contract = contract
     this.channel.addMessageListener(this.processMessage)

@@ -1,5 +1,15 @@
 # @dxfeed/dxlink-feed
 
+## 0.5.0
+
+### Minor Changes
+
+- feed: add ability to specify space for the feed data
+
+### Patch Changes
+
+- @dxfeed/dxlink-core@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
