@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-feed",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": false,
   "sideEffects": false,
   "description": "dxLink FEED provides access to the real-time and historical data of dxFeed",
@@ -27,7 +27,7 @@
     "test:watch": "tsx watch src/index.test.ts"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.5.0"
+    "@dxfeed/dxlink-core": "0.5.1"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [

@@ -1,5 +1,17 @@
 # @dxfeed/dxlink-api
 
+## 0.5.1
+
+### Patch Changes
+
+- aa44de4: Indichart: provide `getSubscription` method for latest setted subscription state
+- Updated dependencies [aa44de4]
+  - @dxfeed/dxlink-indichart@0.5.1
+  - @dxfeed/dxlink-core@0.5.1
+  - @dxfeed/dxlink-dom@0.5.1
+  - @dxfeed/dxlink-feed@0.5.1
+  - @dxfeed/dxlink-websocket-client@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes
