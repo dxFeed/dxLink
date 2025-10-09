@@ -36,6 +36,11 @@ export type DXLinkIndiChartIndicatorsStateListener = (
   indicators: DXLinkIndiChartIndicatorsStates
 ) => void
 
+export interface DXLinkIndiChartSubscriptionState {
+  subscription: DXLinkIndiChartSubscription
+  indicatorsParameters: DXLinkIndiChartIndicatorsParameters
+}
+
 /**
  * dxLink Chart service.
  */
@@ -56,6 +61,8 @@ export interface DXLinkIndiChartRequester {
     subscription: DXLinkIndiChartSubscription,
     indicatorsParameters: DXLinkIndiChartIndicatorsParameters
   ): void
+
+  getSubscription(): DXLinkIndiChartSubscriptionState | null
 
   setup(setup: DXLinkIndiChartSetup): void
 
@@ -114,10 +121,7 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
   private readonly logger: DXLinkLogger
   private readonly channel: DXLinkChannel
 
-  private lastSubscription: {
-    subscription: DXLinkIndiChartSubscription
-    indicatorsParameters: DXLinkIndiChartIndicatorsParameters
-  } | null = null
+  private lastSubscriptionState: DXLinkIndiChartSubscriptionState | null = null
   private lastSetup: DXLinkIndiChartSetup | null = null
   private lastConfig: DXLinkIndiChartConfig | null = null
 
@@ -177,7 +181,7 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
     subscription: DXLinkIndiChartSubscription,
     indicatorsParameters: DXLinkIndiChartIndicatorsParameters
   ) => {
-    this.lastSubscription = {
+    this.lastSubscriptionState = {
       subscription,
       indicatorsParameters,
     }
@@ -185,10 +189,12 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
     if (this.channel.getState() === DXLinkChannelState.OPENED) {
       this.channel.send({
         type: 'INDICHART_SUBSCRIPTION',
-        ...this.lastSubscription,
+        ...this.lastSubscriptionState,
       } satisfies DXLinkIndiChartSubscriptionMessage)
     }
   }
+
+  getSubscription = () => this.lastSubscriptionState
 
   removeIndicators = (indicators: string[]) => {
     this.channel.send({
@@ -280,10 +286,10 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
    * Reconfigure the CHART channel after the channel re-open.
    */
   private reconfigure() {
-    if (this.lastSubscription) {
+    if (this.lastSubscriptionState) {
       this.channel.send({
         type: 'INDICHART_SUBSCRIPTION',
-        ...this.lastSubscription,
+        ...this.lastSubscriptionState,
       } satisfies DXLinkIndiChartSubscriptionMessage)
     }
 
