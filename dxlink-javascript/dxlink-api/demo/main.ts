@@ -76,19 +76,19 @@ async function startIndichart() {
     },
   }
 
-  const chart = new DXLinkIndiChart(client, indicators)
+  const indichart = new DXLinkIndiChart(client, indicators)
 
-  chart.addIndicatorsStateChangeListener((indicators) => {
+  indichart.addIndicatorsStateChangeListener((indicators) => {
     // your buisness logic here
     console.log('Indicators State', indicators)
   })
 
-  chart.addDataListener((candles, indicators, reset, pending) => {
+  indichart.addDataListener((candles, indicators, reset, pending) => {
     // your buisness logic here
-    console.log('Chart Data', chart.getSubscription(), candles, indicators, reset, pending)
+    console.log('Chart Data', indichart.getSubscription(), candles, indicators, reset, pending)
   })
 
-  chart.setSubscription(
+  indichart.setSubscription(
     {
       symbol: 'AAPL{=d}',
       fromTime: 0,
