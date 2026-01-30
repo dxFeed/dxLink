@@ -95,40 +95,76 @@ export interface DXLinkIndiChartCandle {
 
 export type DXLinkIndiChartIndicatorsDataValue = JSONNumber | string | boolean
 
+// New spline-based indicator value with metadata
+export interface DXLinkIndiChartSplineValue {
+  readonly value: JSONNumber
+  readonly title?: string
+  readonly offset?: number
+  readonly color?: {
+    readonly value?: string
+  }
+  readonly type?: string
+}
+
+// Indicator data value can be either a simple value or an object with metadata
+export type DXLinkIndiChartIndicatorValue =
+  | DXLinkIndiChartIndicatorsDataValue
+  | DXLinkIndiChartSplineValue
+
 export interface DXLinkIndiChartIndicatorsData {
   // Indicator name
   readonly [key: string]: {
     // Outputs of the indicator
-    readonly [key: string]: DXLinkIndiChartIndicatorsDataValue[]
+    readonly [key: string]: DXLinkIndiChartIndicatorValue[]
   }
 }
 
-export interface DXLinkIndiChartDataMessage {
-  readonly type: 'INDICHART_DATA'
+// New message type for candle snapshots
+export interface DXLinkIndiChartCandleSnapshotMessage {
+  readonly type: 'INDICHART_CANDLE_SNAPSHOT'
   readonly reset?: boolean
+  readonly pending?: boolean
+  readonly candles: DXLinkIndiChartCandle[]
+}
+
+// New message type for indicator snapshots
+export interface DXLinkIndiChartIndicatorsSnapshotMessage {
+  readonly type: 'INDICHART_INDICATORS_SNAPSHOT'
+  readonly pending?: boolean
+  readonly indicators: DXLinkIndiChartIndicatorsData
+}
+
+// Message type for data updates (no reset flag - reset is only in INDICHART_CANDLE_SNAPSHOT)
+export interface DXLinkIndiChartUpdateMessage {
+  readonly type: 'INDICHART_UPDATE'
   readonly pending?: boolean
   readonly candles: DXLinkIndiChartCandle[]
   readonly indicators: DXLinkIndiChartIndicatorsData
 }
 
-export interface DXLinkIndiChartIndicatorsRemoveMessage {
-  readonly type: 'INDICHART_INDICATORS_REMOVE'
+// Renamed from INDICHART_INDICATORS_REMOVE to INDICHART_REMOVE_INDICATORS
+export interface DXLinkIndiChartRemoveIndicatorsMessage {
+  readonly type: 'INDICHART_REMOVE_INDICATORS'
   readonly indicators: string[]
 }
 
 export type ChartInboundMessage =
   | DXLinkIndiChartIndicatorsMessage
   | DXLinkIndiChartConfigMessage
-  | DXLinkIndiChartDataMessage
+  | DXLinkIndiChartUpdateMessage
+  | DXLinkIndiChartCandleSnapshotMessage
+  | DXLinkIndiChartIndicatorsSnapshotMessage
 
 export type ChartOutboundMessage =
   | DXLinkIndiChartSubscriptionMessage
   | DXLinkIndiChartSetupMessage
-  | DXLinkIndiChartIndicatorsRemoveMessage
+  | DXLinkIndiChartRemoveIndicatorsMessage
 
 export const isChartInboundMessage = (
   message: DXLinkChannelMessage
 ): message is ChartInboundMessage =>
-  message.type === 'INDICHART_DATA' ||
+  message.type === 'INDICHART_UPDATE' ||
   message.type === 'INDICHART_INDICATORS' ||
-  message.type === 'INDICHART_CONFIG'
+  message.type === 'INDICHART_CONFIG' ||
+  message.type === 'INDICHART_CANDLE_SNAPSHOT' ||
+  message.type === 'INDICHART_INDICATORS_SNAPSHOT'

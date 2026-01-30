@@ -12,7 +12,7 @@ def adl = adl[1] + moneyFlowVolume default moneyFlowVolume
 out adl = adl
 out zero = 0`,
 
-  Aroon: `in n = 25
+  'Aroon': `in n = 25
 in overBought = 70
 in overSold = 30
 
@@ -26,18 +26,58 @@ out overSold = overSold
 fun aroonUp {
     in x: number
     in n: const number
-    out = ((n - 1) - x.indexOfMaximum(n)) / (n - 1) * 100
+    out = (n - x.indexOfMaximum(n)) / n * 100 default 0
 }
 
 fun aroonDown {
     in x: number
     in n: const number
-    out = ((n - 1) - x.indexOfMinimum(n)) / (n - 1) * 100
+    out = (n - x.indexOfMinimum(n)) / n * 100 default 0
 }`,
+
+  'Average True Range (ATR)': `in n: const number = 14
+def pc = close[1]
+def h = high
+def l = low
+def d1 = abs(h - l)
+def d2 = abs(h - pc)
+def d3 = abs(l - pc)
+def tr = max(max(d1, d2), d3)
+out atr = wima(tr, n)
+
+fun wima {
+    in x: number
+    in n: const number
+    def w = (w[1] * (n - 1) + x) / n default x.sma(n)
+    out = w
+}
+`,
 
   'Awesome Oscillator (AO)': `def mid = (high + low) / 2
 out awesome = sma(mid, 5) - sma(mid, 34);
 out zero = 0`,
+
+  'Bollinger Bands (BB)': `in n: const number = 20
+in displace: const number = 0
+in numDevUp: const number = 2
+in numDevDown: const number = -2
+
+def c = close
+
+out midLine = fixed_ema(c, n)
+def sd = standardDeviation(c, n)
+out upBand = midLine + numDevUp * sd
+out lowBand = midLine + numDevDown * sd
+
+
+fun standardDeviation {
+  in x: number
+  in n: const number
+
+  def s = x.sum(n)
+  def ss = (x * x).sum(n)
+  out = sqrt((ss - s * s / n) / (n))
+}`,
 
   'Chande Momentum Oscillator (CMO)': `in n = 20
 def c = close
@@ -62,7 +102,27 @@ out OverBought = overBought
 out Zero = 0
 out OverSold = overSold`,
 
-  Momentum: `in n = 12
+  'Double Exponential Moving Average': `in n = 9
+out dema = 2 * close.fixed_ema(n) - close.fixed_ema(n).fixed_ema(n)`,
+
+  'Exponential Moving Average (EMA)': `in n = 9
+out ema = close.fixed_ema(n)`,
+
+  'Mass Index': `in n = 9
+in sumLength = 25
+in triggerLevel = 26.5
+in setupLevel = 27
+
+def diff = high - low
+def emaDiff1 = diff.fixed_ema(n)
+def emaDiff2 = diff.fixed_ema(n)
+def emdEmaDiff = emaDiff1.fixed_ema(n)
+
+out mi = (emaDiff2 / emdEmaDiff).sum(sumLength)
+out trigger = triggerLevel
+out setup = setupLevel`,
+
+  'Momentum': `in n = 12
 out momentum = close - close[n]`,
 
   'Money Flow (MFI)': `in n: const number = 14
@@ -70,18 +130,37 @@ in overBought: const number = 80
 in overSold: const number = 20
 
 def tp = (high + low + close) / 3
-def positiveMoneyFlow = if (isNaN(tp[1])) 0 else if (tp > tp[1]) tp * volume else 0
-def negativeMoneyFlow = if (isNaN(tp[1])) 0 else if (tp < tp[1]) tp * volume else 0
+def positiveMoneyFlow = if (tp > tp[1]) tp * volume else 0 default 0
+def negativeMoneyFlow = if (tp < tp[1]) tp * volume else 0 default 0
 def sumPositiveMoneyFlow = positiveMoneyFlow.sum(n)
 def sumNegativeMoneyFlow = negativeMoneyFlow.sum(n)
 out MFidx = 100 - (100 / (1 + sumPositiveMoneyFlow / sumNegativeMoneyFlow))
 out OverBought = overBought
 out OverSold = overSold`,
 
+  'Moving Average Convergence Divergence (MACD)': `in fastLen: const number = 12
+in slowLen: const number = 26
+in macdLen: const number = 9
+
+def day12 = close.fixed_ema(fastLen)
+def day26 = close.fixed_ema(slowLen)
+out MACD = day12 - day26
+out avg = MACD.fixed_ema(macdLen)
+out diff = MACD - avg`,
+
   'On Balance Volume (OBV)': `def diff = close - close[1]
 def v = if (diff > 0) volume else if (diff < 0) -volume else 0
 def res = res[1] + v default v
 out obv = res`,
+
+  'Price Oscillator': `in fastLen: const number = 9
+in slowLen: const number = 18
+
+def emaFast = close.fixed_ema(fastLen)
+def emaSlow = close.fixed_ema(slowLen)
+
+out PercentagePriceOscillator = emaFast - emaSlow
+out Zero = 0`,
 
   'Price Volume Trend (PVT)': `def prevClose = close[1]
 def currentClose = close
@@ -94,11 +173,31 @@ def currentClose = close
 out roc = ((currentClose - prevClose) / prevClose) * 100
 out zero = 0`,
 
+  'Relative Strength Index (RSI)': `in n: const number = 14
+in overBought: const number = 70
+in overSold: const number = 30
+
+def c = close
+def net = c - c[1]
+def total = abs(c - c[1])
+def averageNet = net.wima(n)
+def averageTotal = total.wima(n)
+out RSI = 50 * (1 + averageNet / averageTotal)
+out overBought = overBought
+out overSold = overSold
+
+fun wima {
+  in x: number
+  in n: const number
+  def w = (w[1] * (n - 1) + x) / n default x.sma(n)
+  out = w
+}`,
+
   'Relative Vigor Index (RVI)': `def nominator = close - open
 def denominator = high - low
 out rvi = nominator / denominator`,
 
-  'Simple Moving Average': `in n = 1
+  'Simple Moving Average': `in n = 9
 out sma = sma(open, n)`,
 
   'Smoothed Moving Average': `in n: const number = 9
@@ -106,33 +205,79 @@ out sma = sma(open, n)`,
 def initialSMMA = close.sma(n)
 out SMMA = (SMMA[1] * (n - 1) + close) / n default initialSMMA`,
 
-  'Weighted Moving Average': `in n = 1
-out wma = wma(open, n)`,
+  'Triple Exponential Average (TRIX)': `in n = 9
+
+def logPrice = close.ln()
+def logPricePrev = close[1].ln()
+
+def triple = trix(logPrice, n)
+def triplePrev = trix(logPricePrev, n)
+
+out TRIX = (triple - triplePrev) * 10000
+
+
+fun trix {
+  in x: number
+  in n: const number
+  def ema1 = x.fixed_ema(n)
+  def ema2 = ema1.fixed_ema(n)
+  out = ema2.fixed_ema(n)
+}`,
+
+  'Triple Exponential Moving Average (TEMA)': `in n = 9
+out tema = 3 * close.fixed_ema(n) - 3 * close.fixed_ema(n).fixed_ema(n) + close.fixed_ema(n).fixed_ema(n).fixed_ema(n)`,
+
+  'True Strength Index (TSI)': `in longLength: const number = 25
+in shortLength: const number = 13
+in signalLength: const number = 8
+
+def momentum = close - close[1]
+def averageOfAverage = momentum.fixed_ema(longLength).fixed_ema(shortLength)
+
+def absMomentum = abs(momentum)
+def absEmaEma = absMomentum.fixed_ema(longLength).fixed_ema(shortLength)
+
+out tsi = averageOfAverage / absEmaEma * 100
+out signal = tsi.fixed_ema(signalLength)
+out zero = 0`,
+
+  'Williams Alligator': `in jawLen = 13
+in jawDisplace = 8
+in teethLen = 8
+in teethDisplace = 5
+in lipsLen = 5
+in lipsDisplace = 3
+
+def median = (high + low) / 2
+
+out Lips = median.wima(lipsLen)[lipsDisplace]
+out Teeth = median.wima(teethLen)[teethDisplace]
+out Jaw = median.wima(jawLen)[jawDisplace]
+
+fun wima {
+    in x: number
+    in n: const number
+    def w = (w[1] * (n - 1) + x) / n default x.sma(n)
+    out = w
+}`,
+
+  'Weighted Moving Average': `in n = 9
+out wma = wma(open, n)`
 }
 
 const INDICHART_JS_INDICATORS = {
-  'Accumulation Distribution (ADL)': `const h = high.get()
-const l = low.get()
-const c = close.get()
-const vol = volume.get()
+  'Accumulation Distribution (ADL)': `function onTick() {
+    const moneyFlowMultiplier = (high !== low) ? ((close - low) - (high - close)) / (high - low) : 1.0;
+    const moneyFlowVolume = ts(moneyFlowMultiplier * volume);
+   
+    
+    spline(ta.cum(moneyFlowVolume), {title: "adl", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.RED});
+}`,
 
-const moneyFlowMultiplier = (h !== l) ? ((c - l) - (h - c)) / (h - l) : 1.0;
-const moneyFlowVolume = moneyFlowMultiplier * vol;
-
-const adl = useSeries(moneyFlowVolume)
-useOutput("adl", adl.cumulativeSum())
-useOutput("zero", 0)`,
-
-  Aroon: `const n = useInput("n",25)
-const overBought = useInput("overBought", 70)
-const overSold = useInput("overSold", 30)
-
-let h = useSeries(high.get())
-let l = useSeries(low.get())
-useOutput("aroonUp", aroonUp(h, n))
-useOutput("aroonDown", aroonDown(l, n))
-useOutput("overBought", overBought)
-useOutput("overSold", overSold)
+  'Aroon': `const n = input("n", 25)
+const overBought = input("overBought", 70)
+const overSold = input("overSold", 30)
 
 function aroonUp(x, n) {
     // return (n - x.indexOfMaximum(n)) / n * 100
@@ -145,13 +290,13 @@ function aroonDown(x, n) {
 }
 
 function indexOfMaximum(x, n) {
-    if (isNaN(x.get(n - 1))) {
+    if (isNaN(x[n - 1])) {
         return n;
     }
     let indexMaxVal = 0
-    let maxVal = x.get(0)
+    let maxVal = x
     for (let i = 1; i < n; ++i) {
-        let v = x.get(i)
+        let v = x[i]
         if (v > maxVal) {
             maxVal = v
             indexMaxVal = i
@@ -161,13 +306,13 @@ function indexOfMaximum(x, n) {
 }
 
 function indexOfMinimum(x, n) {
-    if (isNaN(x.get(n - 1))) {
+    if (isNaN(x[n - 1])) {
         return n;
     }
     let indexMinVal = 0
-    let minVal = x.get(0)
+    let minVal = x
     for (let i = 1; i < n; ++i) {
-        let v = x.get(i)
+        let v = x[i]
         if (v < minVal) {
             minVal = v
             indexMinVal = i
@@ -175,106 +320,337 @@ function indexOfMinimum(x, n) {
     }
     return indexMinVal
 }
-`,
 
-  'Awesome Oscillator (AO)': `const mid = useSeries((high.get() + low.get()) / 2)
 
-useOutput("awesome", mid.sma(5) - mid.sma(34))
-useOutput("zero", 0)
-`,
+function onTick() {
+    const h = high
+    const l = low
+    spline(aroonUp(h, n), {title: "aroonUp", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(aroonDown(l, n), {title: "aroonDown", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(overBought, {title: "overBought", offset: 0, type: SplineType.LINE, color: color.CYAN});
+    spline(overSold, {title: "overSold", offset: 0, type: SplineType.LINE, color: color.BLUE});
+}`,
 
-  'Chande Momentum Oscillator (CMO)': `const n = useInput("n", 20)
+  'Average True Range (ATR)': `const n = input("n", 14)
 
-let diff = close.get() - close.get(1)
-let inc = useSeries(Math.max(diff, 0))
-let dec = useSeries(Math.max(diff * -1, 0))
-let sumInc = inc.sum(n)
-let sumDec = dec.sum(n)
+function onTick() {
+    const pc = close[1]
+    const h = high
+    const l = low
+    const d1 = Math.abs(h - l)
+    const d2 = Math.abs(h - pc)
+    const d3 = Math.abs(l - pc)
+    const tr = ts(Math.max(d1, d2, d3))
+    spline(ta.wima(tr, n), {title: "atr", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
 
-useOutput("CMO", (sumInc - sumDec) / (sumInc + sumDec) * 100)
-useOutput("UpperLevel", 50)
-useOutput("LowerLevel", -50)
-useOutput("Zero", 0)`,
+  'Awesome Oscillator (AO)': `function onTick() {
+    const mid = ts((high + low) / 2)
+    spline(ta.sma(mid, 5) - ta.sma(mid, 34), {title: "awesome", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.RED});
+}`,
 
-  'Commodity Channel Index (CCI)': `const n = useInput("n", 14);
-const overBought = useInput("overBought", 100)
-const overSold = useInput("overSold", -100)
+  'Bollinger Bands (BB)': `const n = input("n", 20)
+const displace = input("displace", 0)
+const numDevUp = input("numDevUp", 2)
+const numDevDown = input("numDevDown", -2)
 
-let x = useSeries(high.get() + low.get() + close.get())
-let ld = linerDev(x, n);
-useOutput("cci", (x.get() - x.sma(n)) / ld / 0.015)
-useOutput("OverBought", overBought)
-useOutput("OverSold", overSold)
-useOutput("Zero", 0)
+function standardDeviation(x, n) {
+    const s = ta.sum(x, n)
+    const ss = sumOfSquares(x, n)
+    return Math.sqrt((ss - s * s / n) / (n))
+}
+
+function sumOfSquares(x, n) {
+    if (isNaN(x[n - 1])) {
+        return NaN
+    }
+    let s = 0;
+    for (let i = 0; i < n; ++i) {
+        const last = x[i]
+        s += last * last
+    }
+    return s;
+}
+
+function onTick() {
+    const c = close
+    const midLineValue = ta.ema(c, n)
+    const sd = standardDeviation(c, n)
+    spline(midLineValue, {title: "midLine", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(midLineValue + numDevUp * sd, {title: "upBand", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(midLineValue + numDevDown * sd, {title: "lowBand", offset: 0, type: SplineType.LINE, color: color.CYAN});
+}`,
+
+  'Chande Momentum Oscillator (CMO)': `const n = input("n", 20)
+
+function onTick() {
+    const diff = close - close[1]
+    const inc = ts(Math.max(diff, 0))
+    const dec = ts(Math.max(diff * -1, 0))
+    const sumInc = ta.sum(inc, n)
+    const sumDec = ta.sum(dec, n)
+    // Wrong prefetch
+    spline((sumInc - sumDec) / (sumInc + sumDec) * 100, {title: "CMO", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(50, {title: "UpperLevel", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(-50, {title: "LowerLevel", offset: 0, type: SplineType.LINE, color: color.CYAN});
+    spline(0, {title: "Zero", offset: 0, type: SplineType.LINE, color: color.BLUE});
+}`,
+
+  'Commodity Channel Index (CCI)': `const n = input("n", 14)
+const overBought = input("overBought", 100)
+const overSold = input("overSold", -100)
 
 function avg(x, n) {
     let sum = 0;
     for (let i = 0; i < n; ++i) {
-        sum += x.get(i);
+        sum += x[i];
     }
     return sum / n;
 }
 
 function linerDev(x, n) {
-    if (isNaN(x.get(n - 1))) {
+    if (isNaN(x[n - 1])) {
         return NaN
     }
 
-    let average = avg(x, n);
+    const average = avg(x, n);
 
     let sumDiff = 0.0;
     for (let i = 0; i < n; ++i) {
-        sumDiff += Math.abs(x.get(i) - average);
+        sumDiff += Math.abs(x[i] - average);
     }
     return sumDiff / n;
+}
+
+function onTick() {
+    const x = ts(high + low + close)
+    const ld = linerDev(x, n);
+    spline((x - ta.sma(x, n)) / ld / 0.015, {title: "cci", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(overBought, {title: "OverBought", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(overSold, {title: "OverSold", offset: 0, type: SplineType.LINE, color: color.CYAN});
+    spline(0, {title: "Zero", offset: 0, type: SplineType.LINE, color: color.BLUE});
 }`,
 
-  Momentum: `const n = useInput("n", 12)
-useOutput("momentum", close.get() - close.get(n))`,
+  'Double Exponential Moving Average': `const n = input("n", 9)
+function onTick() {
+    const c = close
+    const ema1 = ta.ema(c, n)
+    const ema2 = ta.ema(ema1, n)
+    spline(2 * ema1 - ema2, {title: "dema", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
 
-  'Money Flow (MFI)': `const n = useInput("n", 14)
-const overBought = useInput("OverBought", 80)
-const overSold = useInput("OverSold", 20)
+  'Exponential Moving Average (EMA)': `const n = input("n", 9)
 
-let tp = useSeries((high.get() + low.get() + close.get()) / 3)
-let positiveMoneyFlow = useSeries((tp.get() > tp.get(1)) ? tp.get() * volume.get() : 0)
-let negativeMoneyFlow = useSeries((tp.get() < tp.get(1)) ? tp.get() * volume.get() : 0)
-let sumPositiveMoneyFlow = positiveMoneyFlow.sum(n)
-let sumNegativeMoneyFlow = negativeMoneyFlow.sum(n)
-useOutput("MFidx", 100 - (100 / (1 + sumPositiveMoneyFlow / sumNegativeMoneyFlow)))
-useOutput("OverBought", overBought)
-useOutput("OverSold",  overSold)`,
+function onTick() {
+    spline(ta.ema(close, n), {title: "ema", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
 
-  'On Balance Volume (OBV)': `let diff = close.get() - close.get(1)
-let v = useSeries((diff > 0) ? volume.get() : ((diff < 0) ? -volume.get() : 0))
-useOutput("obv", v.cumulativeSum())`,
+  'Mass Index': `const n = input("n", 9)
+const sumLength = input("sumLength", 25)
+const triggerLevel = input("triggerLevel", 26.5)
+const setupLevel = input("setupLevel", 27)
 
-  'Price Volume Trend (PVT)': `let prevClose = close.get(1)
-let currentClose = close.get()
-let v = useSeries((currentClose - prevClose) / prevClose * volume.get())
-useOutput("pvt", v.cumulativeSum())`,
+function onTick() {
+    const diff = ts(high - low)
+    const emaDiff1 = ta.ema(diff, n)
+    const emaEmaDiff = ta.ema(emaDiff1, n)
+    const emaEmaCoef = ts(emaDiff1 / emaEmaDiff)
 
-  'Rate of Change (ROC)': `const n = useInput("n", 12)
-let prevClose = close.get(n)
-let currentClose = close.get()
-useOutput("roc", ((currentClose - prevClose) / prevClose) * 100)
-useOutput("zero", 0)`,
+    spline(ta.sum(emaEmaCoef, sumLength), {title: "mi", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(triggerLevel, {title: "trigger", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(setupLevel, {title: "setup", offset: 0, type: SplineType.LINE, color: color.CYAN});
+}`,
 
-  'Relative Vigor Index (RVI)': `let nominator = close.get() - open.get()
-let denominator = high.get() - low.get()
-useOutput("rvi", nominator / denominator)`,
+  'Momentum': `const n = input("n", 12)
+function onTick() {
+    spline(close - close[n], {title: "momentum", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
 
-  'Simple Moving Average': `const n = useInput("n", 5)
+  'Money Flow (MFI)': `const n = input("n", 14)
+const overBought = input("overBought", 80)
+const overSold = input("overSold", 20)
 
-useOutput("sma", open.sma(n))`,
+function onTick() {
+    const tp = ts((high + low + close) / 3)
+    const tpPrev = ts((high[1]+ low[1] + close[1]) / 3)
+    const positiveMoneyFlow = ts((tp > tpPrev) ? tp * volume : 0)
+    const negativeMoneyFlow = ts((tp < tpPrev) ? tp * volume : 0)
+    const sumPositiveMoneyFlow = ta.sum(positiveMoneyFlow, n)
+    const sumNegativeMoneyFlow = ta.sum(negativeMoneyFlow, n)
+    spline(100 - (100 / (1 + sumPositiveMoneyFlow / sumNegativeMoneyFlow)), {title: "MFidx", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(overBought, {title: "OverBought", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(overSold, {title: "OverSold", offset: 0, type: SplineType.LINE, color: color.CYAN});
+}`,
 
-  'Smoothed Moving Average': `const n = useInput("n", 9)
+  'Moving Average Convergence Divergence (MACD)': `const fastLen = input("fastLen", 12)
+const slowLen = input("slowLen", 26)
+const macdLen = input("macdLen", 9)
 
-let series = useSeries(close.get())
-useOutput("SMMA", series.wima(n))`,
+function onTick() {
+    const series = close
+    const MACD = ts(ta.ema(series, fastLen) - ta.ema(series, slowLen))
+    const avg = ta.ema(MACD, macdLen)
+    spline(MACD, {title: "MACD", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(avg, {title: "avg", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(MACD - avg, {title: "diff", offset: 0, type: SplineType.LINE, color: color.CYAN});
+}`,
 
-  'Weighted Moving Average': `const n = useInput("n", 1)
-useOutput("wma", useSeries(open.get()).wma(n))`,
+  'On Balance Volume (OBV)': `function onTick() {
+    const diff = close - close[1]
+    const v = ts((diff > 0) ? volume : ((diff < 0) ? -volume : 0))
+    spline(ta.cum(v), {title: "obv", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Price Oscillator': `const fastLen = input("fastLen", 9)
+const slowLen = input("slowLen", 18)
+
+function onTick() {
+    const emaFast = ta.ema(close, fastLen)
+    const emaSlow = ta.ema(close, slowLen)
+
+    spline(emaFast - emaSlow, {title: "PercentagePriceOscillator", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(0, {title: "Zero", offset: 0, type: SplineType.LINE, color: color.RED});
+}`,
+
+  'Price Volume Trend (PVT)': `function onTick() {
+    const prevClose = close[1]
+    const currentClose = close
+    const v = ts((currentClose - prevClose) / prevClose * volume)
+    spline(ta.cum(v), {title: "pvt", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Rate of Change (ROC)': `const n = input("n", 12)
+function onTick() {
+    const prevClose = close[n]
+    const currentClose = close
+    spline(((currentClose - prevClose) / prevClose) * 100, {title: "roc", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.RED});
+}`,
+
+  'Relative Strength Index (RSI)': `const n = input("n", 14)
+const overBought = input("overBought", 70)
+const overSold = input("overSold", 30)
+
+function onTick() {
+    const curr = close
+    const prev = close[1]
+    const net = ts(curr - prev)
+    const total = ts(Math.abs(prev - curr))
+    const averageNet = ta.wima(net, n)
+    const averageTotal = ta.wima(total, n)
+    spline(50 * (1 + averageNet / averageTotal), {title: "RSI", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(overBought, {title: "overBought", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(overSold, {title: "overSold", offset: 0, type: SplineType.LINE, color: color.CYAN});
+}`,
+
+  'Relative Vigor Index (RVI)': `function onTick() {
+    const nominator = close - open
+    const denominator = high - low
+    spline(nominator / denominator, {title: "rvi", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Simple Moving Average': `const n = input("n", 9)
+
+function onTick() {
+    spline(ta.sma(open, n), {title: "sma", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Smoothed Moving Average': `const n = input("n", 9)
+
+function onTick() {
+    spline(ta.wima(close, n), {title: "SMMA", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Triple Exponential Average (TRIX)': `const n = input("n", 9)
+
+function trix(x, n) {
+    const ema1 = ta.ema(x, n)
+    const ema2 = ta.ema(ema1, n);
+    return ta.ema(ema2, n);
+}
+
+function onTick() {
+    const logPrice = ts(Math.log(close))
+    const logPrevPrice = ts(Math.log(close[1]))
+
+    const triple = trix(logPrice, n);
+    const triplePrev = trix(logPrevPrice, n)
+
+    spline((triple - triplePrev) * 10000, {title: "TRIX", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Triple Exponential Moving Average (TEMA)': `const n = input("n", 9)
+
+function onTick() {
+    const series = close
+    const ema1 = ta.ema(series, n)
+    const ema2 = ta.ema(ema1, n)
+    const ema3 = ta.ema(ema2, n)
+
+    spline(3 * ema1 - 3 * ema2 + ema3, {title: "tema", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'True Strength Index (TSI)': `const longLength = input("longLength", 25)
+const shortLength = input("shortLength", 13)
+const signalLength = input("signalLength", 8)
+
+function doubleEma(x, longLength, shortLength) {
+    const ema1 = ta.ema(x, longLength)
+    return ta.ema(ema1, shortLength)
+}
+
+function onTick() {
+    const momentum = ts(close - close[1])
+    const averageOfAverage = doubleEma(momentum, longLength, shortLength)
+
+    const absMomentum = ts(Math.abs(momentum))
+    const absEmaEma = doubleEma(absMomentum, longLength, shortLength);
+
+    const tsi = ts(averageOfAverage / absEmaEma * 100)
+    spline(tsi, {title: "tsi", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(ta.ema(tsi, signalLength), {title: "signal", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.CYAN});
+}`,
+
+  'Williams Alligator': `const jawLen = input("jawLen", 13)
+const jawDisplace = input("jawDisplace", 8)
+const teethLen = input("teethLen", 8)
+const teethDisplace = input("teethDisplace", 5)
+const lipsLen = input("lipsLen", 5)
+const lipsDisplace = input("lipsDisplace", 3)
+
+function onTick() {
+    const median = ts((high + low) / 2)
+    const lips = ta.wima(median, lipsLen)
+    const teeth = ta.wima(median, teethLen)
+    const jaw = ta.wima(median, jawLen)
+    spline(lips[lipsDisplace], {title: "Lips", offset: 0, type: SplineType.LINE, color: color.GREEN});
+    spline(teeth[teethDisplace], {title: "Teeth", offset: 0, type: SplineType.LINE, color: color.RED});
+    spline(jaw[jawDisplace], {title: "Jaw", offset: 0, type: SplineType.LINE, color: color.CYAN});
+}`,
+
+  'Weighted Moving Average': `const n = input("n", 9)
+
+function onTick() {
+    spline(ta.wma(open, n), {title: "wma", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Pivot Low': `const left = input("left", 3)
+const right = input("right", 2)
+
+function onTick() {
+    let pivotL = ta.pivotLow(close, left, right)
+    spline(pivotL, {title: "pivotLow", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`,
+
+  'Pivot High': `const left = input("left", 3)
+const right = input("right", 2)
+
+function onTick() {
+    let pivotH = ta.pivotHigh(close, left, right)
+    spline(pivotH, {title: "pivotHigh", offset: 0, type: SplineType.LINE, color: color.GREEN});
+}`
 }
 
 // Exporting the indicators for use in the application
@@ -287,10 +663,21 @@ window['INDICHART_INDICATOR_EXAMPLES'] = [
     id: 'Accumulation Distribution (ADL)',
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/accumulationdistribution',
   },
-  { id: 'Aroon', docUrl: 'https://devexperts.com/dxcharts/kb/docs/aroon-indicator' },
+  {
+    id: 'Aroon',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/aroon-indicator',
+  },
+  {
+    id: 'Average True Range (ATR)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/average-true-range-atr',
+  },
   {
     id: 'Awesome Oscillator (AO)',
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/awesome-oscillator-ao',
+  },
+  {
+    id: 'Bollinger Bands (BB)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/bollinger-bands',
   },
   {
     id: 'Chande Momentum Oscillator (CMO)',
@@ -300,14 +687,37 @@ window['INDICHART_INDICATOR_EXAMPLES'] = [
     id: 'Commodity Channel Index (CCI)',
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/commodity-channel-index',
   },
-  { id: 'Momentum', docUrl: 'https://devexperts.com/dxcharts/kb/docs/momentum' },
+  {
+    id: 'Double Exponential Moving Average',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/double-exponential-moving-average',
+  },
+  {
+    id: 'Exponential Moving Average (EMA)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/exponential-moving-average-ema',
+  },
+  {
+    id: 'Mass Index',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/mass-index',
+  },
+  {
+    id: 'Momentum',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/momentum',
+  },
   {
     id: 'Money Flow (MFI)',
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/money-flow-index-mfi',
   },
   {
+    id: 'Moving Average Convergence Divergence (MACD)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/moving-average-convergence-divergence-macd',
+  },
+  {
     id: 'On Balance Volume (OBV)',
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/on-balance-volume',
+  },
+  {
+    id: 'Price Oscillator',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/price-oscillator',
   },
   {
     id: 'Price Volume Trend (PVT)',
@@ -316,6 +726,10 @@ window['INDICHART_INDICATOR_EXAMPLES'] = [
   {
     id: 'Rate of Change (ROC)',
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/rate-of-change',
+  },
+  {
+    id: 'Relative Strength Index (RSI)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/relative-strength-index-rsi',
   },
   {
     id: 'Relative Vigor Index (RVI)',
@@ -330,7 +744,31 @@ window['INDICHART_INDICATOR_EXAMPLES'] = [
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/smoothed-simple-moving-average',
   },
   {
+    id: 'Triple Exponential Average (TRIX)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/triple-exponential-average',
+  },
+  {
+    id: 'Triple Exponential Moving Average (TEMA)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/triple-exponential-moving-average',
+  },
+  {
+    id: 'True Strength Index (TSI)',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/true-strength-index',
+  },
+  {
+    id: 'Williams Alligator',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/williams-alligator',
+  },
+  {
     id: 'Weighted Moving Average',
     docUrl: 'https://devexperts.com/dxcharts/kb/docs/weighted-moving-average-wma',
+  },
+  {
+    id: 'Pivot Low',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/pivot-points',
+  },
+  {
+    id: 'Pivot High',
+    docUrl: 'https://devexperts.com/dxcharts/kb/docs/pivot-points',
   },
 ]

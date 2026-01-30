@@ -3,7 +3,7 @@ export interface IndichartIndicatorExample {
   docUrl?: string
 }
 
-export type Lang = 'dxScript' | 'js'
+export type Lang = 'js'
 
 const INDICHART_DXSCRIPT_INDICATORS = {
   'Accumulation Distribution (ADL)': `def h = high
@@ -284,7 +284,6 @@ useOutput("wma", useSeries(open.get()).wma(n))`,
 }
 
 export const INDICHART_INDICATROS = window.INDICHART_INDICATROS || {
-  dxScript: {},
   js: {},
 }
 
@@ -293,6 +292,6 @@ export const INDICHART_INDICATOR_EXAMPLES = window.INDICHART_INDICATOR_EXAMPLES 
 declare global {
   interface Window {
     INDICHART_INDICATOR_EXAMPLES?: IndichartIndicatorExample[]
-    INDICHART_INDICATROS?: Record<Lang, Record<string, string>>
+    INDICHART_INDICATROS?: Record<string, Record<string, string>>
   }
 }
