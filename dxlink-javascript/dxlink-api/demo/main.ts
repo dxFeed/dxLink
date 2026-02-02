@@ -71,8 +71,12 @@ async function startIndichart() {
 
   const indicators: DXLinkIndiChartIndicators = {
     indicator1: {
-      lang: 'dxScript',
-      content: 'in depth = 14; out avg = sma(close, depth)',
+      lang: 'js',
+      content:
+          `function onTick() {
+            const sma = ta.sma(close, input.double("length", 20));
+            spline(sma, {title: "SMA"});
+          }`,
     },
   }
 

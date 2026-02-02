@@ -23,7 +23,9 @@ import {
 } from './indichart-indicators'
 import { ContentTemplate } from '../common/content-template'
 import 'ace-builds/src-noconflict/mode-python'
+import 'ace-builds/src-noconflict/mode-javascript'
 import 'ace-builds/src-noconflict/theme-textmate'
+import './ace-dxscript-mode'
 
 const FieldsGroup = styled.div`
   display: grid;

@@ -12,6 +12,9 @@ const CstyleFoldMode = ace.require('ace/mode/folding/cstyle').FoldMode
 const TextHighlightRules = ace.require('ace/mode/text_highlight_rules').TextHighlightRules
 const langTools = ace.require('ace/ext/language_tools')
 
+// Configure Ace base path for dynamic loading
+ace.config.set('basePath', 'https://cdn.jsdelivr.net/npm/ace-builds@1.35.4/src-noconflict/')
+
 const dxScriptCompletions = [
   // Candle
   { caption: 'eventType', value: 'eventType', meta: 'candle' },
@@ -189,3 +192,8 @@ export class DxScriptMode extends TextMode {
     this.$outdent.autoOutdent(doc, row)
   }
 }
+
+// Register the custom mode
+ace.define('ace/mode/dxscript', ['require', 'exports', 'module'], (require: any, exports: any) => {
+  exports.Mode = DxScriptMode
+})
