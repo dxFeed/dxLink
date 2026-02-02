@@ -142,7 +142,7 @@ export function ScriptCandlesSubscription({
 
   const [exampleId, setExampleId] = useState<string>(INDICHART_INDICATOR_EXAMPLES[0]!.id)
   const lang: Lang = 'js'
-  const [script, setScript] = useState<string>(INDICHART_INDICATROS[lang][exampleId]!)
+  const [script, setScript] = useState<string>(INDICHART_INDICATROS[lang]?.[exampleId] ?? '')
   const [search, setSearch] = useState('')
 
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
@@ -271,7 +271,7 @@ export function ScriptCandlesSubscription({
                     onClick={() => {
                       setAnchorEl(null)
                       setExampleId(example.id)
-                      setScript(INDICHART_INDICATROS[lang][example.id] ?? '')
+                      setScript(INDICHART_INDICATROS[lang]?.[example.id] ?? '')
                     }}
                     key={example.id}
                   >

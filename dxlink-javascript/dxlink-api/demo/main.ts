@@ -87,9 +87,9 @@ async function startIndichart() {
     console.log('Indicators State', indicators)
   })
 
-  indichart.addDataListener((candles, indicators, reset, pending) => {
+  indichart.addUpdateListener((candles, indicators, pending) => {
     // your buisness logic here
-    console.log('Chart Data', indichart.getSubscription(), candles, indicators, reset, pending)
+    console.log('Chart Data', indichart.getSubscription(), candles, indicators, pending)
   })
 
   indichart.setSubscription(

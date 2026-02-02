@@ -6,6 +6,7 @@ import 'ace-builds/src-noconflict/mode-text'
 import 'ace-builds/src-noconflict/mode-javascript'
 
 const TextMode = ace.require('ace/mode/text').Mode
+const JavaScriptMode = ace.require('ace/mode/javascript').Mode
 const MatchingBraceOutdent = ace.require('ace/mode/matching_brace_outdent').MatchingBraceOutdent
 const CstyleBehaviour = ace.require('ace/mode/behaviour/cstyle').CstyleBehaviour
 const CstyleFoldMode = ace.require('ace/mode/folding/cstyle').FoldMode
@@ -13,7 +14,7 @@ const TextHighlightRules = ace.require('ace/mode/text_highlight_rules').TextHigh
 const langTools = ace.require('ace/ext/language_tools')
 
 // Configure Ace base path for dynamic loading
-ace.config.set('basePath', 'https://cdn.jsdelivr.net/npm/ace-builds@1.35.4/src-noconflict/')
+ace.config.set('basePath', 'https://cdn.jsdelivr.net/npm/ace-builds@1.43.6/src-noconflict/')
 
 const dxScriptCompletions = [
   // Candle
