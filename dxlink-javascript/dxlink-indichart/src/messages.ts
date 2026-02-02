@@ -93,51 +93,47 @@ export interface DXLinkIndiChartCandle {
   readonly volume: JSONNumber
 }
 
-export type DXLinkIndiChartIndicatorsDataValue = JSONNumber | string | boolean
-
-// New spline-based indicator value with metadata
-export interface DXLinkIndiChartSplineValue {
-  readonly value: JSONNumber
-  readonly title?: string
-  readonly offset?: number
-  readonly color?: {
-    readonly value?: string
-  }
-  readonly type?: string
+export interface DXLinkIndiChartColor {
+  readonly value: string
+  readonly alpha?: number
 }
 
-// Indicator data value can be either a simple value or an object with metadata
-export type DXLinkIndiChartIndicatorValue =
-  | DXLinkIndiChartIndicatorsDataValue
-  | DXLinkIndiChartSplineValue
+export interface DXLinkIndiChartSplinePoint {
+  readonly value: JSONNumber
+  readonly type?: string
+  readonly offset?: number
+  readonly title?: string
+  readonly color?: DXLinkIndiChartColor
+}
+
+export interface DXLinkIndiChartCalculationResult {
+  readonly output?: { [seriesName: string]: JSONNumber[] }
+  readonly spline?: { [seriesIndex: string]: DXLinkIndiChartSplinePoint[] }
+}
 
 export interface DXLinkIndiChartIndicatorsData {
-  // Indicator name
-  readonly [key: string]: {
-    // Outputs of the indicator
-    readonly [key: string]: DXLinkIndiChartIndicatorValue[]
-  }
+  readonly [indicatorName: string]: DXLinkIndiChartCalculationResult
 }
 
 // New message type for candle snapshots
 export interface DXLinkIndiChartCandleSnapshotMessage {
   readonly type: 'INDICHART_CANDLE_SNAPSHOT'
-  readonly reset?: boolean
-  readonly pending?: boolean
+  readonly reset: boolean
+  readonly pending: boolean
   readonly candles: DXLinkIndiChartCandle[]
 }
 
 // New message type for indicator snapshots
 export interface DXLinkIndiChartIndicatorsSnapshotMessage {
   readonly type: 'INDICHART_INDICATORS_SNAPSHOT'
-  readonly pending?: boolean
+  readonly pending: boolean
   readonly indicators: DXLinkIndiChartIndicatorsData
 }
 
 // Message type for data updates (no reset flag - reset is only in INDICHART_CANDLE_SNAPSHOT)
 export interface DXLinkIndiChartUpdateMessage {
   readonly type: 'INDICHART_UPDATE'
-  readonly pending?: boolean
+  readonly pending: boolean
   readonly candles: DXLinkIndiChartCandle[]
   readonly indicators: DXLinkIndiChartIndicatorsData
 }
