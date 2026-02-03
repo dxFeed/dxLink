@@ -131,7 +131,6 @@ export interface ScriptCandlesSubscriptionProps {
   onReset(): void
 }
 
-
 export function ScriptCandlesSubscription({
   onSet,
   onReset,
@@ -226,7 +225,7 @@ export function ScriptCandlesSubscription({
           <CodeEditorInput>
             <AceEditor
               placeholder="Script code"
-              mode="javascript"
+              mode="dxscript"
               theme="textmate"
               name="script-code"
               onChange={(value) => setScript(value)}
