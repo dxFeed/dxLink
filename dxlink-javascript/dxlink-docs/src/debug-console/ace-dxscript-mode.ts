@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import ace from 'ace-builds/src-noconflict/ace'
+
 import 'ace-builds/src-noconflict/ext-language_tools'
 import 'ace-builds/src-noconflict/mode-text'
 import 'ace-builds/src-noconflict/mode-javascript'
@@ -10,7 +11,9 @@ const JavaScriptMode = ace.require('ace/mode/javascript').Mode
 const MatchingBraceOutdent = ace.require('ace/mode/matching_brace_outdent').MatchingBraceOutdent
 const CstyleBehaviour = ace.require('ace/mode/behaviour/cstyle').CstyleBehaviour
 const CstyleFoldMode = ace.require('ace/mode/folding/cstyle').FoldMode
-const JavaScriptHighlightRules = ace.require('ace/mode/javascript_highlight_rules').JavaScriptHighlightRules
+const JavaScriptHighlightRules = ace.require(
+  'ace/mode/javascript_highlight_rules'
+).JavaScriptHighlightRules
 const langTools = ace.require('ace/ext/language_tools')
 
 // Configure Ace base path for dynamic loading
@@ -27,17 +30,17 @@ class DxScriptHighlightRules extends JavaScriptHighlightRules {
     super()
 
     const candleFields =
-      'askVolume|bar_index|bidVolume|close|count|high|hl2|hlc3|impVolatility|low|ohlc4|open|openInterest|time|volume|vwap';
+      'askVolume|bar_index|bidVolume|close|count|high|hl2|hlc3|impVolatility|low|ohlc4|open|openInterest|time|volume|vwap'
 
-    const builtinFunctions = 'input|output|spline|ts';
+    const builtinFunctions = 'input|output|spline|ts'
 
     const builtinConstants =
-      'BOLD|BoxExtend|ITALIC|LineExtend|LineStyle|NONE|SplineType|TextAlign|TextHorizontalAlign|TextVerticalAlign|XLocation';
+      'BOLD|BoxExtend|ITALIC|LineExtend|LineStyle|NONE|SplineType|TextAlign|TextHorizontalAlign|TextVerticalAlign|XLocation'
 
     const colorNames =
-      'BLACK|BLUE|CORAL|CRIMSON|CYAN|GOLD|GRAY|GREEN|LIME|MAGENTA|MAROON|NAVY|ORANGE|PINK|PURPLE|RED|SILVER|TEAL|WHITE|YELLOW';
+      'BLACK|BLUE|CORAL|CRIMSON|CYAN|GOLD|GRAY|GREEN|LIME|MAGENTA|MAROON|NAVY|ORANGE|PINK|PURPLE|RED|SILVER|TEAL|WHITE|YELLOW'
 
-    const namespaces = 'bar|box|console|hline|input|label|line|Math|output|polyline|session|spline|ta|ts';
+    const namespaces = 'bar|box|console|hline|input|label|line|Math|output|polyline|session|spline|ta|ts'
 
     if (this.$rules.start) {
       this.$rules.start.unshift({
@@ -66,9 +69,9 @@ class DxScriptHighlightRules extends JavaScriptHighlightRules {
       })
 
       this.$rules.start.unshift({
-        token: "support.function",
+        token: 'support.function',
         regex: String.raw`\b(?:${namespaces})\.[A-Za-z_$][\w$]*\b`,
-      });
+      })
     }
   }
 }

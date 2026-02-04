@@ -35,10 +35,10 @@ export class ChartHolder implements ChannelInfo {
 
   private pendingCandles: DXLinkIndiChartCandle[] = []
   private pendingIndicators: DXLinkIndiChartIndicatorsData[] = []
-  
+
   // Store candles after snapshot for use with indicators
   private snapshotCandles: DXLinkIndiChartCandle[] = []
-  
+
   // Track whether we're in snapshot mode and candles have been sent
   private candlesSnapshotSent: boolean = false
 
@@ -185,7 +185,7 @@ export class ChartHolder implements ChannelInfo {
       this.candlesSnapshotSent = true
       // Store candles for later use with indicators
       this.snapshotCandles = [...this.pendingCandles]
-      
+
       if (this.listener !== null && this.pendingCandles.length > 0) {
         // Notify with candles only (no indicators yet)
         this.listener(this.pendingCandles, [], 'candles')
@@ -234,5 +234,4 @@ export class ChartHolder implements ChannelInfo {
       this.pendingIndicators = []
     }
   }
-
 }
