@@ -38,9 +38,27 @@ export interface DXLinkIndiChartIndicatorEnabled {
   readonly outParameters: DXLinkIndiChartIndicatorParameterMeta[]
 }
 
+export interface ScriptStackFrame {
+  column: number
+  functionName: string
+  line: number
+}
+
+export interface ScriptError {
+  endColumn: number
+  endLine: number
+  message: string
+  scriptName: string
+  scriptStack: ScriptStackFrame[]
+  startColumn: number
+  startLine: number
+  type: string
+}
+
 export interface DXLinkIndiChartIndicatorDisabled {
   enabled: false
-  error: string
+  scriptError?: ScriptError
+  internalErrorMessage?: string
 }
 
 export type DXLinkIndiChartIndicatorState =

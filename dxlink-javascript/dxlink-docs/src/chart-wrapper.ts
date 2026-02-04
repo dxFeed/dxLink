@@ -107,7 +107,48 @@ export class ChartHolder implements ChannelInfo {
       }
 
       if (!indi.enabled) {
-        errorListener(indi.error ?? 'Unknown error')
+        if (indi.internalErrorMessage !== undefined) {
+          errorListener(`Internal Error: ${indi.internalErrorMessage}`)
+          return
+        }
+
+        if (indi.scriptError) {
+          let type = indi.scriptError.type
+          let error = indi.scriptError
+          switch (type) {
+            case 'SYNTAX':
+              errorListener(`Syntax Error in script '${error.scriptName}' at line ${error.startLine}, column ${error.startColumn}: ${error.message}`)
+              break
+            case 'RUNTIME': {
+              let errorMessage = `Runtime Error in ${error.scriptName} script at line ${error.startLine}, column ${error.startColumn}: ${error.message}.`
+              if (error.scriptStack.length > 0) {
+                errorMessage += '\nStack trace:\n'
+                for (const frame of error.scriptStack) {
+                  errorMessage += `  at ${frame.functionName} (line ${frame.line}, column ${frame.column})\n`
+                }
+              }
+              errorListener(errorMessage)
+              break
+            }
+            case 'TIMEOUT':
+              errorListener(`Script execution timed out`)
+              break
+            case 'LIMIT':
+              errorListener(`Script exceeded resource limits`)
+              break
+            case 'CANCELLED':
+              errorListener(`Script execution was cancelled`)
+              break
+            case 'UNKNOWN':
+              errorListener(`Unknown script error: ${error.message}`)
+              break
+            default:
+              errorListener(`Unknown error in script`)
+              break
+          }
+        } else {
+          errorListener('Unknown error in script')
+        }
       }
     })
 
