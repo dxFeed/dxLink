@@ -38,9 +38,27 @@ export interface DXLinkIndiChartIndicatorEnabled {
   readonly outParameters: DXLinkIndiChartIndicatorParameterMeta[]
 }
 
+export interface ScriptStackFrame {
+  column: number
+  functionName: string
+  line: number
+}
+
+export interface ScriptError {
+  endColumn: number
+  endLine: number
+  message: string
+  scriptName: string
+  scriptStack: ScriptStackFrame[]
+  startColumn: number
+  startLine: number
+  type: string
+}
+
 export interface DXLinkIndiChartIndicatorDisabled {
   enabled: false
-  error: string
+  scriptError?: ScriptError
+  internalErrorMessage?: string
 }
 
 export type DXLinkIndiChartIndicatorState =
@@ -93,42 +111,74 @@ export interface DXLinkIndiChartCandle {
   readonly volume: JSONNumber
 }
 
-export type DXLinkIndiChartIndicatorsDataValue = JSONNumber | string | boolean
-
-export interface DXLinkIndiChartIndicatorsData {
-  // Indicator name
-  readonly [key: string]: {
-    // Outputs of the indicator
-    readonly [key: string]: DXLinkIndiChartIndicatorsDataValue[]
-  }
+export interface DXLinkIndiChartColor {
+  readonly value: string
+  readonly alpha?: number
 }
 
-export interface DXLinkIndiChartDataMessage {
-  readonly type: 'INDICHART_DATA'
-  readonly reset?: boolean
-  readonly pending?: boolean
+export interface DXLinkIndiChartSplinePoint {
+  readonly value: JSONNumber
+  readonly type?: string
+  readonly offset?: number
+  readonly title?: string
+  readonly color?: DXLinkIndiChartColor
+}
+
+export interface DXLinkIndiChartCalculationResult {
+  readonly output?: { [seriesName: string]: JSONNumber[] }
+  readonly spline?: { [seriesIndex: string]: DXLinkIndiChartSplinePoint[] }
+}
+
+export interface DXLinkIndiChartIndicatorsData {
+  readonly [indicatorName: string]: DXLinkIndiChartCalculationResult
+}
+
+// New message type for candle snapshots
+export interface DXLinkIndiChartCandleSnapshotMessage {
+  readonly type: 'INDICHART_CANDLE_SNAPSHOT'
+  readonly reset: boolean
+  readonly pending: boolean
+  readonly candles: DXLinkIndiChartCandle[]
+}
+
+// New message type for indicator snapshots
+export interface DXLinkIndiChartIndicatorsSnapshotMessage {
+  readonly type: 'INDICHART_INDICATORS_SNAPSHOT'
+  readonly pending: boolean
+  readonly indicators: DXLinkIndiChartIndicatorsData
+}
+
+// Message type for data updates (no reset flag - reset is only in INDICHART_CANDLE_SNAPSHOT)
+export interface DXLinkIndiChartUpdateMessage {
+  readonly type: 'INDICHART_UPDATE'
+  readonly pending: boolean
   readonly candles: DXLinkIndiChartCandle[]
   readonly indicators: DXLinkIndiChartIndicatorsData
 }
 
-export interface DXLinkIndiChartIndicatorsRemoveMessage {
-  readonly type: 'INDICHART_INDICATORS_REMOVE'
+// Renamed from INDICHART_INDICATORS_REMOVE to INDICHART_REMOVE_INDICATORS
+export interface DXLinkIndiChartRemoveIndicatorsMessage {
+  readonly type: 'INDICHART_REMOVE_INDICATORS'
   readonly indicators: string[]
 }
 
 export type ChartInboundMessage =
   | DXLinkIndiChartIndicatorsMessage
   | DXLinkIndiChartConfigMessage
-  | DXLinkIndiChartDataMessage
+  | DXLinkIndiChartUpdateMessage
+  | DXLinkIndiChartCandleSnapshotMessage
+  | DXLinkIndiChartIndicatorsSnapshotMessage
 
 export type ChartOutboundMessage =
   | DXLinkIndiChartSubscriptionMessage
   | DXLinkIndiChartSetupMessage
-  | DXLinkIndiChartIndicatorsRemoveMessage
+  | DXLinkIndiChartRemoveIndicatorsMessage
 
 export const isChartInboundMessage = (
   message: DXLinkChannelMessage
 ): message is ChartInboundMessage =>
-  message.type === 'INDICHART_DATA' ||
+  message.type === 'INDICHART_UPDATE' ||
   message.type === 'INDICHART_INDICATORS' ||
-  message.type === 'INDICHART_CONFIG'
+  message.type === 'INDICHART_CONFIG' ||
+  message.type === 'INDICHART_CANDLE_SNAPSHOT' ||
+  message.type === 'INDICHART_INDICATORS_SNAPSHOT'

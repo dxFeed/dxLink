@@ -14,7 +14,9 @@ import {
   isChartInboundMessage,
   type DXLinkIndiChartCandle,
   type DXLinkIndiChartConfig,
-  type DXLinkIndiChartDataMessage,
+  type DXLinkIndiChartUpdateMessage,
+  type DXLinkIndiChartCandleSnapshotMessage,
+  type DXLinkIndiChartIndicatorsSnapshotMessage,
   type DXLinkIndiChartIndicators,
   type DXLinkIndiChartIndicatorsParameters,
   type DXLinkIndiChartIndicatorsData,
@@ -25,10 +27,23 @@ import {
   type DXLinkIndiChartIndicatorsStates,
 } from './messages'
 
-export type DXLinkIndiChartDataListener = (
+// Listener for data updates (INDICHART_UPDATE) - no reset flag, reset is only in INDICHART_CANDLE_SNAPSHOT
+export type DXLinkIndiChartUpdateListener = (
   candles: DXLinkIndiChartCandle[],
   indicators: DXLinkIndiChartIndicatorsData,
+  pending: boolean
+) => void
+
+// Listener for candle snapshots (INDICHART_CANDLE_SNAPSHOT)
+export type DXLinkIndiChartCandleSnapshotListener = (
+  candles: DXLinkIndiChartCandle[],
   reset: boolean,
+  pending: boolean
+) => void
+
+// Listener for indicator snapshots (INDICHART_INDICATORS_SNAPSHOT)
+export type DXLinkIndiChartIndicatorsSnapshotListener = (
+  indicators: DXLinkIndiChartIndicatorsData,
   pending: boolean
 ) => void
 
@@ -71,13 +86,31 @@ export interface DXLinkIndiChartRequester {
   getIndicators(): DXLinkIndiChartIndicatorsStates | null
 
   /**
-   * Add a listener for the Chart channel events received from the channel.
+   * Add a listener for the Chart data updates (INDICHART_UPDATE).
    */
-  addDataListener(listener: DXLinkIndiChartDataListener): void
+  addUpdateListener(listener: DXLinkIndiChartUpdateListener): void
   /**
-   * Remove a listener for the Chart channel events received from the channel.
+   * Remove a listener for the Chart data updates.
    */
-  removeDataListener(listener: DXLinkIndiChartDataListener): void
+  removeUpdateListener(listener: DXLinkIndiChartUpdateListener): void
+
+  /**
+   * Add a listener for the Chart candle snapshots (INDICHART_CANDLE_SNAPSHOT).
+   */
+  addCandleSnapshotListener(listener: DXLinkIndiChartCandleSnapshotListener): void
+  /**
+   * Remove a listener for the Chart candle snapshots.
+   */
+  removeCandleSnapshotListener(listener: DXLinkIndiChartCandleSnapshotListener): void
+
+  /**
+   * Add a listener for the Chart indicator snapshots (INDICHART_INDICATORS_SNAPSHOT).
+   */
+  addIndicatorsSnapshotListener(listener: DXLinkIndiChartIndicatorsSnapshotListener): void
+  /**
+   * Remove a listener for the Chart indicator snapshots.
+   */
+  removeIndicatorsSnapshotListener(listener: DXLinkIndiChartIndicatorsSnapshotListener): void
 
   /**
    * Add a listener for the Chart indicators state changes received from the channel.
@@ -115,7 +148,9 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
    */
   public readonly id: number
 
-  private readonly dataListeners = new Set<DXLinkIndiChartDataListener>()
+  private readonly updateListeners = new Set<DXLinkIndiChartUpdateListener>()
+  private readonly candleSnapshotListeners = new Set<DXLinkIndiChartCandleSnapshotListener>()
+  private readonly indicatorsSnapshotListeners = new Set<DXLinkIndiChartIndicatorsSnapshotListener>()
   private readonly indicatorsStateListeners = new Set<DXLinkIndiChartIndicatorsStateListener>()
 
   private readonly logger: DXLinkLogger
@@ -172,7 +207,9 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
 
   close = () => {
     this.lastSetup = null
-    this.dataListeners.clear()
+    this.updateListeners.clear()
+    this.candleSnapshotListeners.clear()
+    this.indicatorsSnapshotListeners.clear()
 
     this.channel.close()
   }
@@ -203,11 +240,25 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
     })
   }
 
-  addDataListener = (listener: DXLinkIndiChartDataListener) => {
-    this.dataListeners.add(listener)
+  addUpdateListener = (listener: DXLinkIndiChartUpdateListener) => {
+    this.updateListeners.add(listener)
   }
-  removeDataListener = (listener: DXLinkIndiChartDataListener) => {
-    this.dataListeners.delete(listener)
+  removeUpdateListener = (listener: DXLinkIndiChartUpdateListener) => {
+    this.updateListeners.delete(listener)
+  }
+
+  addCandleSnapshotListener = (listener: DXLinkIndiChartCandleSnapshotListener) => {
+    this.candleSnapshotListeners.add(listener)
+  }
+  removeCandleSnapshotListener = (listener: DXLinkIndiChartCandleSnapshotListener) => {
+    this.candleSnapshotListeners.delete(listener)
+  }
+
+  addIndicatorsSnapshotListener = (listener: DXLinkIndiChartIndicatorsSnapshotListener) => {
+    this.indicatorsSnapshotListeners.add(listener)
+  }
+  removeIndicatorsSnapshotListener = (listener: DXLinkIndiChartIndicatorsSnapshotListener) => {
+    this.indicatorsSnapshotListeners.delete(listener)
   }
 
   /**
@@ -217,9 +268,12 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
     // Parse message
     if (isChartInboundMessage(message)) {
       switch (message.type) {
-        case 'INDICHART_DATA':
-          this.processData(message)
-          return
+        case 'INDICHART_UPDATE':
+          return this.processUpdate(message)
+        case 'INDICHART_CANDLE_SNAPSHOT':
+          return this.processCandleSnapshot(message)
+        case 'INDICHART_INDICATORS_SNAPSHOT':
+          return this.processIndicatorsSnapshot(message)
         case 'INDICHART_CONFIG': {
           this.lastConfig = message
           return
@@ -243,17 +297,43 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
   }
 
   /**
-   * Process data received from the channel.
+   * Process data updates received from the channel.
    */
-  private processData = (message: DXLinkIndiChartDataMessage) => {
-    // Notify listeners
-    for (const listener of this.dataListeners) {
+  private processUpdate = (message: DXLinkIndiChartUpdateMessage) => {
+    for (const listener of this.updateListeners) {
       try {
-        const { reset, pending, candles, indicators } = message
-
-        listener(candles, indicators, Boolean(reset), Boolean(pending))
+        const { pending, candles, indicators } = message
+        listener(candles, indicators, Boolean(pending))
       } catch (error) {
-        this.logger.error('Error in data listener', error)
+        this.logger.error('Error in update listener', error)
+      }
+    }
+  }
+
+  /**
+   * Process candle snapshot received from the channel.
+   */
+  private processCandleSnapshot = (message: DXLinkIndiChartCandleSnapshotMessage) => {
+    for (const listener of this.candleSnapshotListeners) {
+      try {
+        const { reset, pending, candles } = message
+        listener(candles, Boolean(reset), Boolean(pending))
+      } catch (error) {
+        this.logger.error('Error in candle snapshot listener', error)
+      }
+    }
+  }
+
+  /**
+   * Process indicators snapshot received from the channel.
+   */
+  private processIndicatorsSnapshot = (message: DXLinkIndiChartIndicatorsSnapshotMessage) => {
+    for (const listener of this.indicatorsSnapshotListeners) {
+      try {
+        const { pending, indicators } = message
+        listener(indicators, Boolean(pending))
+      } catch (error) {
+        this.logger.error('Error in indicators snapshot listener', error)
       }
     }
   }

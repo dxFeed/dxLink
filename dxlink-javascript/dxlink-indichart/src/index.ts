@@ -1,6 +1,8 @@
 export {
   DXLinkIndiChart,
-  type DXLinkIndiChartDataListener,
+  type DXLinkIndiChartUpdateListener,
+  type DXLinkIndiChartCandleSnapshotListener,
+  type DXLinkIndiChartIndicatorsSnapshotListener,
   type DXLinkIndiChartRequester,
   type DXLinkIndiChartOptions,
 } from './chart'
@@ -14,10 +16,15 @@ export {
   type DXLinkIndiChartIndicator,
   type DXLinkIndiChartIndicatorsParameters,
   type DXLinkIndiChartIndicatorsData,
-  type DXLinkIndiChartIndicatorsDataValue,
+  type DXLinkIndiChartCalculationResult,
+  type DXLinkIndiChartSplinePoint,
+  type DXLinkIndiChartColor,
   type DXLinkIndiChartIndicatorsStates,
   type DXLinkIndiChartIndicatorState,
   type DXLinkIndiChartIndicatorEnabled,
   type DXLinkIndiChartIndicatorDisabled,
   type DXLinkIndiChartIndicatorParameterMeta,
+  type DXLinkIndiChartUpdateMessage,
+  type DXLinkIndiChartCandleSnapshotMessage,
+  type DXLinkIndiChartIndicatorsSnapshotMessage,
 } from './messages'

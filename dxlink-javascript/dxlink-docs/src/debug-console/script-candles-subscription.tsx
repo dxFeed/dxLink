@@ -15,8 +15,7 @@ import { useState } from 'react'
 import AceEditor from 'react-ace'
 import styled from 'styled-components'
 
-import { DxScriptMode } from './ace-dxscript-mode'
-import { DxScriptIcon, ErrorIcon, JSIcon } from './icons'
+import { ErrorIcon, JSIcon } from './icons'
 import {
   INDICHART_INDICATOR_EXAMPLES,
   INDICHART_INDICATROS,
@@ -24,7 +23,9 @@ import {
 } from './indichart-indicators'
 import { ContentTemplate } from '../common/content-template'
 import 'ace-builds/src-noconflict/mode-python'
+import 'ace-builds/src-noconflict/mode-javascript'
 import 'ace-builds/src-noconflict/theme-textmate'
+import './ace-dxscript-mode'
 
 const FieldsGroup = styled.div`
   display: grid;
@@ -106,12 +107,6 @@ const ErrorButton = styled(IconButton)`
   color: ${({ theme }) => theme.palette.red.main};
 `
 
-const DxScriptLogo = styled(DxScriptIcon)`
-  width: 16px;
-  height: 16px;
-  margin-right: 2px;
-`
-
 const JSLogo = styled(JSIcon)`
   width: 16px;
   height: 16px;
@@ -136,27 +131,6 @@ export interface ScriptCandlesSubscriptionProps {
   onReset(): void
 }
 
-const mode = new DxScriptMode()
-
-const LANGS = [
-  {
-    id: 'dxScript' as Lang,
-    label: (
-      <>
-        <DxScriptLogo /> dxScript
-      </>
-    ),
-  },
-  {
-    id: 'js' as Lang,
-    label: (
-      <>
-        <JSLogo /> JavaScript
-      </>
-    ),
-  },
-] as const
-
 export function ScriptCandlesSubscription({
   onSet,
   onReset,
@@ -166,8 +140,8 @@ export function ScriptCandlesSubscription({
   const [fromTime, setFromTime] = useState('0')
 
   const [exampleId, setExampleId] = useState<string>(INDICHART_INDICATOR_EXAMPLES[0]!.id)
-  const [lang, setLang] = useState<Lang>('dxScript')
-  const [script, setScript] = useState<string>(INDICHART_INDICATROS[lang][exampleId]!)
+  const lang: Lang = 'js'
+  const [script, setScript] = useState<string>(INDICHART_INDICATROS[lang]?.[exampleId] ?? '')
   const [search, setSearch] = useState('')
 
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
@@ -231,19 +205,9 @@ export function ScriptCandlesSubscription({
 
         <TopPanel>
           <LangWrapper>
-            {LANGS.map((item) => (
-              <LangButton
-                key={item.id}
-                onPressedChange={() => {
-                  const lang = item.id
-                  setScript(INDICHART_INDICATROS[lang][exampleId] ?? '')
-                  setLang(item.id)
-                }}
-                pressed={item.id === lang}
-              >
-                {item.label}
-              </LangButton>
-            ))}
+            <LangButton pressed={true}>
+              <JSLogo /> JavaScript
+            </LangButton>
           </LangWrapper>
           <ErrorWrapper>
             {error && (
@@ -261,7 +225,7 @@ export function ScriptCandlesSubscription({
           <CodeEditorInput>
             <AceEditor
               placeholder="Script code"
-              mode={lang === 'dxScript' ? mode : 'javascript'}
+              mode="dxscript"
               theme="textmate"
               name="script-code"
               onChange={(value) => setScript(value)}
@@ -278,7 +242,7 @@ export function ScriptCandlesSubscription({
                 enableLiveAutocompletion: true,
                 enableSnippets: false,
                 showLineNumbers: true,
-                tabSize: 2,
+                tabSize: 1,
               }}
             />
           </CodeEditorInput>
@@ -306,7 +270,7 @@ export function ScriptCandlesSubscription({
                     onClick={() => {
                       setAnchorEl(null)
                       setExampleId(example.id)
-                      setScript(INDICHART_INDICATROS[lang][example.id] ?? '')
+                      setScript(INDICHART_INDICATROS[lang]?.[example.id] ?? '')
                     }}
                     key={example.id}
                   >

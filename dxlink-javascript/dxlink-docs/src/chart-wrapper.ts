@@ -12,10 +12,16 @@ import {
 
 import type { ChannelInfo } from './debug-console/channel-widget'
 
+// Type of data notification:
+// - 'candles': snapshot of candles only (draw candles immediately)
+// - 'indicators': snapshot of indicators (draw indicators after candles)
+// - 'update': regular data update (update both candles and indicators)
+export type ChartDataType = 'candles' | 'indicators' | 'update'
+
 export type ChartHolderListener = (
   candles: DXLinkIndiChartCandle[],
   indicators: DXLinkIndiChartIndicatorsData[],
-  snapshot: boolean
+  dataType: ChartDataType
 ) => void
 
 export class ChartHolder implements ChannelInfo {
@@ -29,6 +35,12 @@ export class ChartHolder implements ChannelInfo {
 
   private pendingCandles: DXLinkIndiChartCandle[] = []
   private pendingIndicators: DXLinkIndiChartIndicatorsData[] = []
+
+  // Store candles after snapshot for use with indicators
+  private snapshotCandles: DXLinkIndiChartCandle[] = []
+
+  // Track whether we're in snapshot mode and candles have been sent
+  private candlesSnapshotSent: boolean = false
 
   private errorListeners: DXLinkErrorListener[] = []
   private stateListeners: DXLinkChannelStateChangeListener[] = []
@@ -95,11 +107,58 @@ export class ChartHolder implements ChannelInfo {
       }
 
       if (!indi.enabled) {
-        errorListener(indi.error ?? 'Unknown error')
+        if (indi.internalErrorMessage !== undefined) {
+          errorListener(`Internal Error: ${indi.internalErrorMessage}`)
+          return
+        }
+
+        if (indi.scriptError) {
+          let type = indi.scriptError.type
+          let error = indi.scriptError
+          switch (type) {
+            case 'SYNTAX':
+              errorListener(`Syntax Error in script '${error.scriptName}' at line ${error.startLine}, column ${error.startColumn}: ${error.message}`)
+              break
+            case 'RUNTIME': {
+              let errorMessage = `Runtime Error in ${error.scriptName} script at line ${error.startLine}, column ${error.startColumn}: ${error.message}.`
+              if (error.scriptStack.length > 0) {
+                errorMessage += '\nStack trace:\n'
+                for (const frame of error.scriptStack) {
+                  errorMessage += `  at ${frame.functionName} (line ${frame.line}, column ${frame.column})\n`
+                }
+              }
+              errorListener(errorMessage)
+              break
+            }
+            case 'TIMEOUT':
+              errorListener(`Script execution timed out`)
+              break
+            case 'LIMIT':
+              errorListener(`Script exceeded resource limits`)
+              break
+            case 'CANCELLED':
+              errorListener(`Script execution was cancelled`)
+              break
+            case 'UNKNOWN':
+              errorListener(`Unknown script error: ${error.message}`)
+              break
+            default:
+              errorListener(`Unknown error in script`)
+              break
+          }
+        } else {
+          errorListener('Unknown error in script')
+        }
       }
     })
 
-    chart.addDataListener(this.dataListener)
+    // Listen to candle snapshots
+    chart.addCandleSnapshotListener(this.candleSnapshotListener)
+    // Listen to indicator snapshots
+    chart.addIndicatorsSnapshotListener(this.indicatorsSnapshotListener)
+    // Listen to data updates
+    chart.addUpdateListener(this.updateListener)
+
     chart.setSubscription(subscription, {})
 
     this.chart = chart
@@ -124,7 +183,9 @@ export class ChartHolder implements ChannelInfo {
     if (chart !== null) {
       this.errorListeners.forEach((l) => chart.getChannel().removeErrorListener(l))
       this.stateListeners.forEach((l) => chart.getChannel().removeStateChangeListener(l))
-      chart.removeDataListener(this.dataListener)
+      chart.removeCandleSnapshotListener(this.candleSnapshotListener)
+      chart.removeIndicatorsSnapshotListener(this.indicatorsSnapshotListener)
+      chart.removeUpdateListener(this.updateListener)
       chart.close()
       this.listener = null
     }
@@ -132,6 +193,8 @@ export class ChartHolder implements ChannelInfo {
     this.snapshot = false
     this.pendingCandles = []
     this.pendingIndicators = []
+    this.snapshotCandles = []
+    this.candlesSnapshotSent = false
   }
 
   close = () => {
@@ -142,17 +205,62 @@ export class ChartHolder implements ChannelInfo {
     this.stateListeners.forEach((l) => l(DXLinkChannelState.CLOSED, DXLinkChannelState.CLOSED))
   }
 
-  private dataListener = (
+  // Handle candle snapshots (INDICHART_SNAPSHOT_CANDLE)
+  private candleSnapshotListener = (
     candles: DXLinkIndiChartCandle[],
-    indicators: DXLinkIndiChartIndicatorsData,
     reset: boolean,
     pending: boolean
   ) => {
     if (reset) {
       this.snapshot = true
+      this.pendingCandles = []
+      this.pendingIndicators = []
+      this.snapshotCandles = []
+      this.candlesSnapshotSent = false
     }
 
-    // add candles to pending at the end
+    this.pendingCandles.push(...candles)
+
+    // When candles are ready (pending becomes false), notify immediately
+    if (!pending && this.snapshot && !this.candlesSnapshotSent) {
+      this.candlesSnapshotSent = true
+      // Store candles for later use with indicators
+      this.snapshotCandles = [...this.pendingCandles]
+
+      if (this.listener !== null && this.pendingCandles.length > 0) {
+        // Notify with candles only (no indicators yet)
+        this.listener(this.pendingCandles, [], 'candles')
+        this.pendingCandles = []
+      }
+    }
+  }
+
+  // Handle indicator snapshots (INDICHART_INDICATORS_SNAPSHOT)
+  private indicatorsSnapshotListener = (
+    indicators: DXLinkIndiChartIndicatorsData,
+    pending: boolean
+  ) => {
+    this.pendingIndicators.push(indicators)
+
+    // When indicators are ready (pending becomes false), notify with indicators
+    if (!pending && this.snapshot && this.candlesSnapshotSent) {
+      if (this.listener !== null && this.pendingIndicators.length > 0) {
+        // Notify with stored candles (for timestamp mapping) + indicators
+        this.listener(this.snapshotCandles, this.pendingIndicators, 'indicators')
+        this.pendingIndicators = []
+        this.snapshot = false
+        this.snapshotCandles = []
+        this.candlesSnapshotSent = false
+      }
+    }
+  }
+
+  // Handle data updates (INDICHART_UPDATE) - no reset flag, reset is only in INDICHART_CANDLE_SNAPSHOT
+  private updateListener = (
+    candles: DXLinkIndiChartCandle[],
+    indicators: DXLinkIndiChartIndicatorsData,
+    pending: boolean
+  ) => {
     this.pendingCandles.push(...candles)
     this.pendingIndicators.push(indicators)
 
@@ -160,12 +268,11 @@ export class ChartHolder implements ChannelInfo {
       return
     }
 
-    if (this.listener !== null) {
-      this.listener(this.pendingCandles, this.pendingIndicators, this.snapshot)
-
+    // Notify as update
+    if (this.listener !== null && this.pendingCandles.length > 0) {
+      this.listener(this.pendingCandles, this.pendingIndicators, 'update')
       this.pendingCandles = []
       this.pendingIndicators = []
-      this.snapshot = false
     }
   }
 }

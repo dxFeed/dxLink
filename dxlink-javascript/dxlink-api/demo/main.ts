@@ -71,8 +71,12 @@ async function startIndichart() {
 
   const indicators: DXLinkIndiChartIndicators = {
     indicator1: {
-      lang: 'dxScript',
-      content: 'in depth = 14; out avg = sma(close, depth)',
+      lang: 'js',
+      content:
+          `function onTick() {
+            const sma = ta.sma(close, input.double("length", 20));
+            spline(sma, {title: "SMA"});
+          }`,
     },
   }
 
@@ -83,9 +87,9 @@ async function startIndichart() {
     console.log('Indicators State', indicators)
   })
 
-  indichart.addDataListener((candles, indicators, reset, pending) => {
+  indichart.addUpdateListener((candles, indicators, pending) => {
     // your buisness logic here
-    console.log('Chart Data', indichart.getSubscription(), candles, indicators, reset, pending)
+    console.log('Chart Data', indichart.getSubscription(), candles, indicators, pending)
   })
 
   indichart.setSubscription(
