@@ -1,19 +1,23 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
-import type {
-  DXLinkIndiChartCandle,
-  DXLinkIndiChartIndicator,
-  DXLinkIndiChartIndicatorsData,
-  DXLinkIndiChartSubscription,
+import {
+  DXLinkChannelState,
+  type DXLinkIndiChartCandle,
+  type DXLinkIndiChartIndicator,
+  type DXLinkIndiChartIndicatorParameterMeta,
+  type DXLinkIndiChartIndicatorsData,
+  type DXLinkIndiChartSubscription,
 } from '@dxfeed/dxlink-api'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { candleChartColors } from './candles-chart'
+import { ParameterFieldContainer } from './parameter-field-container'
 import { ScriptCandlesSubscription } from './script-candles-subscription'
 import { SortedList } from '../candles/sorted-list'
 import type { ChartDataType, ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'
+import type { DXLinkIndiChartSubscriptionMessage } from '../../../dxlink-indichart/build/messages'
 
 const ChartContainer = styled.div`
   width: 100%;
@@ -160,6 +164,7 @@ const processIndicators = (
 export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelManagerProps) {
   const [available, setAvailable] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
+  const [inParameters, setInParameters] = useState<DXLinkIndiChartIndicatorParameterMeta[]>([])
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<Chart>()
   const seriesMetadataRef = useRef<Record<string, SeriesMetadata>>({})
@@ -333,12 +338,18 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
       (candles, indicators, dataType) => {
         handleDataUpdate(candles, indicators, dataType, chartRef.current!)
       },
+      (params) => setInParameters(params),
       setError
     )
   }
 
+  const handleOnApply = (values: Record<string, any>) => {
+    channel.getChart()?.updateIndicatorsParameters({ current: values })
+  }
+
   const handleReset = () => {
     channel.clear()
+    setInParameters([])
     setAvailable(false)
   }
 
@@ -347,6 +358,14 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
       <Group>
         <ScriptCandlesSubscription onSet={handleSet} onReset={handleReset} error={error} />{' '}
       </Group>
+
+      {(inParameters.length > 0 && available) && (
+        <ContentTemplate title={'Input Parameters'}>
+          <ParameterFieldContainer parameters={inParameters} onApply={handleOnApply} />
+        </ContentTemplate>
+      )}
+
+      {inParameters.length > 0 && <div style={{ height: '16px' }} />}
 
       <ChartGroup available={available}>
         <ContentTemplate title={'Chart'}>

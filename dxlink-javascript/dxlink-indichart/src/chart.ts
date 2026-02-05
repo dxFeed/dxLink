@@ -380,4 +380,27 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
       } satisfies DXLinkIndiChartSetupMessage)
     }
   }
+
+  /**
+   * Updates the indicators parameters without changing the subscription.
+   * @param indicatorsParameters New indicators parameters.
+   */
+  public updateIndicatorsParameters = (indicatorsParameters: Record<string, any>) => {
+    console.log("Updating indi params", indicatorsParameters)
+    if (this.lastSubscriptionState) {
+      this.lastSubscriptionState = {
+        ...this.lastSubscriptionState,
+        indicatorsParameters,
+      }
+
+      if (this.channel.getState() === DXLinkChannelState.OPENED) {
+        this.channel.send({
+          type: 'INDICHART_SUBSCRIPTION',
+          ...this.lastSubscriptionState,
+        } satisfies DXLinkIndiChartSubscriptionMessage)
+      }
+    } else {
+      this.logger.warn('Cannot update indicators parameters, subscription is not set')
+    }
+  }
 }
