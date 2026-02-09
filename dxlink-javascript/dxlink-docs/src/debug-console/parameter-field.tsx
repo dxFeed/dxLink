@@ -144,7 +144,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             <ColorField
               type="color"
               value={value}
-              onChange={(e) => handleChange(e.target.value)}
+              onChange={(e) => handleChange(e.target.value.slice(0, 7))}
             />
           </div>
         )

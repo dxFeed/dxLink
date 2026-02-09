@@ -1,6 +1,6 @@
 import { Button } from '@dxfeed/ui-kit/Button'
 import { unit } from '@dxfeed/ui-kit/utils'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { DXLinkIndiChartIndicatorParameterMeta } from '@dxfeed/dxlink-api'
@@ -39,7 +39,7 @@ const COLOR_MAP: Record<string, string> = {
 function getColorValue(value: any): string {
   if (typeof value === 'string') {
     if (value.startsWith('#')) {
-      return value
+      return value.slice(0, 7)
     }
     // If it's a named color, look it up
     return COLOR_MAP[value.toUpperCase()] || '#000000'
@@ -48,6 +48,9 @@ function getColorValue(value: any): string {
   if (value && typeof value === 'object' && 'value' in value) {
     const colorName = value.value
     if (typeof colorName === 'string') {
+      if (colorName.startsWith('#')) {
+        return colorName.slice(0, 7)
+      }
       return COLOR_MAP[colorName.toUpperCase()] || '#000000'
     }
   }
@@ -79,8 +82,8 @@ interface ParameterFieldContainerProps {
 }
 
 export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldContainerProps) {
-  const [values, setValues] = useState<Record<string, any>>(() =>
-    parameters.reduce((acc, param) => {
+  const initialValues = useMemo(() => {
+    return parameters.reduce((acc, param) => {
       let initialValue: any
 
       if (param.type === 'COLOR') {
@@ -89,11 +92,16 @@ export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldC
         initialValue = param.value ?? param.defaultValue ?? (param.type === 'BOOL' ? false : '')
       }
 
-      // COLOR values are always strings
       acc[param.name] = initialValue
       return acc
     }, {} as Record<string, any>)
-  )
+  }, [parameters])
+
+  const [values, setValues] = useState<Record<string, any>>({})
+
+  useEffect(() => {
+    setValues(initialValues)
+  }, [initialValues])
 
   const handleApply = () => {
     onApply?.(values)
@@ -106,7 +114,7 @@ export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldC
           <ParameterField
             key={param.name}
             parameter={param}
-            value={values[param.name]}
+            value={values[param.name] ?? initialValues[param.name]}
             onChange={(newValue) => setValues(prev => ({ ...prev, [param.name]: newValue }))}
           />
         ))}
