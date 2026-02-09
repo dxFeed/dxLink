@@ -65,7 +65,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
               </label>
               <SelectField
                 value={value}
-                onChange={(e) => handleChange(parseFloat(e.target.value))}
+                onChange={(e) => handleChange(Number.parseFloat(e.target.value))}
               >
                 {parameter.options.map((option) => (
                   <option key={option} value={option}>
@@ -80,6 +80,10 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
           <TextField
             {...commonProps}
             type="number"
+            onChange={(e) => {
+              const num = Number.parseFloat(e.target.value)
+              handleChange(Number.isNaN(num) ? 0 : num)
+            }}
           />
         )
       case 'BOOL':

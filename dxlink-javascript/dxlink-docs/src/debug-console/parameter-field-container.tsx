@@ -86,10 +86,15 @@ export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldC
     return parameters.reduce((acc, param) => {
       let initialValue: any
 
-      if (param.type === 'COLOR') {
+      if (param.type === 'DOUBLE') {
+        const val = param.value ?? param.defaultValue ?? 0
+        initialValue = typeof val === 'number' ? val : Number.parseFloat(val) || 0
+      } else if (param.type === 'BOOL') {
+        initialValue = param.value ?? param.defaultValue ?? false
+      } else if (param.type === 'COLOR') {
         initialValue = getColorValue(param.value ?? param.defaultValue)
       } else {
-        initialValue = param.value ?? param.defaultValue ?? (param.type === 'BOOL' ? false : '')
+        initialValue = param.value ?? param.defaultValue ?? ''
       }
 
       acc[param.name] = initialValue
