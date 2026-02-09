@@ -65,9 +65,10 @@ const Container = styled.div`
 `
 
 const FieldsGrid = styled.div`
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: ${unit(1)};
+  align-items: start;
 `
 
 const Actions = styled.div`

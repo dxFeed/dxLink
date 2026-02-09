@@ -88,17 +88,28 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
         )
       case 'BOOL':
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '100%' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#333'
+            }}>
+              {parameter.name}
+            </label>
             <input
               id={`checkbox-${parameter.name}`}
               type="checkbox"
               checked={value}
               onChange={(e: any) => handleChange(e.target.checked)}
-              style={{ margin: 0 }}
+              style={{
+                width: '20px',
+                height: '20px',
+                cursor: 'pointer',
+                accentColor: '#007acc' // or theme color
+              }}
             />
-            <label htmlFor={`checkbox-${parameter.name}`} style={{ cursor: 'pointer' }}>
-              {parameter.name}
-            </label>
           </div>
         )
       case 'STRING':
@@ -135,46 +146,50 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
         )
       case 'COLOR':
         return (
-          <div style={{ width: '100%' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#333'
-            }}>
-              {parameter.name}
-            </label>
-            <ColorField
-              type="color"
-              value={value}
-              onChange={(e) => handleChange(e.target.value.slice(0, 7))}
-            />
+          <div style={{ gridColumn: 'span 2' }}>
+            <div style={{ width: '100%' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#333'
+              }}>
+                {parameter.name}
+              </label>
+              <ColorField
+                type="color"
+                value={value}
+                onChange={(e) => handleChange(e.target.value.slice(0, 7))}
+              />
+            </div>
           </div>
         )
       case 'SOURCE':
         const sourceOptions = parameter.options || ['open', 'high', 'low', 'close', 'volume']
         return (
-          <div style={{ width: '100%' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#333'
-            }}>
-              {parameter.name}
-            </label>
-            <SelectField
-              value={value}
-              onChange={(e) => handleChange(e.target.value)}
-            >
-              {sourceOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </SelectField>
+          <div style={{ gridColumn: 'span 2' }}>
+            <div style={{ width: '100%' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#333'
+              }}>
+                {parameter.name}
+              </label>
+              <SelectField
+                value={value}
+                onChange={(e) => handleChange(e.target.value)}
+              >
+                {sourceOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
           </div>
         )
       case 'SESSION':
