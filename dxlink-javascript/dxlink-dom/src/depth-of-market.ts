@@ -166,6 +166,10 @@ export interface DXLinkDepthOfMarketOptions {
    * Log level for the DepthOfMarket.
    */
   logLevel: DXLinkLogLevel
+  /**
+   * Space to be used for the DOM channel.
+   */
+  space?: string
 }
 
 const DEPTH_OF_MARKET_SERVICE_NAME = 'DOM'
@@ -231,6 +235,7 @@ export class DXLinkDepthOfMarket implements DXLinkDepthOfMarketRequester {
     this.channel = client.openChannel(DEPTH_OF_MARKET_SERVICE_NAME, {
       symbol: parameters.symbol,
       sources: parameters.sources,
+      space: options.space,
     })
     this.id = this.channel.id
     this.symbol = parameters.symbol
