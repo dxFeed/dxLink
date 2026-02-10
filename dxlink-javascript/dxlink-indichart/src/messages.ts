@@ -32,6 +32,9 @@ export interface DXLinkIndiChartIndicatorParameterMeta {
   readonly defaultValue: any
   readonly value?: any
   readonly options?: string[]
+  readonly min?: number
+  readonly max?: number
+  readonly step?: number
 }
 
 export interface DXLinkIndiChartIndicatorEnabled {

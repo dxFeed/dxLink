@@ -44,7 +44,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
   const renderField = () => {
     const commonProps = {
       label: parameter.name,
-      value,
+      value: value.toString(),
       onChange: (e: any) => handleChange(e.target.value),
     }
 
@@ -53,14 +53,15 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
         if (parameter.options && parameter.options.length > 0) {
           // Dropdown for predefined double values
           return (
-            <div style={{ width: '100%' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#333'
-              }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label
+                style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#333',
+                  margin: 0,
+                }}
+              >
                 {parameter.name}
               </label>
               <SelectField
@@ -80,6 +81,9 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
           <TextField
             {...commonProps}
             type="number"
+            min={parameter.min}
+            max={parameter.max}
+            step={parameter.step}
             onChange={(e) => {
               const num = Number.parseFloat(e.target.value)
               handleChange(Number.isNaN(num) ? 0 : num)
@@ -88,14 +92,15 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
         )
       case 'BOOL':
         return (
-          <div style={{ width: '100%' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#333'
-            }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label
+              style={{
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#333',
+                margin: 0,
+              }}
+            >
               {parameter.name}
             </label>
             <input
@@ -107,7 +112,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
                 width: '20px',
                 height: '20px',
                 cursor: 'pointer',
-                accentColor: '#007acc' // or theme color
+                accentColor: '#007acc',
               }}
             />
           </div>
@@ -116,20 +121,18 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
         if (parameter.options && parameter.options.length > 0) {
           // Dropdown for string options
           return (
-            <div style={{ width: '100%' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#333'
-              }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label
+                style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#333',
+                  margin: 0,
+                }}
+              >
                 {parameter.name}
               </label>
-              <SelectField
-                value={value}
-                onChange={(e) => handleChange(e.target.value)}
-              >
+              <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
                 {parameter.options.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -139,77 +142,66 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             </div>
           )
         }
-        return (
-          <TextField
-            {...commonProps}
-          />
-        )
+        return <TextField {...commonProps} />
       case 'COLOR':
         return (
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={{ width: '100%' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
+          <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label
+              style={{
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#333'
-              }}>
-                {parameter.name}
-              </label>
-              <ColorField
-                type="color"
-                value={value}
-                onChange={(e) => handleChange(e.target.value.slice(0, 7))}
-              />
-            </div>
+                color: '#333',
+                margin: 0,
+              }}
+            >
+              {parameter.name}
+            </label>
+            <ColorField
+              type="color"
+              value={value}
+              onChange={(e) => handleChange(e.target.value.slice(0, 7))}
+            />
           </div>
         )
       case 'SOURCE':
         const sourceOptions = parameter.options || ['open', 'high', 'low', 'close', 'volume']
         return (
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={{ width: '100%' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
+          <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label
+              style={{
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#333'
-              }}>
-                {parameter.name}
-              </label>
-              <SelectField
-                value={value}
-                onChange={(e) => handleChange(e.target.value)}
-              >
-                {sourceOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
+                color: '#333',
+                margin: 0,
+              }}
+            >
+              {parameter.name}
+            </label>
+            <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
+              {sourceOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </SelectField>
           </div>
         )
       case 'SESSION':
         if (parameter.options && parameter.options.length > 0) {
           // Dropdown for predefined sessions
           return (
-            <div style={{ width: '100%' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#333'
-              }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label
+                style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#333',
+                  margin: 0,
+                }}
+              >
                 {parameter.name}
               </label>
-              <SelectField
-                value={value}
-                onChange={(e) => handleChange(e.target.value)}
-              >
+              <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
                 {parameter.options.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -219,31 +211,24 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             </div>
           )
         }
-        return (
-          <TextField
-            {...commonProps}
-            placeholder="e.g., 0930-1600:12345"
-          />
-        )
+        return <TextField {...commonProps} placeholder="e.g., 0930-1600:12345" />
       case 'MAP':
         // For MAP type, we'll assume options contains the mapping keys
         // In a real implementation, there might be a separate mapping property
         if (parameter.options && parameter.options.length > 0) {
           return (
-            <div style={{ width: '200px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#333'
-              }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label
+                style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#333',
+                  margin: 0,
+                }}
+              >
                 {parameter.name}
               </label>
-              <SelectField
-                value={value}
-                onChange={(e) => handleChange(e.target.value)}
-              >
+              <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
                 {parameter.options.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -253,17 +238,9 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             </div>
           )
         }
-        return (
-          <TextField
-            {...commonProps}
-          />
-        )
+        return <TextField {...commonProps} />
       default:
-        return (
-          <TextField
-            {...commonProps}
-          />
-        )
+        return <TextField {...commonProps} />
     }
   }
 

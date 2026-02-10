@@ -116,14 +116,20 @@ export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldC
   return (
     <Container>
       <FieldsGrid>
-        {parameters.map((param) => (
-          <ParameterField
-            key={param.name}
-            parameter={param}
-            value={values[param.name] ?? initialValues[param.name]}
-            onChange={(newValue) => setValues(prev => ({ ...prev, [param.name]: newValue }))}
-          />
-        ))}
+        {[...parameters]
+          .sort((a, b) => {
+            if (a.type === 'BOOL' && b.type !== 'BOOL') return 1
+            if (b.type === 'BOOL' && a.type !== 'BOOL') return -1
+            return 0
+          })
+          .map((param) => (
+            <ParameterField
+              key={param.name}
+              parameter={param}
+              value={values[param.name] ?? initialValues[param.name]}
+              onChange={(newValue) => setValues(prev => ({ ...prev, [param.name]: newValue }))}
+            />
+          ))}
       </FieldsGrid>
       <Actions>
         <Button onClick={handleApply} color="secondary">
