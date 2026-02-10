@@ -8,6 +8,7 @@ import {
   type DXLinkErrorListener,
   DXLinkChannelState,
   DXLinkIndiChart,
+  type DXLinkIndiChartIndicatorParameterMeta,
 } from '@dxfeed/dxlink-api'
 
 import type { ChannelInfo } from './debug-console/channel-widget'
@@ -88,6 +89,7 @@ export class ChartHolder implements ChannelInfo {
     subscription: DXLinkIndiChartSubscription,
     indicator: DXLinkIndiChartIndicator,
     listener: ChartHolderListener,
+    inParametersListener: (params: DXLinkIndiChartIndicatorParameterMeta[]) => void,
     errorListener: (error: string) => void
   ): DXLinkIndiChart => {
     this.clear()
@@ -111,7 +113,6 @@ export class ChartHolder implements ChannelInfo {
           errorListener(`Internal Error: ${indi.internalErrorMessage}`)
           return
         }
-
         if (indi.scriptError) {
           let type = indi.scriptError.type
           let error = indi.scriptError
@@ -149,6 +150,8 @@ export class ChartHolder implements ChannelInfo {
         } else {
           errorListener('Unknown error in script')
         }
+      } else {
+        inParametersListener(indi.inParameters)
       }
     })
 

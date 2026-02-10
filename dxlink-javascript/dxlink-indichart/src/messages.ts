@@ -27,9 +27,14 @@ export interface DXLinkIndiChartIndicatorsParameters {
 }
 
 export interface DXLinkIndiChartIndicatorParameterMeta {
-  readonly type: 'number' | 'double' | 'string' | 'boolean'
-  readonly default: number | string | boolean
   readonly name: string
+  readonly type: 'DOUBLE' | 'STRING' | 'BOOL' | 'COLOR' | 'SOURCE' | 'SESSION' | 'MAP'
+  readonly defaultValue: any
+  readonly value?: any
+  readonly options?: string[]
+  readonly min?: number
+  readonly max?: number
+  readonly step?: number
 }
 
 export interface DXLinkIndiChartIndicatorEnabled {
