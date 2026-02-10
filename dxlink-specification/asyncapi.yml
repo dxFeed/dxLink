@@ -25,8 +25,8 @@ info:
     All messages are JSON objects with the following structure:
     ```json
     {
-      "type": "MESSAGE_TYPE",
-      "channel": "CHANNEL_ID"
+      "type": "<MESSAGE_TYPE>",
+      "channel": <CHANNEL_ID>
       // ...other fields
     }
     ```
@@ -331,7 +331,7 @@ info:
 
     // Close channel
     CLIENT -> {
-      "type": CHANNEL_CANCEL",
+      "type": "CHANNEL_CANCEL",
       "channel": 1
     }
     SERVER <- {
@@ -804,7 +804,7 @@ components:
     FeedConfigMessage:
       summary: Notification of the `FEED` service configuration.
       description: |
-        The server can send this message to the client after receiving the `FEED_CONFIG` message.
+        The server can send this message to the client after receiving the `FEED_SETUP` message.
         The server can send this message to the client if the `FEED` service configuration has changed.
         Parameters are lazy therefore the server may not send the notification immediately, but before the first `FEED_DATA` is sent.
       payload:
@@ -1102,7 +1102,7 @@ components:
                 type: array
                 items:
                   type: object
-                  parameters:
+                  properties:
                     price:
                       type: number
                     size:
@@ -1131,7 +1131,7 @@ components:
                     ]
             required: [channel, type, time, bids, asks]
       examples:
-        - summary: Feed data full format.
+        - summary: DOM Snapshot.
           payload:
             {
               "type": "DOM_SNAPSHOT",
@@ -1669,34 +1669,34 @@ components:
       properties:
         eventType:
           const: Series
-      eventFlags:
-        type: number
-      index:
-        type: number
-      time:
-        type: number
-      sequence:
-        type: number
-      expiration:
-        type: number
-      volatility:
-        $ref: "#/components/schemas/JSONDouble"
-      callVolume:
-        $ref: "#/components/schemas/JSONDouble"
-      putVolume:
-        $ref: "#/components/schemas/JSONDouble"
-      putCallRatio:
-        $ref: "#/components/schemas/JSONDouble"
-      forwardPrice:
-        $ref: "#/components/schemas/JSONDouble"
-      dividend:
-        $ref: "#/components/schemas/JSONDouble"
-      interest:
-        $ref: "#/components/schemas/JSONDouble"
-      eventSymbol:
-        type: string
-      eventTime:
-        type: number
+        eventFlags:
+          type: number
+        index:
+          type: number
+        time:
+          type: number
+        sequence:
+          type: number
+        expiration:
+          type: number
+        volatility:
+          $ref: "#/components/schemas/JSONDouble"
+        callVolume:
+          $ref: "#/components/schemas/JSONDouble"
+        putVolume:
+          $ref: "#/components/schemas/JSONDouble"
+        putCallRatio:
+          $ref: "#/components/schemas/JSONDouble"
+        forwardPrice:
+          $ref: "#/components/schemas/JSONDouble"
+        dividend:
+          $ref: "#/components/schemas/JSONDouble"
+        interest:
+          $ref: "#/components/schemas/JSONDouble"
+        eventSymbol:
+          type: string
+        eventTime:
+          type: number
 
     TimeAndSaleEvent:
       description: |
