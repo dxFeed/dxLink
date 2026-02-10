@@ -1,5 +1,11 @@
 # @dxfeed/dxlink-feed
 
+## 0.6.0
+
+### Patch Changes
+
+- @dxfeed/dxlink-core@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes

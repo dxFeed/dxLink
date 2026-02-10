@@ -1,5 +1,15 @@
 # @dxfeed/dxlink-indichart
 
+## 0.6.0
+
+### Minor Changes
+
+- b8c71bd: Indichart API client was adapted to latest version of the protocol. Now we can receive first candle snapshot before indicators snapshot.
+
+### Patch Changes
+
+- @dxfeed/dxlink-core@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes
