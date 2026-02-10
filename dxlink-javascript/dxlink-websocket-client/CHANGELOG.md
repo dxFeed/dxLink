@@ -1,5 +1,11 @@
 # @dxfeed/dxlink-websocket-client
 
+## 0.6.1
+
+### Patch Changes
+
+- @dxfeed/dxlink-core@0.6.1
+
 ## 0.6.0
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-core",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": false,
   "sideEffects": false,
   "description": "dxLink core",

@@ -1,5 +1,12 @@
 # @dxfeed/dxlink-dom
 
+## 0.6.1
+
+### Patch Changes
+
+- Add `feed` and `source` for FEED selection
+  - @dxfeed/dxlink-core@0.6.1
+
 ## 0.6.0
 
 ### Patch Changes
