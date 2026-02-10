@@ -108,6 +108,7 @@ info:
     ## Channel
     The channel is a virtual connection created by the client and  isolated from other channels.
     The channel can be used to receive data from one of dxFeed's services, by sending the `CHANNEL_REQUEST` message to the server with the `service` field set to the desired service.
+    The client should use only odd channel numbers to send channel requests on the service channels.
 
     ## `FEED` service
     `FEED` - provides real-time access to the market events.
