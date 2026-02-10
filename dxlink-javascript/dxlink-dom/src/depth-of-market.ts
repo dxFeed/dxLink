@@ -162,6 +162,14 @@ export interface DXLinkDepthOfMarketRequester {
  * Options for the {@link DXLinkDepthOfMarket} instance.
  */
 export interface DXLinkDepthOfMarketOptions {
+    /**
+   * Space to be used for the service.
+   */
+  space?: string
+  /**
+   * Feed name to be used for the service.
+   */
+  feed?: string
   /**
    * Log level for the DepthOfMarket.
    */
@@ -231,6 +239,9 @@ export class DXLinkDepthOfMarket implements DXLinkDepthOfMarketRequester {
     this.channel = client.openChannel(DEPTH_OF_MARKET_SERVICE_NAME, {
       symbol: parameters.symbol,
       sources: parameters.sources,
+      // Optional parameters for FEED source
+      space: options.space,
+      feed: options.feed,
     })
     this.id = this.channel.id
     this.symbol = parameters.symbol
