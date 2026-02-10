@@ -131,6 +131,8 @@ export interface ScriptCandlesSubscriptionProps {
   onReset(): void
 }
 
+const lang: Lang = 'dxscript-js'
+
 export function ScriptCandlesSubscription({
   onSet,
   onReset,
@@ -140,7 +142,6 @@ export function ScriptCandlesSubscription({
   const [fromTime, setFromTime] = useState('0')
 
   const [exampleId, setExampleId] = useState<string>(INDICHART_INDICATOR_EXAMPLES[0]!.id)
-  const lang: Lang = 'js'
   const [script, setScript] = useState<string>(INDICHART_INDICATROS[lang]?.[exampleId] ?? '')
   const [search, setSearch] = useState('')
 
@@ -206,7 +207,7 @@ export function ScriptCandlesSubscription({
         <TopPanel>
           <LangWrapper>
             <LangButton pressed={true}>
-              <JSLogo /> JavaScript
+              <JSLogo /> dxScript/JS
             </LangButton>
           </LangWrapper>
           <ErrorWrapper>
