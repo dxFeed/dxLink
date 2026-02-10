@@ -31,7 +31,7 @@ info:
     }
     ```
     - The `type` field is a string that contains the message type
-    - The `channel` field is a string that contains the ID of the channel to which the message belongs
+    - The `channel` field is a number that contains the ID of the channel to which the message belongs
     - Other fields are the message's `payload`
 
     The main channel performs the exchange of protocol messages that pertain to the entire connection (not to a specific channel). This main channel is identified by a channel ID `0`.
@@ -61,7 +61,9 @@ info:
     ## Connection
     The connection is established by sending a WebSocket connection request to the server.
 
-    After the connection is established, the client must send the `SETUP` message to the server. The server will then respond with the `SETUP` message containing its own settings.
+    After the connection is established, the client must send the `SETUP` message to the server within the connection timeout period. The server will then respond with the `SETUP` message containing its own settings.
+    
+    The `version` field contains the protocol version. The format is typically `<protocol-version>-<client-implementation>/<client-version>` (e.g., `"0.1-js/1.0.0"`).
 
     ```json
     {
@@ -74,7 +76,9 @@ info:
     ```
 
     ## Authentication
-    The authentication is performed by sending the `AUTH` message to the server.
+    The authentication is performed by sending the `AUTH` message to the server after the `SETUP` exchange.
+    If the server requires authentication, it will send an `AUTH_STATE` message with `UNAUTHORIZED` state.
+    Authentication may not be required for all servers.
     ```json
     {
       "type": "AUTH",
@@ -92,10 +96,10 @@ info:
     }
     ```
 
-    ## Connection maintenance
+    ## Connection Maintenance
     To prevent the connection from being closed due to inactivity:
-    - The client must send any message to the server before the `keepaliveTimeout` expires. The `keepaliveTimeout` is set in the `SETUP` message by the client.
-    - The server must send any message to the client before the `keepaliveTimeout` expires. The `keepaliveTimeout` is set in the `SETUP` message by the client.
+    - The client must send any message to the server before the server's `keepaliveTimeout` expires. The server's `keepaliveTimeout` is sent in the `SETUP` message from the server.
+    - The server must send any message to the client before the client's `keepaliveTimeout` expires. The client's `keepaliveTimeout` is sent in the `SETUP` message from the client.
     If a client or server does not send any other messages, they can use the special message `KEEPALIVE`. Otherwise, the other side will close the connection.
 
     ```json
@@ -106,8 +110,16 @@ info:
     ```
 
     ## Channel
-    The channel is a virtual connection created by the client and  isolated from other channels.
-    The channel can be used to receive data from one of dxFeed's services, by sending the `CHANNEL_REQUEST` message to the server with the `service` field set to the desired service.
+    The channel is a virtual connection created by the client and isolated from other channels.
+    The channel can be used to receive data from one of dxFeed's services.
+    
+    Channel lifecycle:
+    1. The client sends a `CHANNEL_REQUEST` message with the desired `service` and channel number
+    2. The server responds with a `CHANNEL_OPENED` message
+    3. The client and server exchange service-specific messages on this channel
+    4. The client sends a `CHANNEL_CANCEL` message to close the channel
+    5. The server responds with a `CHANNEL_CLOSED` message
+    
     The client should use only odd channel numbers to send channel requests on the service channels.
 
     ## `FEED` service
@@ -119,7 +131,7 @@ info:
     ```json
     {
       "type": "CHANNEL_REQUEST",
-      "channel": 0,
+      "channel": 1,
       "service": "FEED",
       "parameters": {
         "contract": "AUTO"
@@ -246,7 +258,7 @@ info:
     ```
 
     ### Configuration
-    To configure the service, the client must send a `DOM_SETUP` message to the server with the acceptable configuration.
+    To start receiving snapshots and configure the service, the client must send a `DOM_SETUP` message to the server with the acceptable configuration.
     ```json
     {
       "type": "DOM_SETUP",
@@ -275,15 +287,15 @@ info:
     ```
     CONNECTED
     // Connection establishment
-    CLIENT -> { "type": "SETUP", "channel": "0", "keepaliveTimeout": 60, "acceptKeepaliveTimeout": 60, "version": "1.0.0" }
-    SERVER <- { "type": "SETUP", "channel": "0", "keepaliveTimeout": 60, "acceptKeepaliveTimeout": 60, "version": "1.0.0" }
+    CLIENT -> { "type": "SETUP", "channel": 0, "keepaliveTimeout": 60, "acceptKeepaliveTimeout": 60, "version": "1.0.0" }
+    SERVER <- { "type": "SETUP", "channel": 0, "keepaliveTimeout": 60, "acceptKeepaliveTimeout": 60, "version": "1.0.0" }
 
     // Indicates that authorization is required
-    SERVER <- { "type": "AUTH_STATE", "state": "UNAUTHORIZED" }
+    SERVER <- { "type": "AUTH_STATE", "channel": 0, "state": "UNAUTHORIZED" }
 
     // Authorization
-    CLIENT -> { "type": "AUTH", "token": "token#123" }
-    SERVER <- { "type": "AUTH_STATE", "state": "AUTHORIZED", "userId": "123" }
+    CLIENT -> { "type": "AUTH", "channel": 0, "token": "token#123" }
+    SERVER <- { "type": "AUTH_STATE", "channel": 0, "state": "AUTHORIZED" }
 
     // Request a new channel for Quote events
     CLIENT -> {
@@ -386,7 +398,7 @@ info:
 
     // Close channel
     CLIENT -> {
-      "type": CHANNEL_CANCEL",
+      "type": "CHANNEL_CANCEL",
       "channel": 3
     }
     SERVER <- {
@@ -453,7 +465,7 @@ components:
                   Error type. Possible values:
                   - UNSUPPORTED_PROTOCOL - does not support the protocol version
                   - TIMEOUT - did not receive the expected message within the allotted time period and considered that the connection was lost
-                  - UNAUTHORIZED -  did not authorize
+                  - UNAUTHORIZED - the client was not authorized
                   - INVALID_MESSAGE - when trying to process a received message(s), was unable to parse it correctly
                   - BAD_ACTION - the server has detected a protocol violation in the previously received message(s).
                   - UNKNOWN - an error occurred that does not fit into any of the previously described types.
@@ -466,7 +478,7 @@ components:
                   - BAD_ACTION
                   - UNKNOWN
               message:
-                description: Contains the description or reason for the  error.
+                description: Contains the description or reason for the error.
                 type: string
             required: [channel, type, error, message]
       examples:
@@ -653,7 +665,7 @@ components:
               service:
                 description: |
                   Operated service. Possible values:
-                  - `DOM` - the dom service offer the abilitity to receive real-time updates about the depth of market.
+                  - `DOM` - the dom service offers the ability to receive real-time updates about the depth of market.
                 enum:
                   - DOM
               parameters:
@@ -926,7 +938,7 @@ components:
                         ]
                   - description: |
                       List of events in compact mode.
-                      The even element is the event type, the odd element is the list of values for this event type.
+                      Elements alternate between event type (string) and value arrays for that event type.
                     type: array
                     items:
                       oneOf:
@@ -1034,7 +1046,7 @@ components:
     DomConfigMessage:
       summary: Notification of the `DOM` service configuration.
       description: |
-        The server can send this message to the client after receiving the `DOM_CONFIG` message.
+        The server can send this message to the client after receiving the `DOM_SETUP` message.
         The server can send this message to the client if the `DOM` service configuration has changed.
         Parameters are lazy therefore the server may not send the notification immediately, but before the first `DOM_SNAPSHOT` is sent.
       payload:
@@ -1092,7 +1104,7 @@ components:
               type:
                 const: DOM_SNAPSHOT
               time:
-                description: Snapshot acquisition time (unix)
+                description: Snapshot acquisition time (unix timestamp in milliseconds)
                 type: number
                 example: 1710262466056
               bids:
@@ -1119,7 +1131,7 @@ components:
                 type: array
                 items:
                   type: object
-                  parameters:
+                  properties:
                     price:
                       type: number
                     size:
