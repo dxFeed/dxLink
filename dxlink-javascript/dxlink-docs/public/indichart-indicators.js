@@ -4,8 +4,8 @@ const INDICHART_JS_INDICATORS = {
   'Accumulation Distribution (ADL)': `function onTick() {
 	const moneyFlowMultiplier = (high !== low) ? ((close - low) - (high - close)) / (high - low) : 1.0;
 	const moneyFlowVolume = ts(moneyFlowMultiplier * volume);
-	spline(ta.cum(moneyFlowVolume), {title: "adl", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.RED});
+	spline(ta.cum(moneyFlowVolume), {title: "adl", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(0, {title: "zero", offset: 0, type: spline.STYLE_LINE, color: color.RED});
 }`,
 
   'Aroon': `const n = input("n", 25);
@@ -57,10 +57,10 @@ function indexOfMinimum(x, n) {
 function onTick() {
 	const h = high;
 	const l = low;
-	spline(aroonUp(h, n), {title: "aroonUp", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(aroonDown(l, n), {title: "aroonDown", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(overBought, {title: "overBought", offset: 0, type: SplineType.LINE, color: color.CYAN});
-	spline(overSold, {title: "overSold", offset: 0, type: SplineType.LINE, color: color.BLUE});
+	spline(aroonUp(h, n), {title: "aroonUp", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(aroonDown(l, n), {title: "aroonDown", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(overBought, {title: "overBought", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
+	spline(overSold, {title: "overSold", offset: 0, type: spline.STYLE_LINE, color: color.BLUE});
 }`,
 
   'Average True Range (ATR)': `const n = input("n", 14);
@@ -73,13 +73,13 @@ function onTick() {
 	const d2 = Math.abs(h - pc);
 	const d3 = Math.abs(l - pc);
 	const tr = ts(Math.max(d1, d2, d3));
-	spline(ta.wima(tr, n), {title: "atr", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(ta.wima(tr, n), {title: "atr", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Awesome Oscillator (AO)': `function onTick() {
 	const mid = ts((high + low) / 2);
-	spline(ta.sma(mid, 5) - ta.sma(mid, 34), {title: "awesome", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.RED});
+	spline(ta.sma(mid, 5) - ta.sma(mid, 34), {title: "awesome", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(0, {title: "zero", offset: 0, type: spline.STYLE_LINE, color: color.RED});
 }`,
 
   'Bollinger Bands (BB)': `const n = input("n", 20);
@@ -109,9 +109,9 @@ function onTick() {
 	const c = close;
 	const midLineValue = ta.ema(c, n);
 	const sd = standardDeviation(c, n);
-	spline(midLineValue, {title: "midLine", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(midLineValue + numDevUp * sd, {title: "upBand", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(midLineValue + numDevDown * sd, {title: "lowBand", offset: 0, type: SplineType.LINE, color: color.CYAN});
+	spline(midLineValue, {title: "midLine", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(midLineValue + numDevUp * sd, {title: "upBand", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(midLineValue + numDevDown * sd, {title: "lowBand", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
 }`,
 
   'Chande Momentum Oscillator (CMO)': `const n = input("n", 20);
@@ -123,10 +123,10 @@ function onTick() {
 	const sumInc = ta.sum(inc, n);
 	const sumDec = ta.sum(dec, n);
 	// Wrong prefetch;
-	spline((sumInc - sumDec) / (sumInc + sumDec) * 100, {title: "CMO", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(50, {title: "UpperLevel", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(-50, {title: "LowerLevel", offset: 0, type: SplineType.LINE, color: color.CYAN});
-	spline(0, {title: "Zero", offset: 0, type: SplineType.LINE, color: color.BLUE});
+	spline((sumInc - sumDec) / (sumInc + sumDec) * 100, {title: "CMO", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(50, {title: "UpperLevel", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(-50, {title: "LowerLevel", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
+	spline(0, {title: "Zero", offset: 0, type: spline.STYLE_LINE, color: color.BLUE});
 }`,
 
   'Commodity Channel Index (CCI)': `const n = input("n", 14);
@@ -158,10 +158,10 @@ function linerDev(x, n) {
 function onTick() {
 	const x = ts(high + low + close);
 	const ld = linerDev(x, n);
-	spline((x - ta.sma(x, n)) / ld / 0.015, {title: "cci", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(overBought, {title: "OverBought", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(overSold, {title: "OverSold", offset: 0, type: SplineType.LINE, color: color.CYAN});
-	spline(0, {title: "Zero", offset: 0, type: SplineType.LINE, color: color.BLUE});
+	spline((x - ta.sma(x, n)) / ld / 0.015, {title: "cci", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(overBought, {title: "OverBought", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(overSold, {title: "OverSold", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
+	spline(0, {title: "Zero", offset: 0, type: spline.STYLE_LINE, color: color.BLUE});
 }`,
 
   'Double Exponential Moving Average': `const n = input("n", 9);
@@ -169,13 +169,13 @@ function onTick() {
 	const c = close;
 	const ema1 = ta.ema(c, n);
 	const ema2 = ta.ema(ema1, n);
-	spline(2 * ema1 - ema2, {title: "dema", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(2 * ema1 - ema2, {title: "dema", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Exponential Moving Average (EMA)': `const n = input("n", 9);
 
 function onTick() {
-	spline(ta.ema(close, n), {title: "ema", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(ta.ema(close, n), {title: "ema", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Mass Index': `const n = input("n", 9);
@@ -189,14 +189,14 @@ function onTick() {
 	const emaEmaDiff = ta.ema(emaDiff1, n);
 	const emaEmaCoef = ts(emaDiff1 / emaEmaDiff);
 
-	spline(ta.sum(emaEmaCoef, sumLength), {title: "mi", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(triggerLevel, {title: "trigger", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(setupLevel, {title: "setup", offset: 0, type: SplineType.LINE, color: color.CYAN});
+	spline(ta.sum(emaEmaCoef, sumLength), {title: "mi", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(triggerLevel, {title: "trigger", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(setupLevel, {title: "setup", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
 }`,
 
   'Momentum': `const n = input("n", 12);
 function onTick() {
-	spline(close - close[n], {title: "momentum", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(close - close[n], {title: "momentum", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Money Flow (MFI)': `const n = input("n", 14);
@@ -210,9 +210,9 @@ function onTick() {
 	const negativeMoneyFlow = ts((tp < tpPrev) ? tp * volume : 0);
 	const sumPositiveMoneyFlow = ta.sum(positiveMoneyFlow, n);
 	const sumNegativeMoneyFlow = ta.sum(negativeMoneyFlow, n);
-	spline(100 - (100 / (1 + sumPositiveMoneyFlow / sumNegativeMoneyFlow)), {title: "MFidx", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(overBought, {title: "OverBought", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(overSold, {title: "OverSold", offset: 0, type: SplineType.LINE, color: color.CYAN});
+	spline(100 - (100 / (1 + sumPositiveMoneyFlow / sumNegativeMoneyFlow)), {title: "MFidx", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(overBought, {title: "OverBought", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(overSold, {title: "OverSold", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
 }`,
 
   'Moving Average Convergence Divergence (MACD)': `const fastLen = input("fastLen", 12);
@@ -223,15 +223,15 @@ function onTick() {
 	const series = close;
 	const MACD = ts(ta.ema(series, fastLen) - ta.ema(series, slowLen));
 	const avg = ta.ema(MACD, macdLen);
-	spline(MACD, {title: "MACD", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(avg, {title: "avg", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(MACD - avg, {title: "diff", offset: 0, type: SplineType.LINE, color: color.CYAN});
+	spline(MACD, {title: "MACD", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(avg, {title: "avg", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(MACD - avg, {title: "diff", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
 }`,
 
   'On Balance Volume (OBV)': `function onTick() {
 	const diff = close - close[1];
 	const v = ts((diff > 0) ? volume : ((diff < 0) ? -volume : 0));
-	spline(ta.cum(v), {title: "obv", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(ta.cum(v), {title: "obv", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Price Oscillator': `const fastLen = input("fastLen", 9);
@@ -241,23 +241,23 @@ function onTick() {
 	const emaFast = ta.ema(close, fastLen);
 	const emaSlow = ta.ema(close, slowLen);
 
-	spline(emaFast - emaSlow, {title: "PercentagePriceOscillator", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(0, {title: "Zero", offset: 0, type: SplineType.LINE, color: color.RED});
+	spline(emaFast - emaSlow, {title: "PercentagePriceOscillator", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(0, {title: "Zero", offset: 0, type: spline.STYLE_LINE, color: color.RED});
 }`,
 
   'Price Volume Trend (PVT)': `function onTick() {
 	const prevClose = close[1];
 	const currentClose = close;
 	const v = ts((currentClose - prevClose) / prevClose * volume);
-	spline(ta.cum(v), {title: "pvt", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(ta.cum(v), {title: "pvt", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Rate of Change (ROC)': `const n = input("n", 12);
 function onTick() {
 	const prevClose = close[n];
 	const currentClose = close;
-	spline(((currentClose - prevClose) / prevClose) * 100, {title: "roc", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.RED});
+	spline(((currentClose - prevClose) / prevClose) * 100, {title: "roc", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(0, {title: "zero", offset: 0, type: spline.STYLE_LINE, color: color.RED});
 }`,
 
   'Relative Strength Index (RSI)': `const n = input("n", 14);
@@ -271,27 +271,27 @@ function onTick() {
 	const total = ts(Math.abs(prev - curr));
 	const averageNet = ta.wima(net, n);
 	const averageTotal = ta.wima(total, n);
-	spline(50 * (1 + averageNet / averageTotal), {title: "RSI", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(overBought, {title: "overBought", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(overSold, {title: "overSold", offset: 0, type: SplineType.LINE, color: color.CYAN});
+	spline(50 * (1 + averageNet / averageTotal), {title: "RSI", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(overBought, {title: "overBought", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(overSold, {title: "overSold", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
 }`,
 
   'Relative Vigor Index (RVI)': `function onTick() {
 	const nominator = close - open;
 	const denominator = high - low;
-	spline(nominator / denominator, {title: "rvi", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(nominator / denominator, {title: "rvi", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Simple Moving Average': `const n = input("n", 9);
 
 function onTick() {
-	spline(ta.sma(open, n), {title: "sma", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(ta.sma(open, n), {title: "sma", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Smoothed Moving Average': `const n = input("n", 9);
 
 function onTick() {
-	spline(ta.wima(close, n), {title: "SMMA", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(ta.wima(close, n), {title: "SMMA", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Triple Exponential Average (TRIX)': `const n = input("n", 9);
@@ -309,7 +309,7 @@ function onTick() {
 	const triple = trix(logPrice, n);
 	const triplePrev = trix(logPrevPrice, n);
 
-	spline((triple - triplePrev) * 10000, {title: "TRIX", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline((triple - triplePrev) * 10000, {title: "TRIX", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Triple Exponential Moving Average (TEMA)': `const n = input("n", 9);
@@ -320,7 +320,7 @@ function onTick() {
 	const ema2 = ta.ema(ema1, n);
 	const ema3 = ta.ema(ema2, n);
 
-	spline(3 * ema1 - 3 * ema2 + ema3, {title: "tema", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(3 * ema1 - 3 * ema2 + ema3, {title: "tema", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'True Strength Index (TSI)': `const longLength = input("longLength", 25);
@@ -340,9 +340,9 @@ function onTick() {
 	const absEmaEma = doubleEma(absMomentum, longLength, shortLength);
 
 	const tsi = ts(averageOfAverage / absEmaEma * 100);
-	spline(tsi, {title: "tsi", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(ta.ema(tsi, signalLength), {title: "signal", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(0, {title: "zero", offset: 0, type: SplineType.LINE, color: color.CYAN});
+	spline(tsi, {title: "tsi", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(ta.ema(tsi, signalLength), {title: "signal", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(0, {title: "zero", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
 }`,
 
   'Williams Alligator': `const jawLen = input("jawLen", 13);
@@ -357,15 +357,15 @@ function onTick() {
 	const lips = ta.wima(median, lipsLen);
 	const teeth = ta.wima(median, teethLen);
 	const jaw = ta.wima(median, jawLen);
-	spline(lips[lipsDisplace], {title: "Lips", offset: 0, type: SplineType.LINE, color: color.GREEN});
-	spline(teeth[teethDisplace], {title: "Teeth", offset: 0, type: SplineType.LINE, color: color.RED});
-	spline(jaw[jawDisplace], {title: "Jaw", offset: 0, type: SplineType.LINE, color: color.CYAN});
+	spline(lips[lipsDisplace], {title: "Lips", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
+	spline(teeth[teethDisplace], {title: "Teeth", offset: 0, type: spline.STYLE_LINE, color: color.RED});
+	spline(jaw[jawDisplace], {title: "Jaw", offset: 0, type: spline.STYLE_LINE, color: color.CYAN});
 }`,
 
   'Weighted Moving Average': `const n = input("n", 9);
 
 function onTick() {
-	spline(ta.wma(open, n), {title: "wma", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(ta.wma(open, n), {title: "wma", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Pivot Low': `const left = input("left", 3);
@@ -373,7 +373,7 @@ const right = input("right", 2);
 
 function onTick() {
 	let pivotL = ta.pivotLow(close, left, right);
-	spline(pivotL, {title: "pivotLow", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(pivotL, {title: "pivotLow", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`,
 
   'Pivot High': `const left = input("left", 3);
@@ -381,7 +381,7 @@ const right = input("right", 2);
 
 function onTick() {
 	let pivotH = ta.pivotHigh(close, left, right);
-	spline(pivotH, {title: "pivotHigh", offset: 0, type: SplineType.LINE, color: color.GREEN});
+	spline(pivotH, {title: "pivotHigh", offset: 0, type: spline.STYLE_LINE, color: color.GREEN});
 }`
 }
 

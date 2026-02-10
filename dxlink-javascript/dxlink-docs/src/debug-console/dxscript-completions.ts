@@ -113,17 +113,17 @@ export const dxScriptCompletions = [
   { caption: 'color.CORAL', value: 'color.CORAL', meta: 'constant' },
   { caption: 'color.CRIMSON', value: 'color.CRIMSON', meta: 'constant' },
 
-  // SplineType.*
-  { caption: 'SplineType.LINE', value: 'SplineType.LINE', meta: 'enum' },
-  { caption: 'SplineType.STEPLINE', value: 'SplineType.STEPLINE', meta: 'enum' },
-  { caption: 'SplineType.HISTOGRAM', value: 'SplineType.HISTOGRAM', meta: 'enum' },
-  { caption: 'SplineType.CROSS', value: 'SplineType.CROSS', meta: 'enum' },
-  { caption: 'SplineType.AREA', value: 'SplineType.AREA', meta: 'enum' },
-  { caption: 'SplineType.COLUMNS', value: 'SplineType.COLUMNS', meta: 'enum' },
-  { caption: 'SplineType.CIRCLES', value: 'SplineType.CIRCLES', meta: 'enum' },
-  { caption: 'SplineType.LINE_BREAK', value: 'SplineType.LINE_BREAK', meta: 'enum' },
-  { caption: 'SplineType.AREA_BREAK', value: 'SplineType.AREA_BREAK', meta: 'enum' },
-  { caption: 'SplineType.STEPLINE_BREAK', value: 'SplineType.STEPLINE_BREAK', meta: 'enum' },
+  // spline.STYLE_*
+  { caption: 'spline.STYLE_LINE', value: 'spline.STYLE_LINE', meta: 'constant' },
+  { caption: 'spline.STYLE_STEPLINE', value: 'spline.STYLE_STEPLINE', meta: 'constant' },
+  { caption: 'spline.STYLE_HISTOGRAM', value: 'spline.STYLE_HISTOGRAM', meta: 'constant' },
+  { caption: 'spline.STYLE_CROSS', value: 'spline.STYLE_CROSS', meta: 'constant' },
+  { caption: 'spline.STYLE_AREA', value: 'spline.STYLE_AREA', meta: 'constant' },
+  { caption: 'spline.STYLE_COLUMNS', value: 'spline.STYLE_COLUMNS', meta: 'constant' },
+  { caption: 'spline.STYLE_CIRCLES', value: 'spline.STYLE_CIRCLES', meta: 'constant' },
+  { caption: 'spline.STYLE_LINE_BREAK', value: 'spline.STYLE_LINE_BREAK', meta: 'constant' },
+  { caption: 'spline.STYLE_AREA_BREAK', value: 'spline.STYLE_AREA_BREAK', meta: 'constant' },
+  { caption: 'spline.STYLE_STEPLINE_BREAK', value: 'spline.STYLE_STEPLINE_BREAK', meta: 'constant' },
 
   // Enum/string values used in options (LineStyle / LineExtend / BoxExtend / Align / XLocation / TextFormatting)
   { caption: 'SOLID', value: 'SOLID', meta: 'enum' },

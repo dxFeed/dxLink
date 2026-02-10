@@ -35,7 +35,7 @@ class DxScriptHighlightRules extends JavaScriptHighlightRules {
     const builtinFunctions = 'input|output|spline|ts'
 
     const builtinConstants =
-      'BOLD|BoxExtend|ITALIC|LineExtend|LineStyle|NONE|SplineType|TextAlign|TextHorizontalAlign|TextVerticalAlign|XLocation'
+      'BOLD|BoxExtend|ITALIC|LineExtend|LineStyle|NONE|STYLE_AREA|STYLE_AREA_BREAK|STYLE_CIRCLES|STYLE_COLUMNS|STYLE_CROSS|STYLE_HISTOGRAM|STYLE_LINE|STYLE_LINE_BREAK|STYLE_STEPLINE|STYLE_STEPLINE_BREAK|TextAlign|TextHorizontalAlign|TextVerticalAlign|XLocation'
 
     const colorNames =
       'BLACK|BLUE|CORAL|CRIMSON|CYAN|GOLD|GRAY|GREEN|LIME|MAGENTA|MAROON|NAVY|ORANGE|PINK|PURPLE|RED|SILVER|TEAL|WHITE|YELLOW'
@@ -64,8 +64,8 @@ class DxScriptHighlightRules extends JavaScriptHighlightRules {
       })
 
       this.$rules.start.unshift({
-        token: 'constant.language',
-        regex: String.raw`(?<=color\.)(?:${colorNames})\b`,
+        token: ['support.type', 'punctuation.operator', 'constant.language'],
+        regex: String.raw`\b(color)(\.)(?:(${colorNames}))\b`,
       })
 
       this.$rules.start.unshift({
