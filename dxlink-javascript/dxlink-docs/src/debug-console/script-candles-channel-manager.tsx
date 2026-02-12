@@ -1,6 +1,5 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
 import {
-  DXLinkChannelState,
   type DXLinkIndiChartCandle,
   type DXLinkIndiChartIndicator,
   type DXLinkIndiChartIndicatorParameterMeta,
@@ -17,7 +16,6 @@ import { ScriptCandlesSubscription } from './script-candles-subscription'
 import { SortedList } from '../candles/sorted-list'
 import type { ChartDataType, ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'
-import type { DXLinkIndiChartSubscriptionMessage } from '../../../dxlink-indichart/build/messages'
 
 const ChartContainer = styled.div`
   width: 100%;
@@ -352,7 +350,6 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     setInParameters([])
     setAvailable(false)
   }
-
   return (
     <>
       <Group>
