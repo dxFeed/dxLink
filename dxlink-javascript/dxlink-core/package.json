@@ -23,8 +23,8 @@
     "prepublishOnly": "npm run build && npm run test",
     "build": "microbundle -f esm,cjs",
     "lint": "eslint src",
-    "test": "tsx src/index.test.ts",
-    "test:watch": "tsx watch src/index.test.ts"
+    "test": "tsx src/index.test.ts && tsx src/scheduler.test.ts",
+    "test:watch": "tsx watch src/index.test.ts src/scheduler.test.ts"
   },
   "dependencies": {},
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
