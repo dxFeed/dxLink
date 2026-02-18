@@ -88,4 +88,27 @@ test('clear cancels all scheduled tasks', async () => {
   assert.is(b, false)
 })
 
+test('many schedule calls with same key create only one timer', () => {
+  let setTimeoutCalls = 0
+  const originalSetTimeout = globalThis.setTimeout
+  const wrapper = (...args: Parameters<typeof setTimeout>): ReturnType<typeof setTimeout> => {
+    setTimeoutCalls++
+    return originalSetTimeout.apply(globalThis, args)
+  }
+  globalThis.setTimeout = wrapper as typeof setTimeout
+  try {
+    const scheduler = new Scheduler()
+    for (let i = 0; i < 100; i++) {
+      scheduler.schedule(() => {}, 100, 'sameKey')
+    }
+    assert.is(
+      setTimeoutCalls,
+      1,
+      'expected exactly one setTimeout for many schedule() calls with same key'
+    )
+  } finally {
+    globalThis.setTimeout = originalSetTimeout
+  }
+})
+
 test.run()
