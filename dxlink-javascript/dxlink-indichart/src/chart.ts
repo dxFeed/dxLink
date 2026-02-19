@@ -150,7 +150,8 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
 
   private readonly updateListeners = new Set<DXLinkIndiChartUpdateListener>()
   private readonly candleSnapshotListeners = new Set<DXLinkIndiChartCandleSnapshotListener>()
-  private readonly indicatorsSnapshotListeners = new Set<DXLinkIndiChartIndicatorsSnapshotListener>()
+  private readonly indicatorsSnapshotListeners =
+    new Set<DXLinkIndiChartIndicatorsSnapshotListener>()
   private readonly indicatorsStateListeners = new Set<DXLinkIndiChartIndicatorsStateListener>()
 
   private readonly logger: DXLinkLogger
@@ -385,8 +386,10 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
    * Updates the indicators parameters without changing the subscription.
    * @param indicatorsParameters New indicators parameters.
    */
-  public updateIndicatorsParameters = (indicatorsParameters: Record<string, any>) => {
-    console.log("Updating indi params", indicatorsParameters)
+  public updateIndicatorsParameters = (
+    indicatorsParameters: DXLinkIndiChartIndicatorsParameters
+  ) => {
+    console.log('Updating indi params', indicatorsParameters)
     if (this.lastSubscriptionState) {
       this.lastSubscriptionState = {
         ...this.lastSubscriptionState,

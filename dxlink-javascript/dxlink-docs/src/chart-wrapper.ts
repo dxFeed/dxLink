@@ -114,11 +114,13 @@ export class ChartHolder implements ChannelInfo {
           return
         }
         if (indi.scriptError) {
-          let type = indi.scriptError.type
-          let error = indi.scriptError
+          const type = indi.scriptError.type
+          const error = indi.scriptError
           switch (type) {
             case 'SYNTAX':
-              errorListener(`Syntax Error in script '${error.scriptName}' at line ${error.startLine}, column ${error.startColumn}: ${error.message}`)
+              errorListener(
+                `Syntax Error in script '${error.scriptName}' at line ${error.startLine}, column ${error.startColumn}: ${error.message}`
+              )
               break
             case 'RUNTIME': {
               let errorMessage = `Runtime Error in ${error.scriptName} script at line ${error.startLine}, column ${error.startColumn}: ${error.message}.`

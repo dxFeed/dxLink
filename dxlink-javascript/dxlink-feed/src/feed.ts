@@ -8,7 +8,7 @@ import {
   DXLinkLogLevel,
   type DXLinkLogger,
   Logger,
-  Scheduler,
+  type DXLinkScheduler,
 } from '@dxfeed/dxlink-core'
 
 import {
@@ -297,7 +297,8 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
   /**
    * Scheduler for scheduling subscriptions sending to the channel.
    */
-  private subScheduler: Scheduler = new Scheduler()
+  private readonly scheduler: DXLinkScheduler
+  private readonly processPendingsSchedulerKey: string
 
   private readonly logger: DXLinkLogger
 
@@ -311,12 +312,13 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
       maxSendSubscriptionChunkSize: 4096 * 2,
       ...options,
     }
+    this.scheduler = client.getScheduler()
 
-    this.channel = client.openChannel(FEED_SERVICE_NAME, { 
+    this.channel = client.openChannel(FEED_SERVICE_NAME, {
       contract,
       // Optional parameters for FEED source
       space: options.space,
-      feed: options.feed
+      feed: options.feed,
     })
     this.id = this.channel.id
     this.contract = contract
@@ -328,6 +330,8 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
     this.removeSubscriptions = this.removeSubscriptions.bind(this)
 
     this.logger = new Logger(`${DXLinkFeed.name}#${this.id}`, this.options.logLevel)
+
+    this.processPendingsSchedulerKey = `${FEED_SERVICE_NAME}#${this.id}:PROCESS_PENDINGS`
   }
 
   getChannel = () => this.channel
@@ -358,7 +362,7 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
     this.subscriptions.clear()
     this.touchedEvents.clear()
 
-    this.subScheduler.clear()
+    this.scheduler.cancel(this.processPendingsSchedulerKey)
 
     this.channel.close()
   }
@@ -560,7 +564,7 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
       }
       case DXLinkChannelState.REQUESTED: {
         // Clear the timeout if it is set to avoid sending the subscriptions while the channel is not ready
-        this.subScheduler.clear()
+        this.scheduler.cancel(this.processPendingsSchedulerKey)
         return
       }
       case DXLinkChannelState.CLOSED:
@@ -621,14 +625,14 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
    * Schedule sending pending subscriptions to the channel to batch them together to reduce the number of messages.
    */
   private scheduleProcessPendings() {
-    if (this.subScheduler.has('processPendings')) {
+    if (this.scheduler.has(this.processPendingsSchedulerKey)) {
       return
     }
 
-    this.subScheduler.schedule(
+    this.scheduler.schedule(
       this.processPendings,
       this.options.batchSubscriptionsTime,
-      'processPendings'
+      this.processPendingsSchedulerKey
     )
   }
 
