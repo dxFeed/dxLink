@@ -24,8 +24,3 @@ dxLink JavaScript API
   - `npm run format`
 - Lint with auto-fix across packages:
   - `npm run lint:fix`
-- Run commands for a single workspace package:
-  - `npm run build -w <workspace>`
-  - `npm run test -w <workspace>`
-  - `npm run lint -w <workspace>`
-  - `npm run lint -w <workspace> -- --fix`
