@@ -13,7 +13,7 @@
     "@asyncapi/react-component": "2.5.0",
     "@devexperts/dxcharts-lite": "2.5.3",
     "@dxfeed/dxlink-api": "*",
-    "@dxfeed/dxscript-js-samples": "^1.1.0-SNAPSHOT-20260212-134529",
+    "@dxfeed/dxscript-js-samples": "^1.1.0",
     "@dxfeed/ui-kit": "2.15.2",
     "ace-builds": "1.35.4",
     "react": "^18.2.0",
