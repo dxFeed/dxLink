@@ -40,7 +40,8 @@ class DxScriptHighlightRules extends JavaScriptHighlightRules {
     const colorNames =
       'BLACK|BLUE|CORAL|CRIMSON|CYAN|GOLD|GRAY|GREEN|LIME|MAGENTA|MAROON|NAVY|ORANGE|PINK|PURPLE|RED|SILVER|TEAL|WHITE|YELLOW'
 
-    const namespaces = 'bar|box|console|hline|input|label|line|Math|output|polyline|session|spline|ta|ts'
+    const namespaces =
+      'bar|box|console|hline|input|label|line|Math|output|polyline|session|spline|ta|ts'
 
     if (this.$rules.start) {
       this.$rules.start.unshift({

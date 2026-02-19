@@ -42,6 +42,7 @@ The client uses a connector abstraction, allowing custom WebSocket implementatio
 To establish a connection, call `connect()` with a WebSocket URL. The client immediately transitions to `CONNECTING` state and initiates the WebSocket connection through the connector.
 
 When the WebSocket transport opens:
+
 1. The client automatically sends a SETUP message to the server
 2. If an auth token was previously set, it sends an AUTH message
 3. The client waits for the server's SETUP response
@@ -66,6 +67,7 @@ State changes are notified to registered listeners via `addConnectionStateChange
 ### Setup Phase
 
 The setup phase occurs automatically when the WebSocket transport opens. The client sends a SETUP message containing:
+
 - Protocol version and client version
 - Client's keepalive timeout preferences
 - Acceptable server keepalive timeout
@@ -87,16 +89,19 @@ Keepalive messages are handled automatically and are not exposed in the public A
 ### Reconnection Behavior
 
 The client automatically attempts to reconnect when the WebSocket connection is closed unexpectedly. Reconnection occurs when:
+
 - The WebSocket transport closes and the client was previously authorized
 - A keepalive timeout is detected
 - A connection error occurs
 
 Reconnection does not occur if:
+
 - The client was not authorized (UNAUTHORIZED state) - in this case, the client disconnects completely
 - `disconnect()` was called explicitly
 - Maximum reconnect attempts have been reached (if configured)
 
 **Reconnection process**:
+
 1. The client stops the current connector
 2. All scheduled timeouts are cleared
 3. Connection details are reset to defaults
@@ -112,6 +117,7 @@ The reconnect attempt counter is reset to 0 after a successful connection is est
 ### Disconnection
 
 Explicit disconnection occurs when calling `disconnect()` or `close()`. The client:
+
 1. Stops the WebSocket connector
 2. Clears all scheduled timeouts
 3. Resets connection details to defaults
@@ -165,6 +171,7 @@ This allows the server to indicate whether authentication is required or optiona
 ### Token Rejection
 
 If the server rejects a token (sends AUTH_STATE with `UNAUTHORIZED`), the client:
+
 1. Clears the stored auth token
 2. Transitions auth state to `UNAUTHORIZED`
 3. Notifies auth state change listeners
@@ -177,6 +184,7 @@ The connection remains open, allowing you to retry authentication with a differe
 ### Channel Creation
 
 Channels are created by calling `openChannel()` with a service name and parameters. The client:
+
 1. Assigns a unique channel ID (odd numbers starting from 1: 1, 3, 5, 7, ...)
 2. Creates a channel instance
 3. Stores the channel internally
@@ -198,6 +206,7 @@ State changes are notified to registered listeners via `addStateChangeListener()
 ### Channel Opening
 
 When `openChannel()` is called:
+
 - If the connection is `CONNECTED` and `AUTHORIZED`, the CHANNEL_REQUEST is sent immediately
 - If the connection is not ready, the channel is created but remains in `REQUESTED` state until the connection becomes ready
 - Once the connection becomes ready, all pending channels are automatically requested
@@ -207,6 +216,7 @@ This allows channels to be created before the connection is established, providi
 ### Channel on Reconnect
 
 When the client reconnects, all active channels (not in `CLOSED` state) are automatically re-requested. The client:
+
 1. Transitions all active channels back to `REQUESTED` state
 2. Once the connection is re-established and authorized, sends CHANNEL_REQUEST messages for all active channels
 3. Channels transition back to `OPENED` when the server responds with CHANNEL_OPENED
@@ -216,6 +226,7 @@ This ensures that channel subscriptions are preserved across reconnections witho
 ### Channel Cleanup
 
 Channels are automatically cleaned up when:
+
 - They are explicitly closed via `close()`
 - They receive a CHANNEL_CLOSED message from the server
 - They are in `CLOSED` state during reconnection (removed from internal tracking)
@@ -229,6 +240,7 @@ When a channel is closed, its message and state listeners are cleared, but error
 Messages are categorized into two groups:
 
 **Connection messages** (channel 0): These messages manage the connection itself:
+
 - SETUP: Protocol negotiation
 - AUTH: Authentication
 - AUTH_STATE: Authentication status
@@ -236,6 +248,7 @@ Messages are categorized into two groups:
 - ERROR: Connection-level errors
 
 **Channel messages** (channel > 0): These messages are for service channels:
+
 - CHANNEL_REQUEST: Request to open a channel
 - CHANNEL_CANCEL: Request to close a channel
 - CHANNEL_OPENED: Channel opened confirmation
@@ -246,11 +259,13 @@ Messages are categorized into two groups:
 ### Message Flow
 
 **Outgoing messages**: When you call channel `send()` or the client sends protocol messages internally:
+
 1. The message is serialized to JSON
 2. Sent through the connector to the WebSocket
 3. Keepalive scheduling is updated
 
 **Incoming messages**: When a message is received from the WebSocket:
+
 1. The connector parses the JSON
 2. Validates basic structure (type, channel fields)
 3. Routes to the appropriate handler based on channel ID
@@ -260,6 +275,7 @@ Messages are categorized into two groups:
 ### Channel 0
 
 Channel 0 is the "connection channel" used for protocol-level communication. All connection management messages use this channel:
+
 - SETUP messages
 - AUTH and AUTH_STATE messages
 - KEEPALIVE messages
@@ -270,6 +286,7 @@ This channel is managed internally by the client and is not exposed in the publi
 ### Service Channels
 
 Channels with IDs greater than 0 are service channels. Each channel is isolated and handles its own messages:
+
 - Messages are routed to channels based on the `channel` field in the message
 - Channels process their own lifecycle messages (CHANNEL_OPENED, CHANNEL_CLOSED, ERROR)
 - Channels deliver payload messages to registered message listeners
@@ -278,6 +295,7 @@ Channels with IDs greater than 0 are service channels. Each channel is isolated 
 ### Message Protocol
 
 All messages are JSON objects with at minimum:
+
 - `type`: String identifying the message type
 - `channel`: Number identifying the channel (0 for connection, >0 for service channels)
 - Additional fields specific to the message type
@@ -293,6 +311,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: `connect(url)`
 
 **Protocol mapping**:
+
 1. Creates a WebSocket connection via the connector
 2. When transport opens, automatically sends SETUP message with:
    - Protocol version (`0.1`)
@@ -310,6 +329,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: `setAuthToken(token)`, `getAuthState()`, `addAuthStateChangeListener()`
 
 **Protocol mapping**:
+
 - `setAuthToken()` stores the token and sends an AUTH message (if connected)
 - Server responds with AUTH_STATE message
 - Client updates internal auth state
@@ -322,6 +342,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: `openChannel(service, parameters)`
 
 **Protocol mapping**:
+
 1. Client assigns channel ID
 2. Creates channel instance
 3. Sends CHANNEL_REQUEST message with service name and parameters
@@ -336,6 +357,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: Channel `send(message)`, `addMessageListener()`
 
 **Protocol mapping**:
+
 - `send()` serializes the message and adds the channel ID, sending it as a channel payload message
 - Incoming payload messages are routed to the channel based on channel ID
 - Message listeners receive the payload (without channel ID)
@@ -347,6 +369,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: Not exposed (automatic)
 
 **Protocol mapping**:
+
 - Client automatically sends KEEPALIVE messages at configured intervals
 - Client monitors for incoming messages to detect server keepalive
 - If no messages received within server timeout, connection is considered lost
@@ -358,6 +381,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: `addErrorListener()`, Channel `addErrorListener()`
 
 **Protocol mapping**:
+
 - Protocol ERROR messages (channel 0) trigger client error listeners
 - Protocol ERROR messages (channel > 0) trigger channel error listeners
 - Error type and message are extracted from protocol message
@@ -370,6 +394,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: `reconnect()`, automatic on connection loss
 
 **Protocol mapping**:
+
 - WebSocket close event triggers reconnection logic
 - Client resets protocol state
 - Re-establishes WebSocket connection
@@ -383,6 +408,7 @@ This section describes how protocol-level operations map to the client's public 
 **API**: `getConnectionState()`, `getAuthState()`, Channel `getState()`, various `add*Listener()` methods
 
 **Protocol mapping**:
+
 - Connection state is driven by SETUP/AUTH_STATE protocol messages
 - Auth state is driven by AUTH_STATE protocol messages
 - Channel state is driven by CHANNEL_OPENED/CHANNEL_CLOSED protocol messages
@@ -434,6 +460,7 @@ Errors are reported through error listeners:
 - **Channel-level errors**: Registered via `addErrorListener()` on channel instances. These handle service-specific errors.
 
 When an error occurs:
+
 1. The error is published to the appropriate listeners
 2. If no listeners are registered, the error is logged but not propagated
 3. Listeners are called synchronously
@@ -442,6 +469,7 @@ When an error occurs:
 ### Unhandled Errors
 
 If no error listeners are registered when an error occurs:
+
 - The error is logged at ERROR level
 - The error is not propagated to application code
 - The client continues operating normally
@@ -457,6 +485,7 @@ Timeout errors occur in several scenarios:
 3. **Keepalive timeout**: No messages received from server within the server's keepalive timeout period
 
 When a timeout occurs:
+
 - A TIMEOUT error is published to error listeners
 - The client attempts to reconnect (for keepalive and setup timeouts)
 - For AUTH_STATE timeout, the client also attempts to reconnect
@@ -482,6 +511,7 @@ All configuration options are optional. If not provided, defaults are used.
 ### Default Behavior
 
 With default configuration:
+
 - Keepalive messages are sent every 30 seconds
 - Server timeout is 60 seconds
 - Action timeout is 10 seconds
@@ -515,6 +545,7 @@ A connector must implement the `DXLinkWebSocketConnector` interface:
 - **setMessageListener()**: Registers callback for incoming messages
 
 The connector is responsible for:
+
 - Managing the WebSocket connection lifecycle
 - Serializing/deserializing JSON messages
 - Handling WebSocket events and converting them to connector callbacks
@@ -544,14 +575,14 @@ client.connect('wss://demo.dxfeed.com/dxlink-ws')
 client.addConnectionStateChangeListener((state) => {
   if (state === DXLinkConnectionState.CONNECTED) {
     const channel = client.openChannel('FEED', { contract: 'AUTO' })
-    
+
     // Listen for channel state changes
     channel.addStateChangeListener((state) => {
       if (state === DXLinkChannelState.OPENED) {
         // Channel is ready to use
       }
     })
-    
+
     // Listen for messages
     channel.addMessageListener((message) => {
       console.log('Received:', message)
@@ -598,7 +629,7 @@ feedChannel.addStateChangeListener((state) => {
     // Channel is ready, can send messages
     feedChannel.send({
       type: 'FEED_SUBSCRIPTION',
-      add: [{ type: 'Quote', symbol: 'AAPL' }]
+      add: [{ type: 'Quote', symbol: 'AAPL' }],
     })
   }
 })
@@ -617,7 +648,7 @@ const client = new DXLinkWebSocketClient()
 // Handle connection-level errors
 client.addErrorListener((error) => {
   console.error('Connection error:', error.type, error.message)
-  
+
   if (error.type === 'UNAUTHORIZED') {
     // May need to refresh auth token
   } else if (error.type === 'TIMEOUT') {
@@ -638,19 +669,20 @@ The client handles reconnection automatically, but you may want to react to reco
 
 ```typescript
 const client = new DXLinkWebSocketClient({
-  maxReconnectAttempts: 10 // Limit reconnection attempts
+  maxReconnectAttempts: 10, // Limit reconnection attempts
 })
 
 let reconnectCount = 0
 
 client.addConnectionStateChangeListener((state, prev) => {
-  if (state === DXLinkConnectionState.CONNECTING && 
-      prev === DXLinkConnectionState.CONNECTED) {
+  if (state === DXLinkConnectionState.CONNECTING && prev === DXLinkConnectionState.CONNECTED) {
     // Reconnection in progress
     reconnectCount++
     console.log(`Reconnecting (attempt ${reconnectCount})...`)
-  } else if (state === DXLinkConnectionState.CONNECTED && 
-             prev === DXLinkConnectionState.CONNECTING) {
+  } else if (
+    state === DXLinkConnectionState.CONNECTED &&
+    prev === DXLinkConnectionState.CONNECTING
+  ) {
     // Reconnected successfully
     console.log('Reconnected!')
     reconnectCount = 0
@@ -668,17 +700,18 @@ const customConnectorFactory = (url: string) => {
   // This is a conceptual example - actual implementation depends on WebSocket library
   return new CustomWebSocketConnector(url, {
     headers: {
-      'X-Custom-Header': 'value'
-    }
+      'X-Custom-Header': 'value',
+    },
   })
 }
 
 const client = new DXLinkWebSocketClient({
-  connectorFactory: customConnectorFactory
+  connectorFactory: customConnectorFactory,
 })
 ```
 
 Use custom connectors when you need:
+
 - Custom WebSocket libraries (e.g., for Node.js environments)
 - Additional connection parameters (headers, protocols)
 - Mock implementations for testing
@@ -708,6 +741,7 @@ To implement a custom connector:
 6. Call the appropriate listeners when events occur
 
 The connector should handle:
+
 - Connection state management
 - Message serialization/deserialization
 - Basic message validation (type, channel fields)
@@ -740,4 +774,3 @@ The client integrates with other dxLink packages:
 - **@dxfeed/dxlink-indichart**: Uses the client to open IndiChart service channels
 
 The client provides the transport layer, while service-specific packages provide higher-level APIs for working with specific services. This separation allows the WebSocket client to be protocol-focused while service packages handle service-specific logic.
-

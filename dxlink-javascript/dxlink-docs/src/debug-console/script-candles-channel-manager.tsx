@@ -1,10 +1,10 @@
 import { createChart, Chart } from '@devexperts/dxcharts-lite'
 import {
-  DXLinkChannelState,
   type DXLinkIndiChartCandle,
   type DXLinkIndiChartIndicator,
   type DXLinkIndiChartIndicatorParameterMeta,
   type DXLinkIndiChartIndicatorsData,
+  type DXLinkIndiChartIndicatorsParameters,
   type DXLinkIndiChartSubscription,
 } from '@dxfeed/dxlink-api'
 import { unit } from '@dxfeed/ui-kit/utils'
@@ -17,7 +17,6 @@ import { ScriptCandlesSubscription } from './script-candles-subscription'
 import { SortedList } from '../candles/sorted-list'
 import type { ChartDataType, ChartHolder } from '../chart-wrapper'
 import { ContentTemplate } from '../common/content-template'
-import type { DXLinkIndiChartSubscriptionMessage } from '../../../dxlink-indichart/build/messages'
 
 const ChartContainer = styled.div`
   width: 100%;
@@ -343,7 +342,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     )
   }
 
-  const handleOnApply = (values: Record<string, any>) => {
+  const handleOnApply = (values: DXLinkIndiChartIndicatorsParameters[string]) => {
     channel.getChart()?.updateIndicatorsParameters({ current: values })
   }
 
@@ -359,7 +358,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
         <ScriptCandlesSubscription onSet={handleSet} onReset={handleReset} error={error} />{' '}
       </Group>
 
-      {(inParameters.length > 0 && available) && (
+      {inParameters.length > 0 && available && (
         <ContentTemplate title={'Input Parameters'}>
           <ParameterFieldContainer parameters={inParameters} onApply={handleOnApply} />
         </ContentTemplate>
