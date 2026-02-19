@@ -14,18 +14,16 @@ import { unit } from '@dxfeed/ui-kit/utils'
 import { useState } from 'react'
 import AceEditor from 'react-ace'
 import styled from 'styled-components'
+import Samples from '@dxfeed/dxscript-js-samples'
 
 import { ErrorIcon, JSIcon } from './icons'
-import {
-  INDICHART_INDICATOR_EXAMPLES,
-  INDICHART_INDICATROS,
-  type Lang,
-} from './indichart-indicators'
 import { ContentTemplate } from '../common/content-template'
 import 'ace-builds/src-noconflict/mode-python'
 import 'ace-builds/src-noconflict/mode-javascript'
 import 'ace-builds/src-noconflict/theme-textmate'
 import './ace-dxscript-mode'
+
+type Lang = 'dxscript-js'
 
 const FieldsGroup = styled.div`
   display: grid;
@@ -141,8 +139,8 @@ export function ScriptCandlesSubscription({
   const [symbol, setSymbol] = useState('AAPL{=d}')
   const [fromTime, setFromTime] = useState('0')
 
-  const [exampleId, setExampleId] = useState<string>(INDICHART_INDICATOR_EXAMPLES[0]!.id)
-  const [script, setScript] = useState<string>(INDICHART_INDICATROS[lang]?.[exampleId] ?? '')
+  const [exampleId, setExampleId] = useState<string>(Samples.list()[0]?.name ?? '')
+  const [script, setScript] = useState<string>(Samples.get(exampleId)?.content ?? '')
   const [search, setSearch] = useState('')
 
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
@@ -161,10 +159,10 @@ export function ScriptCandlesSubscription({
   }
 
   const examples = search
-    ? INDICHART_INDICATOR_EXAMPLES.filter((item) =>
-        item.id.toLowerCase().includes(search.toLowerCase())
+    ? Samples.list().filter((item) =>
+        item.name.toLowerCase().includes(search.toLowerCase())
       )
-    : INDICHART_INDICATOR_EXAMPLES
+    : Samples.list()
 
   return (
     <ContentTemplate title="Manage channel">
@@ -270,15 +268,15 @@ export function ScriptCandlesSubscription({
                   <ExampleItem
                     onClick={() => {
                       setAnchorEl(null)
-                      setExampleId(example.id)
-                      setScript(INDICHART_INDICATROS[lang]?.[example.id] ?? '')
+                      setExampleId(example.name)
+                      setScript(Samples.get(example.name)?.content ?? '')
                     }}
-                    key={example.id}
+                    key={example.title}
                   >
                     <ExampleText color="inherit">
-                      <Text color="inherit">{example.id}</Text>
-                      {example.docUrl && (
-                        <ExampleDoc href={example.docUrl} target="blank" rel="noreferrer">
+                      <Text color="inherit">{example.title}</Text>
+                      {example.docs && (
+                        <ExampleDoc href={example.docs} target="blank" rel="noreferrer">
                           [Docs]
                         </ExampleDoc>
                       )}

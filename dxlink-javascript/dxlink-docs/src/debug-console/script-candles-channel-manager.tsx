@@ -351,7 +351,6 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     setInParameters([])
     setAvailable(false)
   }
-
   return (
     <>
       <Group>
