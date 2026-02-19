@@ -1,4 +1,4 @@
-import type { DXLinkLogLevel } from '@dxfeed/dxlink-core'
+import type { DXLinkLogLevel, DXLinkScheduler } from '@dxfeed/dxlink-core'
 
 import type { DXLinkWebSocketConnector } from './connector'
 
@@ -34,6 +34,11 @@ export interface DXLinkWebSocketClientConfig {
    * If 0, then reconnect attempts are not limited.
    */
   readonly maxReconnectAttempts: number
+  /**
+   * Scheduler used by the client for reconnect and timeout handling.
+   * If not provided, {@link DefaultDXLinkScheduler} is used.
+   */
+  readonly scheduler?: DXLinkScheduler
   /**
    * Factory function to create a WebSocket connector.
    * This function should return an instance of {@link DXLinkWebSocketConnector} for the given URL.

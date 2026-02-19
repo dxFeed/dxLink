@@ -1,6 +1,7 @@
 import type { DXLinkAuthState, DXLinkAuthStateChangeListener } from './auth'
 import type { DXLinkChannel } from './channel'
 import type { DXLinkErrorListener } from './error'
+import type { DXLinkScheduler } from './scheduler'
 
 /**
  * Connection state that can be used to check if connection is established and ready to use.
@@ -100,6 +101,10 @@ export interface DXLinkClient {
    * Get connection state that can be used to check if connection is established and ready to use.
    */
   getConnectionState(): DXLinkConnectionState
+  /**
+   * Get scheduler used by the client and services.
+   */
+  getScheduler(): DXLinkScheduler
   /**
    * Add a listener for connection state changes.
    */
