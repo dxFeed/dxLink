@@ -123,7 +123,11 @@ export const dxScriptCompletions = [
   { caption: 'spline.STYLE_CIRCLES', value: 'spline.STYLE_CIRCLES', meta: 'constant' },
   { caption: 'spline.STYLE_LINE_BREAK', value: 'spline.STYLE_LINE_BREAK', meta: 'constant' },
   { caption: 'spline.STYLE_AREA_BREAK', value: 'spline.STYLE_AREA_BREAK', meta: 'constant' },
-  { caption: 'spline.STYLE_STEPLINE_BREAK', value: 'spline.STYLE_STEPLINE_BREAK', meta: 'constant' },
+  {
+    caption: 'spline.STYLE_STEPLINE_BREAK',
+    value: 'spline.STYLE_STEPLINE_BREAK',
+    meta: 'constant',
+  },
 
   // Enum/string values used in options (LineStyle / LineExtend / BoxExtend / Align / XLocation / TextFormatting)
   { caption: 'SOLID', value: 'SOLID', meta: 'enum' },

@@ -1,7 +1,6 @@
+import type { DXLinkIndiChartIndicatorParameterMeta } from '@dxfeed/dxlink-api'
 import { TextField } from '@dxfeed/ui-kit/TextField'
 import styled from 'styled-components'
-
-import type { DXLinkIndiChartIndicatorParameterMeta } from '@dxfeed/dxlink-api'
 
 const SelectField = styled.select`
   width: 100%;
@@ -32,20 +31,20 @@ const ColorField = styled.input`
 
 interface ParameterFieldProps {
   parameter: Readonly<DXLinkIndiChartIndicatorParameterMeta>
-  value: any
-  onChange?: (value: any) => void
+  value: number | string | boolean
+  onChange?: (value: number | string | boolean) => void
 }
 
 export function ParameterField({ parameter, value, onChange }: ParameterFieldProps) {
-  const handleChange = (newValue: any) => {
+  const handleChange = (newValue: number | string | boolean) => {
     onChange?.(newValue)
   }
 
   const renderField = () => {
     const commonProps = {
       label: parameter.name,
-      value: value.toString(),
-      onChange: (e: any) => handleChange(e.target.value),
+      value: String(value),
+      onChange: (e) => handleChange(e.target.value),
     }
 
     switch (parameter.type) {
@@ -65,7 +64,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
                 {parameter.name}
               </label>
               <SelectField
-                value={value}
+                value={String(value)}
                 onChange={(e) => handleChange(Number.parseFloat(e.target.value))}
               >
                 {parameter.options.map((option) => (
@@ -106,8 +105,8 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             <input
               id={`checkbox-${parameter.name}`}
               type="checkbox"
-              checked={value}
-              onChange={(e: any) => handleChange(e.target.checked)}
+              checked={Boolean(value)}
+              onChange={(e) => handleChange(e.target.checked)}
               style={{
                 width: '20px',
                 height: '20px',
@@ -132,7 +131,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
               >
                 {parameter.name}
               </label>
-              <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
+              <SelectField value={String(value)} onChange={(e) => handleChange(e.target.value)}>
                 {parameter.options.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -158,12 +157,12 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             </label>
             <ColorField
               type="color"
-              value={value}
+              value={String(value).slice(0, 7)}
               onChange={(e) => handleChange(e.target.value.slice(0, 7))}
             />
           </div>
         )
-      case 'SOURCE':
+      case 'SOURCE': {
         const sourceOptions = parameter.options || ['open', 'high', 'low', 'close', 'volume']
         return (
           <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -177,7 +176,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             >
               {parameter.name}
             </label>
-            <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
+            <SelectField value={String(value)} onChange={(e) => handleChange(e.target.value)}>
               {sourceOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -186,6 +185,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
             </SelectField>
           </div>
         )
+      }
       case 'SESSION':
         if (parameter.options && parameter.options.length > 0) {
           // Dropdown for predefined sessions
@@ -201,7 +201,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
               >
                 {parameter.name}
               </label>
-              <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
+              <SelectField value={String(value)} onChange={(e) => handleChange(e.target.value)}>
                 {parameter.options.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -228,7 +228,7 @@ export function ParameterField({ parameter, value, onChange }: ParameterFieldPro
               >
                 {parameter.name}
               </label>
-              <SelectField value={value} onChange={(e) => handleChange(e.target.value)}>
+              <SelectField value={String(value)} onChange={(e) => handleChange(e.target.value)}>
                 {parameter.options.map((option) => (
                   <option key={option} value={option}>
                     {option}

@@ -162,7 +162,7 @@ export interface DXLinkDepthOfMarketRequester {
  * Options for the {@link DXLinkDepthOfMarket} instance.
  */
 export interface DXLinkDepthOfMarketOptions {
-    /**
+  /**
    * Space to be used for the service.
    */
   space?: string

@@ -1,9 +1,9 @@
+import type { DXLinkIndiChartIndicatorParameterMeta } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import type { DXLinkIndiChartIndicatorParameterMeta } from '@dxfeed/dxlink-api'
 import { ParameterField } from './parameter-field'
 
 // dxScript default colors mapping
@@ -36,7 +36,10 @@ const COLOR_MAP: Record<string, string> = {
   PINK: '#FFC0CB',
 }
 
-function getColorValue(value: any): string {
+type ParameterValue = number | string | boolean
+type ParameterValues = Record<string, ParameterValue>
+
+function getColorValue(value: unknown): string {
   if (typeof value === 'string') {
     if (value.startsWith('#')) {
       return value.slice(0, 7)
@@ -79,13 +82,13 @@ const Actions = styled.div`
 
 interface ParameterFieldContainerProps {
   parameters: readonly DXLinkIndiChartIndicatorParameterMeta[]
-  onApply?: (values: Record<string, any>) => void
+  onApply?: (values: ParameterValues) => void
 }
 
 export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldContainerProps) {
   const initialValues = useMemo(() => {
     return parameters.reduce((acc, param) => {
-      let initialValue: any
+      let initialValue: ParameterValue
 
       if (param.type === 'DOUBLE') {
         const val = param.value ?? param.defaultValue ?? 0
@@ -100,10 +103,10 @@ export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldC
 
       acc[param.name] = initialValue
       return acc
-    }, {} as Record<string, any>)
+    }, {} as ParameterValues)
   }, [parameters])
 
-  const [values, setValues] = useState<Record<string, any>>({})
+  const [values, setValues] = useState<ParameterValues>({})
 
   useEffect(() => {
     setValues(initialValues)
@@ -127,7 +130,7 @@ export function ParameterFieldContainer({ parameters, onApply }: ParameterFieldC
               key={param.name}
               parameter={param}
               value={values[param.name] ?? initialValues[param.name]}
-              onChange={(newValue) => setValues(prev => ({ ...prev, [param.name]: newValue }))}
+              onChange={(newValue) => setValues((prev) => ({ ...prev, [param.name]: newValue }))}
             />
           ))}
       </FieldsGrid>

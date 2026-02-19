@@ -4,6 +4,7 @@ import {
   type DXLinkIndiChartIndicator,
   type DXLinkIndiChartIndicatorParameterMeta,
   type DXLinkIndiChartIndicatorsData,
+  type DXLinkIndiChartIndicatorsParameters,
   type DXLinkIndiChartSubscription,
 } from '@dxfeed/dxlink-api'
 import { unit } from '@dxfeed/ui-kit/utils'
@@ -341,7 +342,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     )
   }
 
-  const handleOnApply = (values: Record<string, any>) => {
+  const handleOnApply = (values: DXLinkIndiChartIndicatorsParameters[string]) => {
     channel.getChart()?.updateIndicatorsParameters({ current: values })
   }
 
@@ -356,7 +357,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
         <ScriptCandlesSubscription onSet={handleSet} onReset={handleReset} error={error} />{' '}
       </Group>
 
-      {(inParameters.length > 0 && available) && (
+      {inParameters.length > 0 && available && (
         <ContentTemplate title={'Input Parameters'}>
           <ParameterFieldContainer parameters={inParameters} onApply={handleOnApply} />
         </ContentTemplate>
