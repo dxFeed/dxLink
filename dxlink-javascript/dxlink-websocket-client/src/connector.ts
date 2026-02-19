@@ -117,7 +117,6 @@ export class DefaultDXLinkWebSocketConnector implements DXLinkWebSocketConnector
     this.socket.removeEventListener('open', this.handleOpen)
 
     this.socket.addEventListener('message', this.handleMessage)
-    this.socket.addEventListener('close', this.handleClosed)
 
     this.openListener?.()
   }
