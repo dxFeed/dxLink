@@ -5,6 +5,10 @@ dxLink JavaScript API
 ## Public API naming
 - Public interfaces and types are prefixed with `DXLink` to minimize symbol collisions in consumer code.
 
+## Constants style
+- Prefer `as const` for constants where literal narrowing is useful.
+- Name constants in `UPPER_SNAKE_CASE`.
+
 ## Scheduler architecture
 - `DXLinkWebSocketClient` owns a scheduler and exposes it via `getScheduler()`.
 - Scheduler can be overridden through `DXLinkWebSocketClient` options; if not provided, `DefaultDXLinkScheduler` is created automatically.
