@@ -13,3 +13,19 @@ dxLink JavaScript API
 
 ## Packages
 - `@dxfeed/dxlink-api` re-exports public API from all dxlink JavaScript packages, except `dxlink-docs`.
+
+## Development Commands
+- Run commands from `dxlink-javascript` directory.
+- Verify everything (build + test + lint):
+  - `npm run build`
+  - `npm run test`
+  - `npm run lint`
+- Format all supported files:
+  - `npm run format`
+- Lint with auto-fix across packages:
+  - `npm run lint:fix`
+- Run commands for a single workspace package:
+  - `npm run build -w <workspace>`
+  - `npm run test -w <workspace>`
+  - `npm run lint -w <workspace>`
+  - `npm run lint -w <workspace> -- --fix`
