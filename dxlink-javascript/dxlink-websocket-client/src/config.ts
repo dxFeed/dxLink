@@ -31,7 +31,7 @@ export interface DXLinkWebSocketClientConfig {
   /**
    * Maximum number of reconnect attempts.
    * If connection is not established after this number of attempts, connection will be closed.
-   * If not set, then reconnect attempts are not limited.
+   * Default: -1. By default, reconnect attempts are unlimited.
    */
   readonly maxReconnectAttempts: number
   /**
