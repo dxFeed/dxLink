@@ -14,7 +14,7 @@ import { unit } from '@dxfeed/ui-kit/utils'
 import { useState } from 'react'
 import AceEditor from 'react-ace'
 import styled from 'styled-components'
-import Samples from '@dxfeed/dxscript-js-samples'
+import Samples from '@dxscript/js-samples'
 
 import { ErrorIcon, JSIcon } from './icons'
 import { ContentTemplate } from '../common/content-template'

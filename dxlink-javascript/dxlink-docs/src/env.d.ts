@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-declare module '@dxfeed/dxscript-js-samples' {
+declare module '@dxscript/js-samples' {
   export interface Sample {
     name: string;
     title: string;
@@ -10,6 +10,6 @@ declare module '@dxfeed/dxscript-js-samples' {
 
   export default {
     list(): Sample[]
-    ,get(name: string): Sample | undefined;
+    , get(name: string): Sample | undefined;
   };
 }
