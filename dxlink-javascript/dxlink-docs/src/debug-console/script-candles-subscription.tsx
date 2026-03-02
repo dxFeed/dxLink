@@ -159,9 +159,7 @@ export function ScriptCandlesSubscription({
   }
 
   const examples = search
-    ? Samples.list().filter((item) =>
-        item.name.toLowerCase().includes(search.toLowerCase())
-      )
+    ? Samples.list().filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))
     : Samples.list()
 
   return (

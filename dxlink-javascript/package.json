@@ -26,9 +26,10 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "test": "turbo run test",
-    "format": "prettier --write **/*.{js,ts,tsx,md}",
+    "format": "prettier --write **/*.{js,ts,tsx,d.ts,md}",
     "demo": "npm run start -w dxlink-api",
-    "docs": "npm run start -w dxlink-docs"
+    "docs": "npm run start -w dxlink-docs",
+    "changeset": "changeset"
   },
   "devDependencies": {
     "@changesets/cli": "^2.26.2",
