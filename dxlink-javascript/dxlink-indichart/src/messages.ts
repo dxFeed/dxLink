@@ -127,6 +127,7 @@ export interface DXLinkIndiChartSplinePoint {
   readonly offset?: number
   readonly title?: string
   readonly color?: DXLinkIndiChartColor
+  readonly overlay?: boolean
 }
 
 export interface DXLinkIndiChartCalculationResult {
