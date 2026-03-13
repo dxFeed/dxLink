@@ -1,5 +1,11 @@
 # @dxfeed/dxlink-core
 
+## 0.7.0
+
+### Minor Changes
+
+- Add ability to override scheduler for the client
+
 ## 0.6.1
 
 ## 0.6.0

@@ -1,5 +1,16 @@
 # @dxfeed/dxlink-websocket-client
 
+## 0.7.0
+
+### Minor Changes
+
+- Add ability to override scheduler for the client
+
+### Patch Changes
+
+- Updated dependencies
+  - @dxfeed/dxlink-core@0.7.0
+
 ## 0.6.1
 
 ### Patch Changes

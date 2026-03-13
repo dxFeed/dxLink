@@ -1,5 +1,22 @@
 # @dxfeed/dxlink-api
 
+## 0.7.0
+
+### Minor Changes
+
+- Update API of Indichart to latest server version
+- Add ability to override scheduler for the client
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @dxfeed/dxlink-feed@0.7.0
+  - @dxfeed/dxlink-indichart@0.7.0
+  - @dxfeed/dxlink-core@0.7.0
+  - @dxfeed/dxlink-websocket-client@0.7.0
+  - @dxfeed/dxlink-dom@0.7.0
+
 ## 0.6.1
 
 ### Patch Changes

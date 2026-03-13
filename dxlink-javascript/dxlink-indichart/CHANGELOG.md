@@ -1,5 +1,16 @@
 # @dxfeed/dxlink-indichart
 
+## 0.7.0
+
+### Minor Changes
+
+- Update API of Indichart to latest server version
+
+### Patch Changes
+
+- Updated dependencies
+  - @dxfeed/dxlink-core@0.7.0
+
 ## 0.6.1
 
 ### Patch Changes

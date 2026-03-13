@@ -1,5 +1,12 @@
 # @dxfeed/dxlink-dom
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @dxfeed/dxlink-core@0.7.0
+
 ## 0.6.1
 
 ### Patch Changes
