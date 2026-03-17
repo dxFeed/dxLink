@@ -31,10 +31,16 @@ export class Scheduler {
   private runBatch(batchKey: number): void {
     const batch = this.batches.get(batchKey)
     if (batch === undefined) return
-    this.batches.delete(batchKey)
-    for (const [k, cb] of batch.callbacks) {
-      this.keyToBatch.delete(k)
-      cb()
+    try {
+      for (const [k, cb] of batch.callbacks) {
+        this.keyToBatch.delete(k)
+        cb()
+      }
+    } finally {
+      for (const k of batch.callbacks.keys()) {
+        this.keyToBatch.delete(k)
+      }
+      this.batches.delete(batchKey)
     }
   }
 

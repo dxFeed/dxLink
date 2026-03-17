@@ -88,6 +88,55 @@ test('clear cancels all scheduled tasks', async () => {
   assert.is(b, false)
 })
 
+test('cancel called from within a batch prevents the cancelled callback in same batch from running', async () => {
+  const scheduler = new Scheduler()
+  let bCalled = false
+  scheduler.schedule(
+    () => {
+      scheduler.cancel('B')
+    },
+    50,
+    'A'
+  )
+  scheduler.schedule(
+    () => {
+      bCalled = true
+    },
+    50,
+    'B'
+  )
+  await new Promise((r) => setTimeout(r, 100))
+  assert.is(bCalled, false)
+  scheduler.clear()
+})
+
+test('when a callback in a batch throws, keys of not-run callbacks are cleared from scheduler state', async () => {
+  const scheduler = new Scheduler()
+  const expectedMessage = 'callback error'
+  let caught: Error | undefined
+  const onUncaught = (err: Error) => {
+    caught = err
+    process.off('uncaughtException', onUncaught)
+  }
+  process.on('uncaughtException', onUncaught)
+  try {
+    scheduler.schedule(
+      () => {
+        throw new Error(expectedMessage)
+      },
+      50,
+      'A'
+    )
+    scheduler.schedule(() => {}, 50, 'B')
+    await new Promise((r) => setTimeout(r, 100))
+    assert.is(scheduler.has('B'), false)
+    assert.is(caught?.message, expectedMessage)
+  } finally {
+    process.off('uncaughtException', onUncaught)
+  }
+  scheduler.clear()
+})
+
 test('many schedule calls with same key create only one timer', () => {
   let setTimeoutCalls = 0
   const originalSetTimeout = globalThis.setTimeout
