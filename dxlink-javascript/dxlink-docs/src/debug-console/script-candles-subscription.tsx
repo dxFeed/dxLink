@@ -239,7 +239,7 @@ export function ScriptCandlesSubscription({
                 enableLiveAutocompletion: true,
                 enableSnippets: false,
                 showLineNumbers: true,
-                tabSize: 1,
+                tabSize: 2,
               }}
             />
           </CodeEditorInput>
