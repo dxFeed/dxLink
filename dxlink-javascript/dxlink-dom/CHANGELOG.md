@@ -1,5 +1,11 @@
 # @dxfeed/dxlink-dom
 
+## 0.8.0
+
+### Patch Changes
+
+- @dxfeed/dxlink-core@0.8.0
+
 ## 0.7.0
 
 ### Patch Changes

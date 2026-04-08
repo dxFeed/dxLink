@@ -1,5 +1,21 @@
 # @dxfeed/dxlink-api
 
+## 0.8.0
+
+### Minor Changes
+
+- 185957f: feat(rpc): add rpc service support
+
+### Patch Changes
+
+- Updated dependencies [185957f]
+  - @dxfeed/dxlink-rpc@0.8.0
+  - @dxfeed/dxlink-core@0.8.0
+  - @dxfeed/dxlink-dom@0.8.0
+  - @dxfeed/dxlink-feed@0.8.0
+  - @dxfeed/dxlink-indichart@0.8.0
+  - @dxfeed/dxlink-websocket-client@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

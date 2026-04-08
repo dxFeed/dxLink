@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-rpc",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": false,
   "sideEffects": false,
   "description": "dxLink RPC provides utilities for RPC over dxLink client using rxjs Observable",
@@ -27,7 +27,7 @@
     "test:watch": "tsx watch src/index.test.ts"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.7.0"
+    "@dxfeed/dxlink-core": "0.8.0"
   },
   "peerDependencies": {
     "rxjs": ">=7.0.0"

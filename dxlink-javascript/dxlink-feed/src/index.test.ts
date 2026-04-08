@@ -52,7 +52,6 @@ test(`Live feed service returns Quote for AAPL`, async () => {
   })
   feed.addSubscriptions({ type: 'Quote', symbol: 'AAPL' })
 
-
   try {
     client.connect(DEMO_URL)
 
