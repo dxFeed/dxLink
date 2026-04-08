@@ -19,6 +19,7 @@
     "dxlink-feed",
     "dxlink-dom",
     "dxlink-indichart",
+    "dxlink-rpc",
     "dxlink-docs"
   ],
   "scripts": {

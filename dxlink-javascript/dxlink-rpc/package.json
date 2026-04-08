@@ -1,9 +1,9 @@
 {
-  "name": "@dxfeed/dxlink-api",
+  "name": "@dxfeed/dxlink-rpc",
   "version": "0.7.0",
   "private": false,
   "sideEffects": false,
-  "description": "dxLink API provides access to market data from dxFeed services",
+  "description": "dxLink RPC provides utilities for RPC over dxLink client using rxjs Observable",
   "source": "src/index.ts",
   "exports": {
     "types": "./build/index.d.ts",
@@ -20,18 +20,20 @@
     "mangle": false
   },
   "scripts": {
-    "start": "vite ./demo",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && npm run test",
     "build": "microbundle -f esm,cjs",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "tsx src/index.test.ts",
+    "test:watch": "tsx watch src/index.test.ts"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.7.0",
-    "@dxfeed/dxlink-websocket-client": "0.7.0",
-    "@dxfeed/dxlink-feed": "0.7.0",
-    "@dxfeed/dxlink-dom": "0.7.0",
-    "@dxfeed/dxlink-indichart": "0.7.0",
-    "@dxfeed/dxlink-rpc": "0.7.0"
+    "@dxfeed/dxlink-core": "0.7.0"
+  },
+  "peerDependencies": {
+    "rxjs": ">=7.0.0"
+  },
+  "devDependencies": {
+    "rxjs": "^7.5.2"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [
@@ -49,23 +51,17 @@
     "url": "https://github.com/dxfeed/dxlink/issues"
   },
   "homepage": "https://dxfeed.com/",
+  "keywords": [
+    "api",
+    "rpc",
+    "client",
+    "rxjs",
+    "observable",
+    "dxfeed",
+    "dxlink"
+  ],
   "files": [
     "/build",
     "/package.json"
-  ],
-  "keywords": [
-    "api",
-    "feed",
-    "client",
-    "financial-data",
-    "market-data",
-    "market-data-feeds",
-    "market-api",
-    "stock-market",
-    "stock-price-data",
-    "real-time-data",
-    "historical-data",
-    "dxfeed",
-    "dxlink"
   ]
 }
