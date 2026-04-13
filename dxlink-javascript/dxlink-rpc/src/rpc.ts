@@ -10,7 +10,7 @@ import {
 } from '@dxfeed/dxlink-core'
 import { Observable, of, type Subscription } from 'rxjs'
 
-import { isChannelDataMessage } from './types'
+import { CHANNEL_DATA_TYPE, isChannelDataMessage } from './types'
 
 /**
  * Options for the {@link DxLinkRpcService} instance.
@@ -126,9 +126,6 @@ export class DxLinkRpcService {
     retry: boolean
   ): Observable<Response> {
     return new Observable<Response>((subscriber) => {
-      // Opens a dedicated channel by sending CHANNEL_REQUEST with the service name
-      // and methodName in parameters. The server uses `service` to route to the RPC handler,
-      // and `methodName` to select which method to invoke.
       const channel: DXLinkChannel = this.client.openChannel(
         this.service,
         { methodName: method },
@@ -147,7 +144,7 @@ export class DxLinkRpcService {
         inputSubscription = input$.subscribe({
           next: (value) => {
             try {
-              channel.send({ type: 'CHANNEL_DATA', payload: value })
+              channel.send({ type: CHANNEL_DATA_TYPE, payload: value })
             } catch (err) {
               subscriber.error(err)
             }
