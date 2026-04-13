@@ -1,4 +1,3 @@
-import { DXLinkConnectionState } from '@dxfeed/dxlink-core'
 import { test } from 'uvu'
 import * as assert from 'uvu/assert'
 
@@ -20,15 +19,12 @@ const waitForFirstEvents = (
       resolve(events)
     }
 
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
     const cleanup = () => {
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId)
-      }
+      clearTimeout(timeoutId)
       feed.removeEventListener(listener)
     }
 
-    timeoutId = setTimeout(() => {
+    const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => {
       cleanup()
       reject(new Error('Timeout waiting for Quote event for AAPL'))
     }, timeoutMs)

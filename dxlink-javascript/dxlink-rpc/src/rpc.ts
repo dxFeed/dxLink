@@ -10,7 +10,7 @@ import {
 } from '@dxfeed/dxlink-core'
 import { Observable, of, type Subscription } from 'rxjs'
 
-import { type ChannelDataMessage, isChannelDataMessage } from './types'
+import { isChannelDataMessage } from './types'
 
 /**
  * Options for the {@link DxLinkRpcService} instance.
@@ -135,46 +135,34 @@ export class DxLinkRpcService {
         { reconnect: retry }
       )
 
-      // Buffer for values emitted before the channel reaches OPENED state.
-      // CHANNEL_DATA cannot be sent until the server confirms with CHANNEL_OPENED;
-      // any input emitted before that (or during reconnect) is queued here and flushed on OPENED.
-      const buffer: ChannelDataMessage<Request>[] = []
+      let inputSubscription: Subscription | undefined
 
-      const sendOrBuffer = (message: ChannelDataMessage<Request>) => {
-        if (channel.getState() === DXLinkChannelState.OPENED) {
-          try {
-            channel.send(message)
-          } catch (err) {
+      // Subscribe to input only when the channel reaches OPENED state.
+      // Callers needing to emit values before the channel opens (or replay them on reconnect)
+      // should wrap their input in a ReplaySubject — its replay buffer drains synchronously
+      // when we subscribe here, and the values are sent immediately on the open channel.
+      const subscribeToInput = () => {
+        if (inputSubscription !== undefined) return
+
+        inputSubscription = input$.subscribe({
+          next: (value) => {
+            try {
+              channel.send({ type: 'CHANNEL_DATA', payload: value })
+            } catch (err) {
+              subscriber.error(err)
+            }
+          },
+          error: (err) => {
             subscriber.error(err)
-          }
-        } else {
-          buffer.push(message)
-        }
+            channel.close()
+          },
+        })
       }
 
-      const flushBuffer = () => {
-        while (buffer.length > 0) {
-          const message = buffer.shift()!
-          try {
-            channel.send(message)
-          } catch (err) {
-            subscriber.error(err)
-            return
-          }
-        }
+      const unsubscribeFromInput = () => {
+        inputSubscription?.unsubscribe()
+        inputSubscription = undefined
       }
-
-      // Subscribe to input immediately so that values from cold observables (like of(request))
-      // and values pushed before OPENED are not lost — they are buffered until the channel opens.
-      const inputSubscription: Subscription = input$.subscribe({
-        next: (value) => {
-          sendOrBuffer({ type: 'CHANNEL_DATA', payload: value })
-        },
-        error: (err) => {
-          subscriber.error(err)
-          channel.close()
-        },
-      })
 
       // Server responses arrive as CHANNEL_DATA messages on the same channel id.
       // Each payload is extracted and emitted on the output Observable.
@@ -189,18 +177,20 @@ export class DxLinkRpcService {
 
       const stateListener = (state: DXLinkChannelState) => {
         switch (state) {
-          // Server confirmed the channel with CHANNEL_OPENED — flush any buffered values.
+          // Server confirmed the channel with CHANNEL_OPENED — subscribe input and start sending.
           case DXLinkChannelState.OPENED:
-            flushBuffer()
+            subscribeToInput()
             break
           // Channel is re-requesting after a connection drop.
-          // New input values will be buffered until OPENED again.
+          // Unsubscribe input; on next OPENED we re-subscribe and a ReplaySubject input would
+          // re-emit its buffered values automatically.
           case DXLinkChannelState.REQUESTED:
+            unsubscribeFromInput()
             break
           // Server sent CHANNEL_CLOSED — the RPC for this channel id is finished.
           // The channel id must not be reused; the output Observable completes.
           case DXLinkChannelState.CLOSED:
-            inputSubscription.unsubscribe()
+            unsubscribeFromInput()
             subscriber.complete()
             break
         }
@@ -220,16 +210,16 @@ export class DxLinkRpcService {
       channel.addErrorListener(errorListener)
 
       // The channel implementation may not fire the state listener synchronously on add,
-      // so flush the buffer if the channel is already OPENED to avoid missing the initial state.
+      // so subscribe to input now if the channel is already OPENED.
       if (channel.getState() === DXLinkChannelState.OPENED) {
-        flushBuffer()
+        subscribeToInput()
       }
 
       // Teardown: sends CHANNEL_CANCEL to the server, telling it to abort the RPC.
       // The server should respond with CHANNEL_CLOSED to retire the channel id.
       // channel.close() is idempotent — safe to call even if already closed.
       return () => {
-        inputSubscription.unsubscribe()
+        unsubscribeFromInput()
         channel.removeMessageListener(messageListener)
         channel.removeStateChangeListener(stateListener)
         channel.removeErrorListener(errorListener)

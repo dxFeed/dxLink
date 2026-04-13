@@ -44,7 +44,6 @@ const waitForConnectionState = (
     client.addConnectionStateChangeListener(listener)
   })
 
-
 test(`Live market-data endpoint success-path`, async () => {
   const client = new DXLinkWebSocketClient({
     actionTimeout: ACTION_TIMEOUT_SEC,
