@@ -6,6 +6,7 @@ import {
   DXLinkDepthOfMarket,
   DXLinkIndiChart,
   type DXLinkIndiChartIndicators,
+  DxLinkRpcService,
 } from '../src'
 
 
@@ -108,6 +109,48 @@ function startIndichart(url: string): DXLinkWebSocketClient {
 }
 
 
+function startRpc(url: string): DXLinkWebSocketClient {
+  console.log('Start RPC')
+
+  const client = new DXLinkWebSocketClient()
+  client.setAuthToken("bro1:test")
+  client.connect('wss://whsdev.prosp.devexperts.com/dxlink-dxtrade-unified-gateway')
+
+  interface GetAccountStatementSettingsRequest {
+
+  }
+
+  interface GetAccountStatementSettingsResponse {
+
+  }
+
+  const rpc = new DxLinkRpcService(
+    client,
+    'dxtrade.api.experimental.reports.v1.AccountStatementService'
+  )
+
+  // Unary RPC: send one request, receive one response
+  const request: GetAccountStatementSettingsRequest = {}
+  rpc
+    .requestResponse<GetAccountStatementSettingsRequest, GetAccountStatementSettingsResponse>(
+      'GetAccountStatementSettings',
+      request
+    )
+    .subscribe({
+      next: (response) => {
+        console.log('AccountStatementSettings', response)
+      },
+      error: (err) => {
+        console.error('RPC Error', err)
+      },
+      complete: () => {
+        console.log('RPC completed')
+      },
+    })
+
+  return client
+}
+
 function createUi(): void {
   type DemoDefinition = {
     label: string
@@ -130,6 +173,11 @@ function createUi(): void {
       label: 'Indichart',
       defaultUrl: DEFAULT_URL,
       start: startIndichart,
+    } satisfies DemoDefinition,
+    rpc: {
+      label: 'RPC',
+      defaultUrl: DEFAULT_URL,
+      start: startRpc,
     } satisfies DemoDefinition,
   } as const
   

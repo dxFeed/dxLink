@@ -1,2 +1,2 @@
 export { DxLinkRpcService } from './rpc'
-export type { DxLinkRpcServiceOptions } from './rpc'
+export type { DxLinkRpcCallOptions, DxLinkRpcServiceOptions } from './rpc'

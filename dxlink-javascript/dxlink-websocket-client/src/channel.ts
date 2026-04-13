@@ -31,6 +31,7 @@ export class DXLinkWebSocketChannel implements DXLinkChannel {
     public readonly id: number,
     public readonly service: string,
     public readonly parameters: Record<string, unknown>,
+    public readonly reconnect: boolean,
     private readonly sendMessage: (message: DXLinkWebSocketMessage) => void,
     config: DXLinkWebSocketClientConfig
   ) {

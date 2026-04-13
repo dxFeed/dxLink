@@ -321,7 +321,28 @@ test('resubscribes to input$ on channel reconnect', () => {
   sub.unsubscribe()
 })
 
-test('does not send input values while channel is in REQUESTED state', () => {
+test('buffers input values emitted before channel is OPENED and flushes on OPENED', () => {
+  const mock = createMockClient()
+  const rpc = new DxLinkRpcService(mock.client, 'svc')
+  const input$ = new Subject<string>()
+
+  const sub = rpc.streamStream('Method', input$).subscribe()
+
+  // Channel is REQUESTED, not yet OPENED — values should be buffered
+  input$.next('early-1')
+  input$.next('early-2')
+  assert.is(mock.lastChannel!.sentMessages.length, 0)
+
+  // Once OPENED, the buffer is flushed
+  mock.lastChannel!.simulateOpen()
+  assert.is(mock.lastChannel!.sentMessages.length, 2)
+  assert.equal(mock.lastChannel!.sentMessages[0]!['payload'], 'early-1')
+  assert.equal(mock.lastChannel!.sentMessages[1]!['payload'], 'early-2')
+
+  sub.unsubscribe()
+})
+
+test('buffers input values emitted during REQUESTED reconnect and flushes on next OPENED', () => {
   const mock = createMockClient()
   const rpc = new DxLinkRpcService(mock.client, 'svc')
   const input$ = new Subject<string>()
@@ -332,13 +353,17 @@ test('does not send input values while channel is in REQUESTED state', () => {
   input$.next('before')
   assert.is(mock.lastChannel!.sentMessages.length, 1)
 
+  // Simulate connection drop — channel goes back to REQUESTED
   mock.lastChannel!.simulateRequested()
 
-  // Values emitted while REQUESTED should not be sent
-  // (input is unsubscribed during REQUESTED state)
-  // Subject won't buffer, so this value is lost
+  // Values during reconnect are buffered, not lost
   input$.next('during-requested')
   assert.is(mock.lastChannel!.sentMessages.length, 1)
+
+  // Reconnect succeeds — buffer flushes
+  mock.lastChannel!.simulateOpen()
+  assert.is(mock.lastChannel!.sentMessages.length, 2)
+  assert.equal(mock.lastChannel!.sentMessages[1]!['payload'], 'during-requested')
 
   sub.unsubscribe()
 })

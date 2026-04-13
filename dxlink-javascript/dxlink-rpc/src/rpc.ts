@@ -23,6 +23,19 @@ export interface DxLinkRpcServiceOptions {
 }
 
 /**
+ * Per-call options for {@link DxLinkRpcService.requestResponse} and {@link DxLinkRpcService.requestStream}.
+ */
+export interface DxLinkRpcCallOptions {
+  /**
+   * Whether to automatically retry the RPC call after a connection drop.
+   * When `true`, the channel is re-requested on reconnect and the same request is re-sent.
+   * When `false`, the channel transitions to CLOSED on disconnect and the output Observable completes.
+   * @default false
+   */
+  retry?: boolean
+}
+
+/**
  * dxLink RPC service that provides RPC-over-channel utilities using rxjs Observable.
  *
  * Each method call opens a dedicated channel by sending CHANNEL_REQUEST with the service name
@@ -61,6 +74,9 @@ export class DxLinkRpcService {
   /**
    * Bidirectional streaming RPC: Observable input stream, Observable output stream.
    *
+   * Retry on connection drop is not supported for this method — the input stream is owned by
+   * the caller, so re-sending past values is not possible without changing semantics.
+   *
    * @param method - RPC method name.
    * @param input$ - Observable stream of request payloads to send to the server.
    * @returns Observable stream of response payloads from the server.
@@ -69,46 +85,96 @@ export class DxLinkRpcService {
     method: string,
     input$: Observable<Request>
   ): Observable<Response> {
+    return this.runRpc(method, input$, false)
+  }
+
+  /**
+   * Unary RPC: send one request, receive one response.
+   *
+   * @param method - RPC method name.
+   * @param request - Single request payload to send to the server.
+   * @param options - Per-call options, including {@link DxLinkRpcCallOptions.retry}.
+   * @returns Observable that emits one response value and completes.
+   */
+  requestResponse<Request, Response>(
+    method: string,
+    request: Request,
+    options?: DxLinkRpcCallOptions
+  ): Observable<Response> {
+    return this.runRpc(method, of(request), options?.retry ?? false)
+  }
+
+  /**
+   * Server-streaming RPC: send one request, receive a stream of responses.
+   *
+   * @param method - RPC method name.
+   * @param request - Single request payload to send to the server.
+   * @param options - Per-call options, including {@link DxLinkRpcCallOptions.retry}.
+   * @returns Observable stream of response payloads, completes when the server closes the channel.
+   */
+  requestStream<Request, Response>(
+    method: string,
+    request: Request,
+    options?: DxLinkRpcCallOptions
+  ): Observable<Response> {
+    return this.runRpc(method, of(request), options?.retry ?? false)
+  }
+
+  private runRpc<Request, Response>(
+    method: string,
+    input$: Observable<Request>,
+    retry: boolean
+  ): Observable<Response> {
     return new Observable<Response>((subscriber) => {
       // Opens a dedicated channel by sending CHANNEL_REQUEST with the service name
       // and methodName in parameters. The server uses `service` to route to the RPC handler,
       // and `methodName` to select which method to invoke.
-      const channel: DXLinkChannel = this.client.openChannel(this.service, {
-        methodName: method,
-      })
+      const channel: DXLinkChannel = this.client.openChannel(
+        this.service,
+        { methodName: method },
+        { reconnect: retry }
+      )
 
-      let inputSubscription: Subscription | undefined
+      // Buffer for values emitted before the channel reaches OPENED state.
+      // CHANNEL_DATA cannot be sent until the server confirms with CHANNEL_OPENED;
+      // any input emitted before that (or during reconnect) is queued here and flushed on OPENED.
+      const buffer: ChannelDataMessage<Request>[] = []
 
-      const subscribeToInput = () => {
-        if (inputSubscription !== undefined) return
-
-        inputSubscription = input$.subscribe({
-          next: (value) => {
-            // CHANNEL_DATA can only be sent after the server confirms the channel
-            // with CHANNEL_OPENED. Before that the channel is in REQUESTED state.
-            if (channel.getState() === DXLinkChannelState.OPENED) {
-              try {
-                const message: ChannelDataMessage<Request> = {
-                  type: 'CHANNEL_DATA',
-                  payload: value,
-                }
-                channel.send(message)
-              } catch (err) {
-                subscriber.error(err)
-              }
-            }
-          },
-          error: (err) => {
+      const sendOrBuffer = (message: ChannelDataMessage<Request>) => {
+        if (channel.getState() === DXLinkChannelState.OPENED) {
+          try {
+            channel.send(message)
+          } catch (err) {
             subscriber.error(err)
-            channel.close()
-          },
-        })
+          }
+        } else {
+          buffer.push(message)
+        }
       }
 
-      const unsubscribeFromInput = () => {
-        inputSubscription?.unsubscribe()
-        inputSubscription = undefined
+      const flushBuffer = () => {
+        while (buffer.length > 0) {
+          const message = buffer.shift()!
+          try {
+            channel.send(message)
+          } catch (err) {
+            subscriber.error(err)
+            return
+          }
+        }
       }
+
+      // Subscribe to input immediately so that values from cold observables (like of(request))
+      // and values pushed before OPENED are not lost — they are buffered until the channel opens.
+      const inputSubscription: Subscription = input$.subscribe({
+        next: (value) => {
+          sendOrBuffer({ type: 'CHANNEL_DATA', payload: value })
+        },
+        error: (err) => {
+          subscriber.error(err)
+          channel.close()
+        },
+      })
 
       // Server responses arrive as CHANNEL_DATA messages on the same channel id.
       // Each payload is extracted and emitted on the output Observable.
@@ -123,19 +189,18 @@ export class DxLinkRpcService {
 
       const stateListener = (state: DXLinkChannelState) => {
         switch (state) {
-          // Server confirmed the channel with CHANNEL_OPENED — ready to exchange CHANNEL_DATA.
+          // Server confirmed the channel with CHANNEL_OPENED — flush any buffered values.
           case DXLinkChannelState.OPENED:
-            subscribeToInput()
+            flushBuffer()
             break
           // Channel is re-requesting after a connection drop.
-          // Input is unsubscribed; will re-subscribe on next OPENED.
+          // New input values will be buffered until OPENED again.
           case DXLinkChannelState.REQUESTED:
-            unsubscribeFromInput()
             break
           // Server sent CHANNEL_CLOSED — the RPC for this channel id is finished.
           // The channel id must not be reused; the output Observable completes.
           case DXLinkChannelState.CLOSED:
-            unsubscribeFromInput()
+            inputSubscription.unsubscribe()
             subscriber.complete()
             break
         }
@@ -155,45 +220,21 @@ export class DxLinkRpcService {
       channel.addErrorListener(errorListener)
 
       // The channel implementation may not fire the state listener synchronously on add,
-      // so check if the channel is already OPENED to avoid missing the initial state.
+      // so flush the buffer if the channel is already OPENED to avoid missing the initial state.
       if (channel.getState() === DXLinkChannelState.OPENED) {
-        subscribeToInput()
+        flushBuffer()
       }
 
       // Teardown: sends CHANNEL_CANCEL to the server, telling it to abort the RPC.
       // The server should respond with CHANNEL_CLOSED to retire the channel id.
       // channel.close() is idempotent — safe to call even if already closed.
       return () => {
-        unsubscribeFromInput()
+        inputSubscription.unsubscribe()
         channel.removeMessageListener(messageListener)
         channel.removeStateChangeListener(stateListener)
         channel.removeErrorListener(errorListener)
         channel.close()
       }
     })
-  }
-
-  /**
-   * Unary RPC: send one request, receive one response.
-   *
-   * @param method - RPC method name.
-   * @param request - Single request payload to send to the server.
-   * @returns Observable that emits one response value and completes.
-   */
-  requestResponse<Request, Response>(method: string, request: Request): Observable<Response> {
-    // The server sends one response and then CHANNEL_CLOSED — no need for client-side take(1).
-    return this.streamStream<Request, Response>(method, of(request))
-  }
-
-  /**
-   * Server-streaming RPC: send one request, receive a stream of responses.
-   *
-   * @param method - RPC method name.
-   * @param request - Single request payload to send to the server.
-   * @returns Observable stream of response payloads, completes when the server closes the channel.
-   */
-  requestStream<Request, Response>(method: string, request: Request): Observable<Response> {
-    // The channel stays open for receiving until the server sends CHANNEL_CLOSED.
-    return this.streamStream<Request, Response>(method, of(request))
   }
 }

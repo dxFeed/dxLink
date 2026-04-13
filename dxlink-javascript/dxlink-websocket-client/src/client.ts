@@ -12,6 +12,7 @@ import {
   DXLinkChannelState,
   type DXLinkAuthStateChangeListener,
   type DXLinkChannel,
+  type DXLinkChannelOptions,
   type DXLinkError,
   type DXLinkClient,
 } from '@dxfeed/dxlink-core'
@@ -175,6 +176,11 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     for (const channel of this.channels.values()) {
       if (channel.getState() === DXLinkChannelState.CLOSED) continue
 
+      if (!channel.reconnect) {
+        channel.processStatusClosed()
+        continue
+      }
+
       channel.processStatusRequested()
     }
 
@@ -245,7 +251,11 @@ export class DXLinkWebSocketClient implements DXLinkClient {
   addErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.add(listener)
   removeErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.delete(listener)
 
-  openChannel = (service: string, parameters: Record<string, unknown>): DXLinkChannel => {
+  openChannel = (
+    service: string,
+    parameters: Record<string, unknown>,
+    options?: DXLinkChannelOptions
+  ): DXLinkChannel => {
     const channelId = this.globalChannelId
     this.globalChannelId += 2
 
@@ -253,6 +263,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
       channelId,
       service,
       parameters,
+      options?.reconnect ?? true,
       this.sendMessage,
       this.config
     )

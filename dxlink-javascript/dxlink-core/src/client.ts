@@ -62,6 +62,19 @@ export type DXLinkConnectionStateChangeListener = (
 ) => void
 
 /**
+ * Options for opening a channel.
+ * @see {DXLinkClient.openChannel}
+ */
+export interface DXLinkChannelOptions {
+  /**
+   * Whether to automatically re-request this channel after a connection drop.
+   * When `false`, the channel transitions to CLOSED on disconnect instead of re-requesting.
+   * @default true
+   */
+  reconnect?: boolean
+}
+
+/**
  * dxLink client that can be used to connect to the remote dxLink endpoint and open channels to services.
  */
 export interface DXLinkClient {
@@ -147,9 +160,14 @@ export interface DXLinkClient {
    * Open a isolated channel to service withing single {@link DXLinkClient} connection to remote endpoint.
    * @param service Name of the service to open channel to.
    * @param parameters Parameters of the service to open channel to.
+   * @param options Channel options.
    * @see {DXLinkChannel}
    */
-  openChannel(service: string, parameters: Record<string, unknown>): DXLinkChannel
+  openChannel(
+    service: string,
+    parameters: Record<string, unknown>,
+    options?: DXLinkChannelOptions
+  ): DXLinkChannel
 
   /**
    * Close the client and free all resources.
