@@ -10,19 +10,14 @@ import {
   DXLinkIndiChart,
   type DXLinkIndiChartIndicatorParameterMeta,
 } from '@dxfeed/dxlink-api'
+import type { IndiChartDataType } from '@dxscript/dxlink-dxcharts-lite'
 
 import type { ChannelInfo } from './debug-console/channel-widget'
-
-// Type of data notification:
-// - 'candles': snapshot of candles only (draw candles immediately)
-// - 'indicators': snapshot of indicators (draw indicators after candles)
-// - 'update': regular data update (update both candles and indicators)
-export type ChartDataType = 'candles' | 'indicators' | 'update'
 
 export type ChartHolderListener = (
   candles: DXLinkIndiChartCandle[],
   indicators: DXLinkIndiChartIndicatorsData[],
-  dataType: ChartDataType
+  dataType: IndiChartDataType
 ) => void
 
 export class ChartHolder implements ChannelInfo {
@@ -47,6 +42,9 @@ export class ChartHolder implements ChannelInfo {
   private stateListeners: DXLinkChannelStateChangeListener[] = []
 
   constructor(private readonly client: DXLinkClient) {}
+
+  /** Return the underlying dxLink client. */
+  getClient = (): DXLinkClient => this.client
 
   addStateChangeListener = (listener: DXLinkChannelStateChangeListener) => {
     this.stateListeners.push(listener)

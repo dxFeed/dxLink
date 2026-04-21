@@ -1,4 +1,5 @@
 import './styles.css'
+import '@dxscript/dxlink-dxcharts-lite/styles.css'
 import { CssBaseline } from '@dxfeed/ui-kit/CssBaseline'
 import { ThemeProvider } from '@dxfeed/ui-kit/theme'
 import { light as LIGHT_THEME } from '@dxfeed/ui-kit/theme/light'
