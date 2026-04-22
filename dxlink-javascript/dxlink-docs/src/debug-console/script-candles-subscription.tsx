@@ -1,27 +1,13 @@
 import type { DXLinkIndiChartIndicator, DXLinkIndiChartSubscription } from '@dxfeed/dxlink-api'
 import { Button } from '@dxfeed/ui-kit/Button'
 import { HelperMessage } from '@dxfeed/ui-kit/HelperMessage'
-import { IconButton } from '@dxfeed/ui-kit/IconButton'
-import { Search } from '@dxfeed/ui-kit/Icons'
-import { Menu, MenuItem } from '@dxfeed/ui-kit/Menu'
-import { Notification } from '@dxfeed/ui-kit/Notification'
-import { Text } from '@dxfeed/ui-kit/Text'
 import { TextField } from '@dxfeed/ui-kit/TextField'
-import { TextInput } from '@dxfeed/ui-kit/TextInput'
-import { ToggleButton } from '@dxfeed/ui-kit/ToggleButton'
-import { Tooltip } from '@dxfeed/ui-kit/Tooltip'
 import { unit } from '@dxfeed/ui-kit/utils'
-import Samples from '@dxscript/js-samples'
+import { DxScriptEditor } from '@dxscript/dxlink-dxscript-editor'
 import { useState } from 'react'
-import AceEditor from 'react-ace'
 import styled from 'styled-components'
 
-import { ErrorIcon, JSIcon } from './icons'
 import { ContentTemplate } from '../common/content-template'
-import 'ace-builds/src-noconflict/mode-python'
-import 'ace-builds/src-noconflict/mode-javascript'
-import 'ace-builds/src-noconflict/theme-textmate'
-import './ace-dxscript-mode'
 
 type Lang = 'dxscript-js'
 
@@ -39,55 +25,11 @@ const FieldWrapper = styled.div`
   width: 100%;
 `
 
-const TopPanel = styled.div`
-  display: flex;
-  flex-direction: row;
-  border-top: 1px solid ${({ theme }) => theme.palette.separator.primary};
-  padding-bottom: ${unit(1)};
-  padding-top: ${unit(1)};
-`
-
-const ErrorWrapper = styled.div``
-
-const LangWrapper = styled.div`
-  flex-grow: 1;
-  display: flex;
-  flex-direction: row;
-`
-
-const LangButton = styled(ToggleButton)`
-  margin-right: ${unit(1)};
-  display: flex;
-  align-items: center;
-`
-
-const ExampleButton = styled(Button)`
-  margin-top: ${unit(1)};
-`
-
-const ExampleItem = styled(MenuItem)`
-  cursor: pointer;
-`
-
 const CodeEditorGroup = styled.div`
   display: flex;
   flex-direction: column;
   padding-bottom: ${unit(1)};
   width: 100%;
-`
-const CodeEditorInput = styled.div`
-  width: 100%;
-
-  .ace_custom-keyword {
-    color: #ff6347; /* Красный цвет для подсветки */
-    font-weight: bold;
-  }
-`
-
-const CodeEditorHelp = styled.div`
-  width: 100%;
-  display: flex;
-  justify-content: end;
 `
 
 const Actions = styled.div`
@@ -99,28 +41,6 @@ const Actions = styled.div`
 
 const ActionGroup = styled.div`
   padding-right: ${unit(1)};
-`
-
-const ErrorButton = styled(IconButton)`
-  color: ${({ theme }) => theme.palette.red.main};
-`
-
-const JSLogo = styled(JSIcon)`
-  width: 16px;
-  height: 16px;
-  margin-right: 4px;
-  margin-bottom: 2px;
-`
-
-const ExampleText = styled(Text)`
-  display: flex;
-  flex-grow: 1;
-  justify-content: space-between;
-  min-width: 300px;
-`
-
-const ExampleDoc = styled.a`
-  margin-left: ${unit(2)};
 `
 
 export interface ScriptCandlesSubscriptionProps {
@@ -138,12 +58,7 @@ export function ScriptCandlesSubscription({
 }: ScriptCandlesSubscriptionProps) {
   const [symbol, setSymbol] = useState('AAPL{=d}')
   const [fromTime, setFromTime] = useState('0')
-
-  const [exampleId, setExampleId] = useState<string>(Samples.list()[0]?.name ?? '')
-  const [script, setScript] = useState<string>(Samples.get(exampleId)?.content ?? '')
-  const [search, setSearch] = useState('')
-
-  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
+  const [script, setScript] = useState('')
 
   const handleSet = () => {
     onSet(
@@ -157,10 +72,6 @@ export function ScriptCandlesSubscription({
       }
     )
   }
-
-  const examples = search
-    ? Samples.list().filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))
-    : Samples.list()
 
   return (
     <ContentTemplate title="Manage channel">
@@ -200,94 +111,15 @@ export function ScriptCandlesSubscription({
           </FieldWrapper>
         </FieldsGroup>
 
-        <TopPanel>
-          <LangWrapper>
-            <LangButton pressed={true}>
-              <JSLogo /> dxScript/JS
-            </LangButton>
-          </LangWrapper>
-          <ErrorWrapper>
-            {error && (
-              <Tooltip content={error} placement="left-start" enableHoverableContent={true}>
-                {(triggerProps) => (
-                  <ErrorButton type="button" kind="ghost" size="small" {...triggerProps}>
-                    <ErrorIcon />
-                  </ErrorButton>
-                )}
-              </Tooltip>
-            )}
-          </ErrorWrapper>
-        </TopPanel>
         <CodeEditorGroup>
-          <CodeEditorInput>
-            <AceEditor
-              placeholder="Script code"
-              mode="dxscript"
-              theme="textmate"
-              name="script-code"
-              onChange={(value) => setScript(value)}
-              fontSize={14}
-              lineHeight={18}
-              showPrintMargin={true}
-              showGutter={true}
-              highlightActiveLine={true}
-              value={script}
-              width="100%"
-              height="320px"
-              setOptions={{
-                enableBasicAutocompletion: true,
-                enableLiveAutocompletion: true,
-                enableSnippets: false,
-                showLineNumbers: true,
-                tabSize: 2,
-              }}
-            />
-          </CodeEditorInput>
-          <CodeEditorHelp>
-            <ExampleButton color="secondary" onClick={(event) => setAnchorEl(event.currentTarget)}>
-              Try examples
-            </ExampleButton>
-            <Menu
-              anchorEl={anchorEl}
-              isOpen={!!anchorEl}
-              placement="left-end"
-              onClose={() => setAnchorEl(null)}
-              head={
-                <TextInput
-                  size="medium"
-                  leftIcon={<Search />}
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              }
-            >
-              {examples.length > 0 ? (
-                examples.map((example) => (
-                  <ExampleItem
-                    onClick={() => {
-                      setAnchorEl(null)
-                      setExampleId(example.name)
-                      setScript(Samples.get(example.name)?.content ?? '')
-                    }}
-                    key={example.title}
-                  >
-                    <ExampleText color="inherit">
-                      <Text color="inherit">{example.title}</Text>
-                      {example.docs && (
-                        <ExampleDoc href={example.docs} target="blank" rel="noreferrer">
-                          [Docs]
-                        </ExampleDoc>
-                      )}
-                    </ExampleText>
-                  </ExampleItem>
-                ))
-              ) : (
-                <ExampleText color="inherit">
-                  <Notification>Nothing found</Notification>
-                </ExampleText>
-              )}
-            </Menu>
-          </CodeEditorHelp>
+          <DxScriptEditor
+            onChange={setScript}
+            placeholder="Script code"
+            height="320px"
+            enableSamplesButton={true}
+            showLangLogo={true}
+            onError={error}
+          />
         </CodeEditorGroup>
 
         <Actions>
