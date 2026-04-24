@@ -21,6 +21,10 @@ export interface DXLinkError {
    */
   readonly type: DXLinkErrorType
   /**
+   * Channel id where the error happened.
+   */
+  readonly channel: number
+  /**
    * Message of the error with details.
    * @example 'Timeout exceeded'
    */
