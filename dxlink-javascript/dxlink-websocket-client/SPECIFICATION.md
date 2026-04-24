@@ -384,10 +384,9 @@ This section describes how protocol-level operations map to the client's public 
 
 - Protocol ERROR messages (channel 0) trigger client error listeners
 - Protocol ERROR messages (channel > 0) trigger channel error listeners
-- Error type and message are extracted from protocol message
-- Errors are published to listeners
+- Error listeners receive normalized error object (`type`, `channel`, `message`) where `type` is the error code (for example `INVALID_MESSAGE`)
 
-**What's hidden**: The protocol ERROR message format is abstracted. Listeners receive a simplified error object with type and message fields.
+**What's hidden**: The protocol ERROR frame is routed to the corresponding listener and exposed with a stable shape.
 
 ### Reconnection
 

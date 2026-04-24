@@ -22,6 +22,7 @@ import type { DXLinkWebSocketClientConfig } from './config'
 import { type DXLinkWebSocketConnector, DefaultDXLinkWebSocketConnector } from './connector'
 import {
   type AuthStateMessage,
+  type ChannelErrorMessage,
   type ErrorMessage,
   type DXLinkWebSocketMessage,
   type SetupMessage,
@@ -345,10 +346,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
         case 'AUTH_STATE':
           return this.processAuthStateMessage(message)
         case 'ERROR':
-          return this.publishError({
-            type: message.error,
-            message: message.message,
-          })
+          return this.publishError(this.mapServerError(message))
         case 'KEEPALIVE':
           // Ignore keepalive messages coz they are used only to maintain connection
           return
@@ -367,10 +365,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
           case 'CHANNEL_CLOSED':
             return channel.processStatusClosed()
           case 'ERROR':
-            return channel.processError({
-              type: message.error,
-              message: message.message,
-            })
+            return channel.processError(this.mapServerError(message))
         }
         return
       }
@@ -380,6 +375,15 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
     this.logger.warn('Unhandeled message', message.type)
   }
+
+  /**
+   * Maps server ERROR frame to public error object.
+   */
+  private mapServerError = (message: ErrorMessage | ChannelErrorMessage): DXLinkError => ({
+    type: message.error,
+    channel: message.channel,
+    message: message.message,
+  })
 
   private processSetupMessage = (serverSetup: SetupMessage): void => {
     // Clear setup timeout check from connect method
@@ -502,6 +506,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
         this.publishError({
           type: errorMessage.error,
+          channel: 0,
           message: `${errorMessage.message} from server`,
         })
 
@@ -527,6 +532,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
         this.publishError({
           type: errorMessage.error,
+          channel: 0,
           message: `${errorMessage.message} from server`,
         })
 
@@ -554,6 +560,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     if (error !== undefined) {
       this.publishError({
         type: 'UNKNOWN',
+        channel: 0,
         message: reason,
       })
     }
