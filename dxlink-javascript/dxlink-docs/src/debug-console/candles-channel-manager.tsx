@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { CandlesSubscription } from './candles-subscription'
-import type { DXLinkCandleData, DXLinkCandleEvent, DXLinkCandles } from '../candles/candles'
+import type { DXLinkCandleData, DXLinkCandleEvent, DXLinkCandles, DXLinkCandleSubscription } from '../candles/candles'
 import { ContentTemplate } from '../common/content-template'
 
 const ChartContainer = styled(IndiChart)`
@@ -46,7 +46,13 @@ const toIndiChartCandle = (event: Readonly<DXLinkCandleEvent>): DXLinkIndiChartC
 
 export function CandlesChannelManager({ channel }: CandlesChannelManagerProps) {
   const [data, setData] = useState<DXLinkCandleData>()
+  const [chartResetKey, setChartResetKey] = useState(0)
   const ref = useRef<IndiChartHandle>(null)
+
+  const handleSet = (subscription: DXLinkCandleSubscription) => {
+    setChartResetKey((k) => k + 1)
+    channel.setSubscription(subscription)
+  }
 
   useEffect(() => {
     channel.addListener(setData)
@@ -68,13 +74,14 @@ export function CandlesChannelManager({ channel }: CandlesChannelManagerProps) {
   return (
     <>
       <Group>
-        <CandlesSubscription onSet={channel.setSubscription} />{' '}
+        <CandlesSubscription onSet={handleSet} />{' '}
       </Group>
 
       <ChartGroup available={data !== undefined}>
         <ContentTemplate title={'Chart'}>
           <ChartContainer
             ref={ref}
+            resetKey={chartResetKey}
             onIndicatorError={(chartError) => {
               if (chartError) {
                 console.error(chartError)

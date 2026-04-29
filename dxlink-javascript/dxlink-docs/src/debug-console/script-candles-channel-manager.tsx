@@ -43,6 +43,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
   const [available, setAvailable] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [inParameters, setInParameters] = useState<DXLinkIndiChartIndicatorParameterMeta[]>([])
+  const [chartResetKey, setChartResetKey] = useState(0)
   const chartRef = useRef<IndiChartHandle>(null)
 
   const handleSet = (
@@ -52,7 +53,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
     setError(undefined)
     setAvailable(false)
     setInParameters([])
-    chartRef.current?.reset()
+    setChartResetKey((k) => k + 1)
 
     channel.update(
       subscription,
@@ -99,6 +100,7 @@ export function ScriptCandlesChannelManager({ channel }: ScriptCandlesChannelMan
         <ContentTemplate title={'Chart'}>
           <ChartContainer
             ref={chartRef}
+            resetKey={chartResetKey}
             onIndicatorError={(chartError) => setError(chartError ?? undefined)}
           />
           <Powered>
