@@ -28,10 +28,11 @@ export interface DXLinkIndiChartIndicatorsParameters {
 
 export interface DXLinkIndiChartIndicatorParameterMeta {
   readonly name: string
-  readonly type: 'DOUBLE' | 'STRING' | 'BOOL' | 'COLOR' | 'SOURCE' | 'SESSION' | 'MAP'
+  readonly type: 'DOUBLE' | 'STRING' | 'BOOL' | 'COLOR' | 'SOURCE' | 'SESSION' | 'ENUM'
   readonly defaultValue: unknown
   readonly value?: unknown
   readonly options?: string[]
+  readonly timeZone?: string
   readonly min?: number
   readonly max?: number
   readonly step?: number
