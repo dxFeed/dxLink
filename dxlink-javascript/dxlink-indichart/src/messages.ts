@@ -26,17 +26,72 @@ export interface DXLinkIndiChartIndicatorsParameters {
   }
 }
 
-export interface DXLinkIndiChartIndicatorParameterMeta {
+export interface DXLinkIndiChartDoubleParameterMeta {
   readonly name: string
-  readonly type: 'DOUBLE' | 'STRING' | 'BOOL' | 'COLOR' | 'SOURCE' | 'SESSION' | 'ENUM'
-  readonly defaultValue: unknown
-  readonly value?: unknown
-  readonly options?: string[]
-  readonly timeZone?: string
+  readonly type: 'DOUBLE'
+  readonly defaultValue: JSONNumber
+  readonly value?: JSONNumber
+  readonly options?: (JSONNumber | string)[]
   readonly min?: number
   readonly max?: number
   readonly step?: number
 }
+
+export interface DXLinkIndiChartStringParameterMeta {
+  readonly name: string
+  readonly type: 'STRING'
+  readonly defaultValue: string
+  readonly value?: string
+  readonly options?: string[]
+}
+
+export interface DXLinkIndiChartBoolParameterMeta {
+  readonly name: string
+  readonly type: 'BOOL'
+  readonly defaultValue: boolean
+  readonly value?: boolean
+}
+
+export interface DXLinkIndiChartColorParameterMeta {
+  readonly name: string
+  readonly type: 'COLOR'
+  readonly defaultValue: DXLinkIndiChartColor
+  readonly value?: DXLinkIndiChartColor
+}
+
+export interface DXLinkIndiChartSourceParameterMeta {
+  readonly name: string
+  readonly type: 'SOURCE'
+  readonly defaultValue: string
+  readonly value?: string
+  readonly options?: string[]
+}
+
+export interface DXLinkIndiChartSessionParameterMeta {
+  readonly name: string
+  readonly type: 'SESSION'
+  readonly defaultValue: string
+  readonly value?: string
+  readonly options?: string[]
+  readonly timeZone?: string
+}
+
+export interface DXLinkIndiChartEnumParameterMeta {
+  readonly name: string
+  readonly type: 'ENUM'
+  readonly defaultValue: string
+  readonly value?: string
+  readonly options?: string[]
+}
+
+export type DXLinkIndiChartIndicatorParameterMeta =
+  | DXLinkIndiChartDoubleParameterMeta
+  | DXLinkIndiChartStringParameterMeta
+  | DXLinkIndiChartBoolParameterMeta
+  | DXLinkIndiChartColorParameterMeta
+  | DXLinkIndiChartSourceParameterMeta
+  | DXLinkIndiChartSessionParameterMeta
+  | DXLinkIndiChartEnumParameterMeta
 
 export interface DXLinkIndiChartIndicatorEnabled {
   readonly enabled: true
