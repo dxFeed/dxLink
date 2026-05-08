@@ -377,12 +377,12 @@ export class DXLinkWebSocketClient implements DXLinkClient {
   }
 
   /**
-   * Maps server ERROR frame to public error object.
+   * Maps server ERROR message to public error object.
    */
   private mapServerError = (message: ErrorMessage | ChannelErrorMessage): DXLinkError => ({
     type: message.error,
-    channel: message.channel,
     message: message.message,
+    ...(message.correlationId === undefined ? {} : { correlationId: message.correlationId }),
   })
 
   private processSetupMessage = (serverSetup: SetupMessage): void => {
@@ -506,7 +506,6 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
         this.publishError({
           type: errorMessage.error,
-          channel: 0,
           message: `${errorMessage.message} from server`,
         })
 
@@ -532,7 +531,6 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
         this.publishError({
           type: errorMessage.error,
-          channel: 0,
           message: `${errorMessage.message} from server`,
         })
 
@@ -560,7 +558,6 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     if (error !== undefined) {
       this.publishError({
         type: 'UNKNOWN',
-        channel: 0,
         message: reason,
       })
     }

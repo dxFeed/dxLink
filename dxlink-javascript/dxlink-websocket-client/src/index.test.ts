@@ -107,7 +107,7 @@ class MockDXLinkWebSocketConnector implements DXLinkWebSocketConnector {
   }
 }
 
-test('Connection and channel error listeners receive server error payload metadata', () => {
+test('Connection and channel error listeners receive server error payload metadata without channel id', () => {
   const connector = new MockDXLinkWebSocketConnector('wss://mock')
   const scheduler = new MockDXLinkScheduler()
   const client = new DXLinkWebSocketClient({
@@ -150,6 +150,7 @@ test('Connection and channel error listeners receive server error payload metada
     channel: 0,
     error: 'BAD_ACTION',
     message: 'Connection-level error',
+    correlationId: 'connection-correlation-id',
   })
 
   connector.emitMessage({
@@ -161,11 +162,16 @@ test('Connection and channel error listeners receive server error payload metada
 
   assert.ok(clientError)
   assert.is(clientError!.type, 'BAD_ACTION')
-  assert.is(clientError!.channel, 0)
+  assert.is(clientError!.message, 'Connection-level error')
+  assert.is(clientError!.correlationId, 'connection-correlation-id')
+  assert.notContains(Object.keys(clientError!), 'channel')
 
   assert.ok(channelError)
   assert.is(channelError!.type, 'INVALID_MESSAGE')
-  assert.is(channelError!.channel, channel.id)
+  assert.is(channelError!.message, 'Some text')
+  assert.is(channelError!.correlationId, undefined)
+  assert.notContains(Object.keys(channelError!), 'correlationId')
+  assert.notContains(Object.keys(channelError!), 'channel')
 })
 
 test(`Live market-data endpoint success-path`, async () => {
