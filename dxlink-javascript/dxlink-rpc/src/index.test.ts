@@ -250,11 +250,16 @@ test('errors output when channel receives error', () => {
     },
   })
   mock.lastChannel!.simulateOpen()
-  mock.lastChannel!.simulateError({ type: 'UNAUTHORIZED', message: 'Not authorized' })
+  mock.lastChannel!.simulateError({
+    type: 'UNAUTHORIZED',
+    message: 'Not authorized',
+  })
 
   assert.ok(receivedError)
   assert.is(receivedError!.type, 'UNAUTHORIZED')
   assert.is(receivedError!.message, 'Not authorized')
+  assert.is(receivedError!.correlationId, undefined)
+  assert.notContains(Object.keys(receivedError!), 'correlationId')
 
   sub.unsubscribe()
 })
