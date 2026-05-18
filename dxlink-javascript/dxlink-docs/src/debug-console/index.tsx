@@ -9,6 +9,7 @@ import {
   FeedContract,
   DXLinkDepthOfMarket,
 } from '@dxfeed/dxlink-api'
+import '@dxscript/dxlink-dxcharts-lite/styles.css'
 import { Text } from '@dxfeed/ui-kit/Text'
 import { unit } from '@dxfeed/ui-kit/utils'
 import { useCallback, useEffect, useState } from 'react'
