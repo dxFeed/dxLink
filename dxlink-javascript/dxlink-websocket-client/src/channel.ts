@@ -64,11 +64,12 @@ export class DXLinkWebSocketChannel implements DXLinkChannel {
   addErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.add(listener)
   removeErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.delete(listener)
 
-  error = ({ type, message }: DXLinkError) =>
+  error = ({ type, message, correlationId }: DXLinkError) =>
     this.send({
       type: 'ERROR',
       error: type,
       message,
+      ...(correlationId === undefined ? {} : { correlationId }),
     })
 
   close = () => {

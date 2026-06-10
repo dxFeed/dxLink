@@ -21,6 +21,10 @@ export interface DXLinkError {
    */
   readonly type: DXLinkErrorType
   /**
+   * Correlation id of the operation where the error happened.
+   */
+  readonly correlationId?: string
+  /**
    * Message of the error with details.
    * @example 'Timeout exceeded'
    */

@@ -62,6 +62,7 @@ export interface ErrorMessage {
   channel: 0
   error: ErrorType
   message: string
+  correlationId?: string
 }
 
 export interface ChannelErrorMessage {
@@ -69,6 +70,7 @@ export interface ChannelErrorMessage {
   channel: number
   error: ErrorType
   message: string
+  correlationId?: string
 }
 
 export interface ChannelPayloadMessage {
