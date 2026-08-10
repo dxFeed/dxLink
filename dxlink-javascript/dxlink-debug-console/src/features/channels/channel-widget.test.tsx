@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { ChannelWidget } from './channel-widget'
 import type { TimestampedError } from '../../shared/lib/timestamped-error'
@@ -15,10 +15,6 @@ const renderWidget = (props: Partial<Parameters<typeof ChannelWidget>[0]> = {}) 
       <div>channel body</div>
     </ChannelWidget>
   )
-
-afterEach(() => {
-  document.body.innerHTML = ''
-})
 
 describe('ChannelWidget', () => {
   it('shows the protocol channel id next to the subtitle', () => {

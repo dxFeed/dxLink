@@ -189,6 +189,26 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     this.chart?.setSubscription(subscription, parameters)
   }
 
+  /**
+   * Push new indicator parameters without re-subscribing.
+   *
+   * The server keeps the current subscription and recomputes the indicators, so the
+   * candles are not refetched and the chart is not reset — the difference between
+   * tweaking a moving-average period and reloading the whole history.
+   */
+  applyParameters = (parameters: DXLinkIndiChartIndicatorsParameters): void => {
+    this.chart?.updateIndicatorsParameters(parameters)
+  }
+
+  /**
+   * Drop the subscription and all derived state, leaving the channel open and ready
+   * for a new one.
+   */
+  reset = (): void => {
+    this.resetCoordination()
+    this.store.setState({ subscription: null, outputs: {}, indicatorStates: null, errors: [] })
+  }
+
   clearErrors = (): void => {
     this.store.setState({ errors: [] })
   }

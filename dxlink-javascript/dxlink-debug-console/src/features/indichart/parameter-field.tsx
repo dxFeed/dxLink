@@ -8,18 +8,13 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
+import { SessionParameterField } from './session-parameter-field'
+import { toHexColor } from '../../shared/lib/colors'
+
 export type ParameterValue = number | string | boolean
 
 const toNumber = (value: JSONNumber | undefined): number =>
   typeof value === 'number' ? value : Number(value ?? 0)
-
-/** Safely extract a hex color string from a (possibly missing) COLOR value. */
-const toColor = (raw: unknown): string => {
-  if (raw !== null && typeof raw === 'object' && 'value' in raw) {
-    return String((raw as { value: unknown }).value)
-  }
-  return typeof raw === 'string' ? raw : '#3b6fed'
-}
 
 /** Initial value for a parameter: its current value, else its default. Null-safe — the
  * server's parameter metadata is dynamic and may omit fields, so this never throws. */
@@ -28,7 +23,7 @@ export const initialParameterValue = (
 ): ParameterValue => {
   switch (meta.type) {
     case 'COLOR':
-      return toColor(meta.value ?? meta.defaultValue)
+      return toHexColor(meta.value ?? meta.defaultValue)
     case 'DOUBLE':
       return toNumber(meta.value ?? meta.defaultValue)
     case 'BOOL':
@@ -102,7 +97,9 @@ export const ParameterField = ({ meta, value, onChange }: ParameterFieldProps) =
   }
 
   if (meta.type === 'COLOR') {
-    const hex = typeof value === 'string' ? value : toColor(meta.value ?? meta.defaultValue)
+    // Resolve through the palette: the value may still be a dxScript color name (e.g.
+    // after a server update), which a color input cannot render.
+    const hex = toHexColor(typeof value === 'string' ? value : (meta.value ?? meta.defaultValue))
     return (
       <TextField
         label={meta.name}
@@ -174,7 +171,12 @@ export const ParameterField = ({ meta, value, onChange }: ParameterFieldProps) =
 
   // STRING | SOURCE | SESSION | ENUM
   const current = typeof value === 'string' ? value : String(meta.value ?? meta.defaultValue)
-  const helper = meta.type === 'SESSION' && meta.timeZone ? `SESSION · ${meta.timeZone}` : meta.type
+
+  if (meta.type === 'SESSION') {
+    return <SessionParameterField meta={meta} value={current} onChange={onChange} />
+  }
+
+  const helper = meta.type
 
   if (meta.options && meta.options.length > 0) {
     return (

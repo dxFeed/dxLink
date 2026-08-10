@@ -1,6 +1,6 @@
 import type { DXLinkClient } from '@dxfeed/dxlink-api'
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { SubscriptionManager } from './feed-subscriptions'
 import { FeedViewModel } from './feed-view-model'
@@ -29,10 +29,6 @@ const setValue = (input: HTMLElement, value: string) => {
   fireEvent.change(input, { target: { value } })
   fireEvent.keyDown(input, { key: 'Escape' })
 }
-
-afterEach(() => {
-  document.body.innerHTML = ''
-})
 
 describe('SubscriptionManager', () => {
   it('offers the event types the old console had, including the four that were dropped', () => {

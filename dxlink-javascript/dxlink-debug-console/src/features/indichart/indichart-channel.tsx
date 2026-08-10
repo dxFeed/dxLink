@@ -7,6 +7,8 @@ import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import InsightsIcon from '@mui/icons-material/Insights'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import TuneIcon from '@mui/icons-material/Tune'
 import Accordion from '@mui/material/Accordion'
 import AccordionDetails from '@mui/material/AccordionDetails'
 import AccordionSummary from '@mui/material/AccordionSummary'
@@ -27,6 +29,7 @@ import { IndiChartViewModel } from './indichart-view-model'
 import type { IndicatorOutputKind, IndicatorOutputMeta } from './indichart-view-model'
 import { ParameterField, initialParameterValue } from './parameter-field'
 import type { ParameterValue } from './parameter-field'
+import { describeScriptError } from './script-error'
 import { DocLink } from '../../shared/components/doc-link'
 import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../../shared/lib/order-sources'
 import { useVM } from '../../shared/view-model'
@@ -108,6 +111,7 @@ const IndicatorPanel = ({
   onParam: (name: string, value: ParameterValue) => void
 }) => {
   const { name, code, state } = entry
+  const scriptError = describeScriptError(state)
 
   return (
     <Accordion
@@ -229,28 +233,42 @@ const IndicatorPanel = ({
           </Stack>
         )}
 
-        {state !== undefined && !state.enabled && (
+        {scriptError !== undefined && (
           <Alert severity="error" variant="outlined" sx={{ mt: 1.5 }}>
-            <AlertTitle>{state.scriptError?.type ?? 'Compilation error'}</AlertTitle>
-            {state.scriptError ? (
+            <AlertTitle>{scriptError.title}</AlertTitle>
+            <Box
+              component="pre"
+              sx={{
+                m: 0,
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                fontSize: 13,
+              }}
+            >
+              {scriptError.message}
+            </Box>
+            {scriptError.location !== undefined && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                In {scriptError.location}
+              </Typography>
+            )}
+            {scriptError.stack !== undefined && scriptError.stack.length > 0 && (
               <>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                  Stack trace
+                </Typography>
                 <Box
                   component="pre"
                   sx={{
                     m: 0,
                     whiteSpace: 'pre-wrap',
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-                    fontSize: 13,
+                    fontSize: 12,
                   }}
                 >
-                  {state.scriptError.message}
+                  {scriptError.stack.map((frame) => `  ${frame}`).join('\n')}
                 </Box>
-                <Typography variant="caption" color="text.secondary">
-                  Line {state.scriptError.startLine}:{state.scriptError.startColumn}
-                </Typography>
               </>
-            ) : (
-              state.internalErrorMessage
             )}
           </Alert>
         )}
@@ -346,11 +364,26 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
     setHasData(false)
     chartRef.current?.reset()
     setResetKey((k) => k + 1)
-    const parameters: Record<string, Record<string, ParameterValue>> = {}
-    for (const [name, params] of Object.entries(values)) {
-      parameters[name] = params
-    }
-    vm.apply(symbol.trim(), Number(fromTime) || 0, parameters)
+    vm.apply(symbol.trim(), Number(fromTime) || 0, values)
+  }
+
+  /**
+   * Re-apply only the parameters. The server keeps the subscription and recomputes the
+   * indicators, so the candles are not refetched — the chart is left as it is and only
+   * the indicator series change.
+   */
+  const applyParameters = () => {
+    setChartError(null)
+    vm.applyParameters(values)
+  }
+
+  /** Drop the subscription and clear the chart, leaving the channel open. */
+  const reset = () => {
+    setChartError(null)
+    setHasData(false)
+    chartRef.current?.reset()
+    setResetKey((k) => k + 1)
+    vm.reset()
   }
 
   const statusChip =
@@ -426,8 +459,32 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
               Apply
             </Button>
           </Box>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ mt: 1.5, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+          >
+            <Button
+              variant="outlined"
+              startIcon={<TuneIcon />}
+              onClick={applyParameters}
+              disabled={subscription === null}
+            >
+              Apply parameters
+            </Button>
+            <Button
+              color="inherit"
+              startIcon={<RestartAltIcon />}
+              onClick={reset}
+              disabled={subscription === null}
+            >
+              Reset
+            </Button>
+          </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Applies the symbol, from time and all indicator parameters together.
+            <b>Apply</b> re-subscribes and reloads the candles. <b>Apply parameters</b> recomputes
+            the indicators against the candles already loaded. <b>Reset</b> drops the subscription
+            and clears the chart, leaving the channel open.
           </Typography>
         </Box>
 
