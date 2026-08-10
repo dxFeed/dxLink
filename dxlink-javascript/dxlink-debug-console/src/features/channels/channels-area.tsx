@@ -29,7 +29,6 @@ import { FeedChannel } from '../feed/feed-channel'
 import { FeedChannelRequest } from '../feed/feed-channel-request'
 import { IndiChartChannel } from '../indichart/indichart-channel'
 import { IndiChartChannelRequest } from '../indichart/indichart-channel-request'
-import { DEFAULT_INDICATOR_CODE } from '../indichart/samples'
 
 const ADD_BUTTONS: { kind: ChannelKind; label: string; icon: ReactNode }[] = [
   { kind: 'feed', label: 'Feed', icon: <ShowChartIcon /> },
@@ -78,9 +77,7 @@ export const ChannelsArea = () => {
     feed: '',
     space: '',
   })
-  const [indiRequest, setIndiRequest] = useState<IndiChartRequest>({
-    indicators: [DEFAULT_INDICATOR_CODE],
-  })
+  const [indiRequest, setIndiRequest] = useState<IndiChartRequest>({ indicators: [''] })
 
   const nextId = useRef(1)
   const [scrollToId, setScrollToId] = useState<string | null>(null)
@@ -94,6 +91,21 @@ export const ChannelsArea = () => {
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     setScrollToId(null)
   }, [scrollToId])
+
+  /**
+   * Open the request dialog for a service.
+   *
+   * Feed and DOM requests keep their values between opens, so several similar channels
+   * are quick to create. IndiChart cannot: its editor is uncontrolled and always mounts
+   * empty, so retaining the scripts would leave stale text in state behind a blank
+   * editor. Its request is reset instead.
+   */
+  const openRequest = (kind: ChannelKind) => {
+    if (kind === 'indichart') {
+      setIndiRequest({ indicators: [''] })
+    }
+    setRequestKind(kind)
+  }
 
   const openChannel = () => {
     if (requestKind === null) {
@@ -119,7 +131,10 @@ export const ChannelsArea = () => {
         space: domRequest.space.trim(),
       }
     } else {
-      config = { kind: 'indichart', indicators: indiRequest.indicators }
+      config = {
+        kind: 'indichart',
+        indicators: indiRequest.indicators.filter((code) => code.trim() !== ''),
+      }
     }
 
     setChannels((current) => [...current, { id, config }])
@@ -127,7 +142,12 @@ export const ChannelsArea = () => {
     setScrollToId(id)
   }
 
-  const canOpen = requestKind !== 'dom' || domRequest.symbol.trim().length > 0
+  const canOpen =
+    requestKind === 'dom'
+      ? domRequest.symbol.trim().length > 0
+      : requestKind === 'indichart'
+        ? indiRequest.indicators.some((code) => code.trim() !== '')
+        : true
 
   return (
     <Stack spacing={2}>
@@ -142,7 +162,7 @@ export const ChannelsArea = () => {
             variant="outlined"
             color="inherit"
             startIcon={button.icon}
-            onClick={() => setRequestKind(button.kind)}
+            onClick={() => openRequest(button.kind)}
           >
             {button.label}
           </Button>

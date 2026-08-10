@@ -1,42 +1,50 @@
+import { DxScriptEditor } from '@dxscript/dxlink-dxscript-editor'
 import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import IconButton from '@mui/material/IconButton'
-import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
-import TextField from '@mui/material/TextField'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 
-import { DEFAULT_INDICATOR_CODE, getSampleContent, listSamples } from './samples'
 import { MAX_INDICATORS } from '../channels/types'
 import type { IndiChartRequest } from '../channels/types'
-
-// The official dxScript indicator samples (same set as the dxlink-docs editor).
-const SAMPLES = listSamples()
 
 interface IndiChartChannelRequestProps {
   value: IndiChartRequest
   onChange: (value: IndiChartRequest) => void
 }
 
-/** IndiChart channel request form (draft / presentational only): 1..N indicator scripts. */
+/**
+ * IndiChart channel request form: 1..N dxScript indicator sources.
+ *
+ * Uses the first-party `DxScriptEditor`, which brings dxScript syntax highlighting,
+ * completion and its own bundled sample picker (it depends on `@dxscript/js-samples`) —
+ * the same editor dxlink-docs used.
+ *
+ * The editor is **uncontrolled**: it owns its text and only reports changes through
+ * `onChange`, with no prop to push text back in. Two consequences:
+ *  - each editor starts empty, so the samples button is how you get a starting script;
+ *  - the request cannot be re-populated after the dialog closes, which is why
+ *    `channels-area` resets this request whenever the dialog opens. Restoring the
+ *    previous text would show stale values in state behind an empty editor.
+ */
 export const IndiChartChannelRequest = ({ value, onChange }: IndiChartChannelRequestProps) => {
   const setAt = (index: number, code: string) =>
-    onChange({ indicators: value.indicators.map((c, i) => (i === index ? code : c)) })
+    onChange({ indicators: value.indicators.map((current, i) => (i === index ? code : current)) })
 
-  const add = () => onChange({ indicators: [...value.indicators, DEFAULT_INDICATOR_CODE] })
+  const add = () => onChange({ indicators: [...value.indicators, ''] })
 
   const remove = (index: number) =>
-    onChange({ indicators: value.indicators.filter((_c, i) => i !== index) })
+    onChange({ indicators: value.indicators.filter((_code, i) => i !== index) })
 
   const full = value.indicators.length >= MAX_INDICATORS
 
   return (
     <Stack spacing={2} sx={{ pt: 1 }}>
-      {value.indicators.map((code, index) => (
+      {value.indicators.map((_code, index) => (
         <Card key={index} variant="outlined">
           <CardContent>
             <Stack
@@ -45,44 +53,20 @@ export const IndiChartChannelRequest = ({ value, onChange }: IndiChartChannelReq
               sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}
             >
               <Typography variant="subtitle2">Indicator {index + 1}</Typography>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <TextField
-                  select
-                  size="small"
-                  value=""
-                  sx={{ minWidth: 220 }}
-                  onChange={(e) => setAt(index, getSampleContent(e.target.value))}
-                >
-                  <MenuItem value="" disabled>
-                    Insert example…
-                  </MenuItem>
-                  {SAMPLES.map((sample) => (
-                    <MenuItem key={sample.name} value={sample.name}>
-                      {sample.title}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                {value.indicators.length > 1 && (
-                  <Tooltip title="Remove indicator">
-                    <IconButton aria-label="Remove indicator" onClick={() => remove(index)}>
-                      <CloseIcon />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Stack>
+              {value.indicators.length > 1 && (
+                <Tooltip title="Remove indicator">
+                  <IconButton aria-label="Remove indicator" onClick={() => remove(index)}>
+                    <CloseIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Stack>
-            <TextField
-              multiline
-              minRows={4}
-              fullWidth
-              value={code}
-              onChange={(e) => setAt(index, e.target.value)}
-              sx={{
-                '& textarea': {
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-                  fontSize: 13,
-                },
-              }}
+            <DxScriptEditor
+              onChange={(code) => setAt(index, code)}
+              placeholder="dxScript indicator source"
+              height="260px"
+              enableSamplesButton={true}
+              showLangLogo={true}
             />
           </CardContent>
         </Card>
