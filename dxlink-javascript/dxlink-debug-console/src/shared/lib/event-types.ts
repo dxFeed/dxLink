@@ -28,8 +28,6 @@ const EVENT_TYPE_LIST = [
   'Message',
 ] as const
 
-export type EventType = (typeof EVENT_TYPE_LIST)[number]
-
 /** Widened for use as picker options, where any string is a valid entry. */
 export const EVENT_TYPES: readonly string[] = EVENT_TYPE_LIST
 

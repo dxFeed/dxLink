@@ -28,10 +28,10 @@ const CONFIG: ConfigInterface = {
  * imported with Vite's `?url` so it is emitted as a hashed asset and can be both
  * fetched by the viewer and downloaded by the user.
  *
- * Default-exported as well as named: `app/routes.tsx` lazy-loads this route to keep
- * the parser + highlighter out of the initial chunk.
+ * Default-exported only, so `app/routes.tsx` can lazy-load it and keep the parser and
+ * highlighter out of the initial chunk.
  */
-export const ProtocolPage = () => (
+const ProtocolPage = () => (
   <Card variant="outlined">
     <CardHeader
       title={<Typography sx={{ fontWeight: 700 }}>dxLink WebSocket protocol</Typography>}

@@ -4,12 +4,11 @@ import type {
   DepthOfMarketConfig,
   DepthOfMarketOrder,
   DXLinkClient,
-  DXLinkError,
 } from '@dxfeed/dxlink-api'
 import { createStore } from 'zustand/vanilla'
 
-import { prependError } from '../../shared/lib/timestamped-error'
-import type { TimestampedError } from '../../shared/lib/timestamped-error'
+import { ChannelErrorTracker, initialChannelErrorState } from '../../shared/lib/channel-errors'
+import type { ChannelErrorState } from '../../shared/lib/channel-errors'
 import type { ViewModel } from '../../shared/view-model'
 
 export interface DomSnapshot {
@@ -18,16 +17,10 @@ export interface DomSnapshot {
   asks: DepthOfMarketOrder[]
 }
 
-export interface DomVMState {
+export interface DomVMState extends ChannelErrorState {
   channelState: DXLinkChannelState
   config: DepthOfMarketConfig | null
   snapshot: DomSnapshot | null
-  /** Protocol channel id, for correlating with a protocol log. Null until opened. */
-  channelId: number | null
-  /** Parameters this channel was actually opened with. Null until opened. */
-  channelParameters: Readonly<Record<string, unknown>> | null
-  /** Errors scoped to THIS channel — connection errors live on the connection VM. */
-  errors: TimestampedError[]
 }
 
 // Coalesce snapshots to the latest one within this window (~10fps).
@@ -45,11 +38,10 @@ export class DomViewModel implements ViewModel<DomVMState> {
     channelState: DXLinkChannelState.REQUESTED,
     config: null,
     snapshot: null,
-    channelId: null,
-    channelParameters: null,
-    errors: [],
+    ...initialChannelErrorState(),
   }))
 
+  private readonly channelErrors = new ChannelErrorTracker(this.store)
   private readonly client: DXLinkClient
   private readonly params: { symbol: string; sources: string[]; feed?: string; space?: string }
   private dom: DXLinkDepthOfMarket | null = null
@@ -82,15 +74,9 @@ export class DomViewModel implements ViewModel<DomVMState> {
     dom.addSnapshotListener(this.handleSnapshot)
     dom.addConfigChangeListener(this.handleConfig)
     dom.addStateChangeListener(this.handleState)
-    const channel = dom.getChannel()
-    channel.addErrorListener(this.handleError)
+    this.channelErrors.attach(dom.getChannel())
     this.dom = dom
-    this.store.setState({
-      channelState: dom.getState(),
-      config: dom.getConfig(),
-      channelId: channel.id,
-      channelParameters: channel.parameters,
-    })
+    this.store.setState({ channelState: dom.getState(), config: dom.getConfig() })
   }
 
   stop = (): void => {
@@ -105,7 +91,7 @@ export class DomViewModel implements ViewModel<DomVMState> {
     dom.removeSnapshotListener(this.handleSnapshot)
     dom.removeConfigChangeListener(this.handleConfig)
     dom.removeStateChangeListener(this.handleState)
-    dom.getChannel().removeErrorListener(this.handleError)
+    this.channelErrors.detach(dom.getChannel())
     dom.close()
   }
 
@@ -113,9 +99,7 @@ export class DomViewModel implements ViewModel<DomVMState> {
     this.dom?.configure(accept)
   }
 
-  clearErrors = (): void => {
-    this.store.setState({ errors: [] })
-  }
+  clearErrors = (): void => this.channelErrors.clear()
 
   close = (): void => {
     this.stop()
@@ -150,9 +134,5 @@ export class DomViewModel implements ViewModel<DomVMState> {
 
   private handleState = (state: DXLinkChannelState): void => {
     this.store.setState({ channelState: state })
-  }
-
-  private handleError = (error: DXLinkError): void => {
-    this.store.setState((s) => ({ errors: prependError(s.errors, error) }))
   }
 }

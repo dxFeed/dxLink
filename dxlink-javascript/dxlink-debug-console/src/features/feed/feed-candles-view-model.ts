@@ -1,11 +1,11 @@
 import { DXLinkChannelState, DXLinkLogLevel } from '@dxfeed/dxlink-api'
-import type { DXLinkClient, DXLinkError, DXLinkIndiChartCandle } from '@dxfeed/dxlink-api'
+import type { DXLinkClient, DXLinkIndiChartCandle } from '@dxfeed/dxlink-api'
 import { createStore } from 'zustand/vanilla'
 
 import { DXLinkCandles } from './candles'
 import type { DXLinkCandleData, DXLinkCandleEvent } from './candles'
-import { prependError } from '../../shared/lib/timestamped-error'
-import type { TimestampedError } from '../../shared/lib/timestamped-error'
+import { ChannelErrorTracker, initialChannelErrorState } from '../../shared/lib/channel-errors'
+import type { ChannelErrorState } from '../../shared/lib/channel-errors'
 import type { ViewModel } from '../../shared/view-model'
 
 /** How the chart consumes a batch of candles: a fresh snapshot or an incremental update. */
@@ -14,17 +14,11 @@ export type CandleChartListener = (
   dataType: 'candles' | 'update'
 ) => void
 
-export interface CandlesVMState {
+export interface CandlesVMState extends ChannelErrorState {
   channelState: DXLinkChannelState
   subscription: { symbol: string; fromTime: number } | null
   candleCount: number
   lastUpdate: number | null
-  /** Protocol channel id, for correlating with a protocol log. Null until opened. */
-  channelId: number | null
-  /** Parameters this channel was actually opened with. Null until opened. */
-  channelParameters: Readonly<Record<string, unknown>> | null
-  /** Errors scoped to THIS channel — connection errors live on the connection VM. */
-  errors: TimestampedError[]
 }
 
 const toChartCandle = (event: DXLinkCandleEvent): DXLinkIndiChartCandle => ({
@@ -52,11 +46,10 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
     subscription: null,
     candleCount: 0,
     lastUpdate: null,
-    channelId: null,
-    channelParameters: null,
-    errors: [],
+    ...initialChannelErrorState(),
   }))
 
+  private readonly channelErrors = new ChannelErrorTracker(this.store)
   private readonly client: DXLinkClient
   private readonly params: { feed?: string; space?: string }
   private candles: DXLinkCandles | null = null
@@ -83,13 +76,9 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
     candles.addListener(this.handleData)
     const channel = candles.getChannel()
     channel.addStateChangeListener(this.handleState)
-    channel.addErrorListener(this.handleError)
+    this.channelErrors.attach(channel)
     this.candles = candles
-    this.store.setState({
-      channelState: channel.getState(),
-      channelId: channel.id,
-      channelParameters: channel.parameters,
-    })
+    this.store.setState({ channelState: channel.getState() })
     // Re-apply an existing subscription after a StrictMode restart.
     const { subscription } = this.store.getState()
     if (subscription !== null) {
@@ -104,7 +93,7 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
     candles.removeListener(this.handleData)
     const channel = candles.getChannel()
     channel.removeStateChangeListener(this.handleState)
-    channel.removeErrorListener(this.handleError)
+    this.channelErrors.detach(channel)
     candles.close()
   }
 
@@ -114,9 +103,7 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
     this.candles?.setSubscription(subscription)
   }
 
-  clearErrors = (): void => {
-    this.store.setState({ errors: [] })
-  }
+  clearErrors = (): void => this.channelErrors.clear()
 
   close = (): void => {
     this.stop()
@@ -135,9 +122,5 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
 
   private handleState = (state: DXLinkChannelState): void => {
     this.store.setState({ channelState: state })
-  }
-
-  private handleError = (error: DXLinkError): void => {
-    this.store.setState((s) => ({ errors: prependError(s.errors, error) }))
   }
 }

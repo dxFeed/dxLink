@@ -47,8 +47,6 @@ const FEED_ORDER_SOURCE_LIST = [
   'DEFAULT',
 ] as const
 
-export type FeedOrderSource = (typeof FEED_ORDER_SOURCE_LIST)[number]
-
 /** Widened for use as picker options, where any string is a valid entry. */
 export const FEED_ORDER_SOURCES: readonly string[] = FEED_ORDER_SOURCE_LIST
 

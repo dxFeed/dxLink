@@ -93,16 +93,23 @@ Also closed alongside these:
 
 - **Channel-level errors** — every channel VM listens on its channel and keeps its own
   `errors[]`, surfaced on that channel's card. Connection errors still aggregate on the
-  connection VM.
+  connection VM. The shared mechanics live in `shared/lib/channel-errors.ts`
+  (`ChannelErrorTracker`), so the four channel VMs cannot drift apart; lists are capped at
+  `MAX_ERRORS` per scope, since a server rejecting a large batch can emit thousands.
 - **Channel identity** — the widget shows the protocol channel id and the parameters the
   channel was actually opened with. Those replace the chips rendered from our own request
   config: same information, negotiated rather than requested. IndiChart deliberately does
   not show parameters — for that service they carry the whole indicator source.
-- **Channel failures contained** — channel cards are wrapped in an error boundary. Three
-  construct their VM in a `useState` initializer that throws without a live client, and
-  they host a third-party chart; either could blank the console and take every other open
-  channel with it. The throws remain (they are clear programmer errors) but can no longer
-  take down the page.
+- **Channel failures contained**, by two separate mechanisms, because they fail in two
+  different places:
+  - *Render* — channel cards are wrapped in an error boundary, as is the lazy Protocol
+    route. Three channels construct their VM in a `useState` initializer that throws
+    without a live client; that throw remains (it is a clear programmer error) but can no
+    longer blank the console and take every other open channel with it.
+  - *Protocol dispatch* — `chartRef.pushData` is called synchronously from the WebSocket
+    frame handler, which does not guard its listeners. A throw there is invisible to React
+    (it is not a render error) and would abort that frame for every other channel, so both
+    chart views catch it and surface it as a chart error.
 - **`logLevel: DEBUG`** on Feed, DOM and Candles channels. **Not** IndiChart:
   `DXLinkIndiChart`'s constructor accepts no options at all, so its logger is fixed at
   `WARN`. Changing `dxlink-api` is out of scope (PLAN.md §1), so this is recorded rather

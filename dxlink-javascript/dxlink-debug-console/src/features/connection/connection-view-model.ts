@@ -18,9 +18,6 @@ export interface ConnectionParams {
   acceptKeepaliveTimeout: number
 }
 
-/** A connection-level error, timestamped for the error center. */
-export type ConnectionError = TimestampedError
-
 export interface ConnectionVMState {
   connection: DXLinkConnectionState
   /**
@@ -30,7 +27,7 @@ export interface ConnectionVMState {
    */
   auth: DXLinkAuthState | undefined
   details: DXLinkConnectionDetails | null
-  errors: ConnectionError[]
+  errors: TimestampedError[]
   /**
    * Identifies the current client instance. Bumped on each fresh {@link connect}
    * (new client) but NOT on {@link reconnect} (same client). The channels area uses

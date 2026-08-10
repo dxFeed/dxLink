@@ -1,7 +1,6 @@
 import { DXLinkChannelState, DXLinkIndiChart } from '@dxfeed/dxlink-api'
 import type {
   DXLinkClient,
-  DXLinkError,
   DXLinkIndiChartCandle,
   DXLinkIndiChartIndicators,
   DXLinkIndiChartIndicatorsData,
@@ -11,8 +10,8 @@ import type {
 } from '@dxfeed/dxlink-api'
 import { createStore } from 'zustand/vanilla'
 
-import { prependError } from '../../shared/lib/timestamped-error'
-import type { TimestampedError } from '../../shared/lib/timestamped-error'
+import { ChannelErrorTracker } from '../../shared/lib/channel-errors'
+import type { ChannelErrorState } from '../../shared/lib/channel-errors'
 import type { ViewModel } from '../../shared/view-model'
 
 export type ChartDataType = 'candles' | 'indicators' | 'update'
@@ -36,19 +35,13 @@ export interface IndicatorOutputMeta {
   overlay?: boolean
 }
 
-export interface IndiChartVMState {
+export interface IndiChartVMState extends ChannelErrorState {
   channelState: DXLinkChannelState
   /** Per-indicator states reported by the server (in/out params or script error). */
   indicatorStates: DXLinkIndiChartIndicatorsStates | null
   /** Per-indicator declared outputs (output/spline/shape/barColor/backgroundColor) from the state. */
   outputs: Record<string, IndicatorOutputMeta[]>
   subscription: { symbol: string; fromTime: number } | null
-  /** Protocol channel id, for correlating with a protocol log. Null until opened. */
-  channelId: number | null
-  /** Parameters this channel was actually opened with. Null until opened. */
-  channelParameters: Readonly<Record<string, unknown>> | null
-  /** Errors scoped to THIS channel — connection errors live on the connection VM. */
-  errors: TimestampedError[]
 }
 
 // The enabled indicator state carries one array per output kind (plural field names),
@@ -105,10 +98,10 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     outputs: {},
     subscription: null,
     channelId: null,
-    channelParameters: null,
     errors: [],
   }))
 
+  private readonly channelErrors = new ChannelErrorTracker(this.store)
   private readonly client: DXLinkClient
   private readonly indicators: DXLinkIndiChartIndicators
   private chart: DXLinkIndiChart | null = null
@@ -148,13 +141,11 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     chart.addUpdateListener(this.handleUpdate)
     const channel = chart.getChannel()
     channel.addStateChangeListener(this.handleState)
-    channel.addErrorListener(this.handleError)
+    // withParameters: false — an INDICHART channel's parameters carry the full source of
+    // every indicator, which the indicator panels already render from `config`.
+    this.channelErrors.attach(channel, { withParameters: false })
     this.chart = chart
-    this.store.setState({
-      channelState: chart.getState(),
-      channelId: channel.id,
-      channelParameters: channel.parameters,
-    })
+    this.store.setState({ channelState: chart.getState() })
     // Re-apply an existing subscription after a StrictMode restart.
     const { subscription } = this.store.getState()
     if (subscription !== null) {
@@ -172,7 +163,7 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     chart.removeUpdateListener(this.handleUpdate)
     const channel = chart.getChannel()
     channel.removeStateChangeListener(this.handleState)
-    channel.removeErrorListener(this.handleError)
+    this.channelErrors.detach(channel)
     chart.close()
     this.resetCoordination()
   }
@@ -221,9 +212,7 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     }
   }
 
-  clearErrors = (): void => {
-    this.store.setState({ errors: [] })
-  }
+  clearErrors = (): void => this.channelErrors.clear()
 
   close = (): void => {
     this.stop()
@@ -251,10 +240,6 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
 
   private handleState = (state: DXLinkChannelState): void => {
     this.store.setState({ channelState: state })
-  }
-
-  private handleError = (error: DXLinkError): void => {
-    this.store.setState((s) => ({ errors: prependError(s.errors, error) }))
   }
 
   // --- ChartHolder snapshot/update coordination (ported verbatim in behaviour) ---
