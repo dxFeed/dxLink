@@ -305,8 +305,16 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
   useEffect(() => {
     vm.start()
     vm.setChartListener((candles, indicators, dataType) => {
-      chartRef.current?.pushData(candles, indicators, dataType)
-      if (candles.length > 0) setHasData(true)
+      // pushData runs synchronously inside the WebSocket frame dispatch, which does not
+      // guard its listeners. An escaping throw would abort processing of that frame for
+      // every other channel, and React's error boundary cannot see it — this is not a
+      // render error. Contain it here and report it as a chart error.
+      try {
+        chartRef.current?.pushData(candles, indicators, dataType)
+        if (candles.length > 0) setHasData(true)
+      } catch (error) {
+        setChartError(error instanceof Error ? error.message : String(error))
+      }
     })
     return () => {
       vm.setChartListener(null)

@@ -201,12 +201,24 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
   }
 
   /**
-   * Drop the subscription and all derived state, leaving the channel open and ready
-   * for a new one.
+   * Drop the subscription and all derived state, leaving a fresh channel ready for a new
+   * one.
+   *
+   * The protocol has no way to cancel an INDICHART subscription short of replacing it, so
+   * clearing local state alone would leave the server streaming into a chart the UI says
+   * is empty. The channel is therefore closed and reopened — which is what
+   * `ChartHolder.clear()` did in dxlink-docs. The channel id changes as a result.
+   *
+   * Errors are deliberately kept: they are a log of what this channel did, and the widget
+   * has its own explicit Clear.
    */
   reset = (): void => {
-    this.resetCoordination()
-    this.store.setState({ subscription: null, outputs: {}, indicatorStates: null, errors: [] })
+    const wasStarted = this.chart !== null
+    this.stop()
+    this.store.setState({ subscription: null, outputs: {}, indicatorStates: null })
+    if (wasStarted) {
+      this.start()
+    }
   }
 
   clearErrors = (): void => {

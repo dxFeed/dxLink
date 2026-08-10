@@ -13,17 +13,29 @@ const meta = (fields: Partial<SessionMeta> = {}): SessionMeta => ({
   ...fields,
 })
 
-const openDialog = (label = 'session') => fireEvent.click(screen.getByLabelText(label))
+const trigger = () => screen.getByRole('button', { name: /configure session/i })
+
+const openDialog = () => fireEvent.click(trigger())
 
 const resultValue = (): string => (screen.getByLabelText('Result') as HTMLInputElement).value
 
 describe('SessionParameterField', () => {
-  it('shows the value without letting it be typed over', () => {
+  it('shows the value on a trigger that can be operated from the keyboard', () => {
     render(<SessionParameterField meta={meta()} value="0930-1600" onChange={vi.fn()} />)
 
-    const field = screen.getByLabelText('session') as HTMLInputElement
-    expect(field.value).toBe('0930-1600')
-    expect(field).toHaveAttribute('readonly')
+    // A real <button>, not a readOnly input with onClick: browsers activate a button on
+    // Enter/Space, so the field is reachable without a mouse.
+    expect(trigger().tagName).toBe('BUTTON')
+    expect(trigger()).toHaveTextContent('0930-1600')
+
+    trigger().focus()
+    expect(trigger()).toHaveFocus()
+  })
+
+  it('prompts when there is no value yet', () => {
+    render(<SessionParameterField meta={meta()} value="" onChange={vi.fn()} />)
+
+    expect(trigger()).toHaveTextContent('Configure session')
   })
 
   it('opens in interval mode for a parseable value', () => {
@@ -90,12 +102,35 @@ describe('SessionParameterField', () => {
     expect(onChange).toHaveBeenCalledWith('CUSTOM_WINDOW')
   })
 
-  it('switching to interval seeds a usable window instead of blanking the value', () => {
-    render(<SessionParameterField meta={meta()} value="ALWAYS" onChange={vi.fn()} />)
+  it('switching to interval commits the window it shows, not the raw value behind it', () => {
+    const onChange = vi.fn()
+    render(<SessionParameterField meta={meta()} value="ALWAYS" onChange={onChange} />)
     openDialog()
 
     fireEvent.click(screen.getByRole('button', { name: 'Interval' }))
+
+    // The pickers show 09:30-16:00, so that is what Apply must send — not 'ALWAYS'.
     expect((screen.getByLabelText('Start') as HTMLInputElement).value).toBe('09:30')
+    expect(resultValue()).toBe('0930-1600')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(onChange).toHaveBeenCalledWith('0930-1600')
+  })
+
+  it('normalizes a cleared time instead of emitting a malformed session', () => {
+    const onChange = vi.fn()
+    render(<SessionParameterField meta={meta()} value="0930-1600" onChange={onChange} />)
+    openDialog()
+
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '' } })
+
+    // Formatting '' straight through would yield '-1600', which parses to nothing: the
+    // pickers would snap back while Apply sent the broken string.
+    expect(resultValue()).toBe('0000-1600')
+    expect((screen.getByLabelText('Start') as HTMLInputElement).value).toBe('00:00')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(onChange).toHaveBeenCalledWith('0000-1600')
   })
 
   it('offers only the presets when the parameter constrains them', () => {

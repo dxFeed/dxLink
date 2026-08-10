@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
+import { createIndicatorEntry } from './types'
 import type {
   ChannelConfig,
   ChannelKind,
@@ -77,7 +78,9 @@ export const ChannelsArea = () => {
     feed: '',
     space: '',
   })
-  const [indiRequest, setIndiRequest] = useState<IndiChartRequest>({ indicators: [''] })
+  const [indiRequest, setIndiRequest] = useState<IndiChartRequest>(() => ({
+    indicators: [createIndicatorEntry()],
+  }))
 
   const nextId = useRef(1)
   const [scrollToId, setScrollToId] = useState<string | null>(null)
@@ -102,7 +105,7 @@ export const ChannelsArea = () => {
    */
   const openRequest = (kind: ChannelKind) => {
     if (kind === 'indichart') {
-      setIndiRequest({ indicators: [''] })
+      setIndiRequest({ indicators: [createIndicatorEntry()] })
     }
     setRequestKind(kind)
   }
@@ -133,7 +136,9 @@ export const ChannelsArea = () => {
     } else {
       config = {
         kind: 'indichart',
-        indicators: indiRequest.indicators.filter((code) => code.trim() !== ''),
+        indicators: indiRequest.indicators
+          .map((entry) => entry.code)
+          .filter((code) => code.trim() !== ''),
       }
     }
 
@@ -146,7 +151,7 @@ export const ChannelsArea = () => {
     requestKind === 'dom'
       ? domRequest.symbol.trim().length > 0
       : requestKind === 'indichart'
-        ? indiRequest.indicators.some((code) => code.trim() !== '')
+        ? indiRequest.indicators.some((entry) => entry.code.trim() !== '')
         : true
 
   return (

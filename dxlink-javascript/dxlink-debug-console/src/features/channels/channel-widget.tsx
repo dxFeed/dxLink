@@ -15,6 +15,27 @@ import { useState } from 'react'
 import type { TimestampedError } from '../../shared/lib/timestamped-error'
 import { ErrorCenter } from '../errors/error-center'
 
+/**
+ * Render a channel parameter for its chip, or `null` when it carries no information.
+ *
+ * Channel parameters are `unknown`: DOM sends `sources` as an array, other services send
+ * strings or numbers, and optional ones arrive as `undefined`.
+ */
+const formatParameter = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.join(', ') : null
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  const text = String(value)
+
+  return text === '' ? null : text
+}
+
 interface ChannelWidgetProps {
   icon: React.ReactNode
   title: string
@@ -77,9 +98,14 @@ export const ChannelWidget = ({
   const subheader =
     channelId != null ? [subtitle, `channel #${channelId}`].filter(Boolean).join(' · ') : subtitle
 
-  const parameterEntries = Object.entries(parameters ?? {}).filter(
-    ([, value]) => value !== undefined
-  )
+  const parameterEntries = Object.entries(parameters ?? {}).flatMap(([key, value]) => {
+    const formatted = formatParameter(value)
+
+    // A parameter the client omitted, or an empty list (e.g. DOM opened with no order
+    // source), carries no information — showing `sources: ` with nothing after it is
+    // worse than showing nothing at all. Absence means "server default".
+    return formatted === null ? [] : [[key, formatted] as const]
+  })
 
   return (
     <Card>
@@ -142,12 +168,7 @@ export const ChannelWidget = ({
             {parameterEntries.length > 0 && (
               <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', mb: 2 }}>
                 {parameterEntries.map(([key, value]) => (
-                  <Chip
-                    key={key}
-                    size="small"
-                    variant="outlined"
-                    label={`${key}: ${String(value)}`}
-                  />
+                  <Chip key={key} size="small" variant="outlined" label={`${key}: ${value}`} />
                 ))}
               </Stack>
             )}

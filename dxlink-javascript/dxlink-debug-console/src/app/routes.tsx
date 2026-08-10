@@ -4,6 +4,7 @@ import { Suspense, lazy } from 'react'
 import type { ReactElement } from 'react'
 
 import { ConsolePage } from '../pages/console-page'
+import { ErrorBoundary } from '../shared/components/error-boundary'
 
 // The AsyncAPI viewer bundles its own parser and syntax highlighter and is far larger
 // than the rest of the app, so it is kept out of the initial chunk.
@@ -33,10 +34,15 @@ export const ROUTES: readonly RouteDef[] = [
   {
     label: 'Protocol',
     path: '/protocol',
+    // A rejected chunk fetch (stale deploy, flaky network) throws during render, which
+    // would otherwise reach the root and unmount the whole app — including the console
+    // page and every open channel.
     element: (
-      <Suspense fallback={<RouteFallback />}>
-        <ProtocolPage />
-      </Suspense>
+      <ErrorBoundary title="The protocol page failed to load">
+        <Suspense fallback={<RouteFallback />}>
+          <ProtocolPage />
+        </Suspense>
+      </ErrorBoundary>
     ),
   },
 ]

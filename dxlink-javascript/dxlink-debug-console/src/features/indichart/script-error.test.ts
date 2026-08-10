@@ -103,6 +103,19 @@ describe('describeScriptError', () => {
     })
   })
 
+  it('prefers an internal failure over a script error reported alongside it', () => {
+    // dxlink-docs checked internalErrorMessage first; a scriptError sent with it may be
+    // stale, and the engine failure is the actionable one.
+    expect(
+      describeScriptError(
+        disabled({
+          internalErrorMessage: 'engine unavailable',
+          scriptError: scriptError({ message: 'stale' }),
+        })
+      )
+    ).toEqual({ title: 'Internal error', message: 'engine unavailable' })
+  })
+
   it('still says something when the server reports no detail at all', () => {
     expect(describeScriptError(disabled({}))).toEqual({
       title: 'Script error',

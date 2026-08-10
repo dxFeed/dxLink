@@ -61,8 +61,8 @@ export const ErrorCenter = ({ errors, onClear, label = 'Errors', size }: ErrorCe
               Clear
             </Button>
           </Stack>
-          {errors.map((error, index) => (
-            <Alert key={index} severity="error" variant="outlined">
+          {errors.map((error) => (
+            <Alert key={error.id} severity="error" variant="outlined">
               <AlertTitle sx={{ mb: 0 }}>
                 {error.type}
                 <Typography

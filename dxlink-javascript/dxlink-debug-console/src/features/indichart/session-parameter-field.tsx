@@ -1,10 +1,13 @@
 import type { DXLinkIndiChartIndicatorParameterMeta } from '@dxfeed/dxlink-api'
 import EditCalendarIcon from '@mui/icons-material/EditCalendar'
+import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
+import FormControl from '@mui/material/FormControl'
+import FormHelperText from '@mui/material/FormHelperText'
 import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
@@ -17,6 +20,7 @@ import {
   DEFAULT_SESSION_PARTS,
   SESSION_DAYS,
   formatSession,
+  normalizeSessionTime,
   parseSession,
 } from '../../shared/lib/session'
 import type { SessionParts } from '../../shared/lib/session'
@@ -54,12 +58,34 @@ export const SessionParameterField = ({ meta, value, onChange }: SessionParamete
 
   const draftParts = parseSession(draft)
   // Interval mode always needs a window to show; fall back to a sensible default when
-  // the current value is raw.
+  // the current value is raw. Switching into interval mode writes this back into `draft`
+  // (see `showInterval`) so the pickers can never display one window while Apply sends
+  // another.
   const parts = draftParts ?? DEFAULT_SESSION_PARTS
 
   const timeZone = meta.timeZone ?? 'UTC'
 
-  const updateParts = (next: SessionParts) => setDraft(formatSession(next))
+  /**
+   * Times are normalized before formatting. A cleared `<input type="time">` reports `''`,
+   * which would otherwise format to a malformed `-1600` that parses back to nothing — the
+   * pickers would snap to the default while Apply sent the broken string.
+   */
+  const updateParts = (next: SessionParts) =>
+    setDraft(
+      formatSession({
+        start: normalizeSessionTime(next.start),
+        end: normalizeSessionTime(next.end),
+        days: next.days,
+      })
+    )
+
+  /** Entering interval mode commits the window the pickers are about to show. */
+  const showInterval = () => {
+    if (draftParts === undefined) {
+      setDraft(formatSession(DEFAULT_SESSION_PARTS))
+    }
+    setMode('interval')
+  }
 
   const openDialog = () => {
     // A constrained parameter whose value is off-list starts from the first preset.
@@ -75,21 +101,36 @@ export const SessionParameterField = ({ meta, value, onChange }: SessionParamete
 
   return (
     <>
-      <TextField
-        label={meta.name}
-        value={value}
-        placeholder="Configure session"
-        onClick={openDialog}
-        size="small"
-        fullWidth
-        helperText={`SESSION · ${timeZone}`}
-        slotProps={{
-          // Read-only rather than disabled: still focusable and copyable, and it must
-          // open the dialog instead of accepting keystrokes.
-          input: { readOnly: true, endAdornment: <EditCalendarIcon fontSize="small" /> },
-        }}
-        sx={{ '& .MuiInputBase-root': { cursor: 'pointer' } }}
-      />
+      {/*
+        A real button, not a readOnly input with onClick: the input variant could only be
+        opened with a mouse, since Enter/Space on a text input synthesises no click. This
+        keeps the field reachable and operable from the keyboard.
+      */}
+      <FormControl size="small" fullWidth>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={openDialog}
+          endIcon={<EditCalendarIcon fontSize="small" />}
+          aria-label={`${meta.name} — configure session`}
+          sx={{
+            justifyContent: 'space-between',
+            textTransform: 'none',
+            fontWeight: 400,
+            minHeight: 40,
+            borderColor: 'divider',
+            color: value === '' ? 'text.secondary' : 'text.primary',
+          }}
+        >
+          <Box
+            component="span"
+            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {value === '' ? 'Configure session' : value}
+          </Box>
+        </Button>
+        <FormHelperText sx={{ mx: 1.75 }}>{`SESSION · ${timeZone}`}</FormHelperText>
+      </FormControl>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>{meta.name}</DialogTitle>
@@ -117,7 +158,13 @@ export const SessionParameterField = ({ meta, value, onChange }: SessionParamete
                   exclusive
                   size="small"
                   value={mode}
-                  onChange={(_event, next: SessionMode | null) => next !== null && setMode(next)}
+                  onChange={(_event, next: SessionMode | null) => {
+                    if (next === 'interval') {
+                      showInterval()
+                    } else if (next === 'raw') {
+                      setMode('raw')
+                    }
+                  }}
                 >
                   <ToggleButton value="interval">Interval</ToggleButton>
                   <ToggleButton value="raw">Raw</ToggleButton>

@@ -20,8 +20,15 @@ export const SESSION_DAYS = [
   { value: '7', label: 'Sun' },
 ] as const
 
-/** Every weekday, in order — what an unrestricted session means. */
-export const ALL_SESSION_DAYS: string[] = SESSION_DAYS.map((day) => day.value)
+/**
+ * Every weekday, in order — what an unrestricted session means.
+ *
+ * `readonly`, and `SessionParts.days` is too: this array is handed straight back from
+ * `parseSession` for an unrestricted window and is aliased by
+ * {@link DEFAULT_SESSION_PARTS}, so an in-place mutation anywhere would corrupt the
+ * module default for the rest of the page.
+ */
+export const ALL_SESSION_DAYS: readonly string[] = SESSION_DAYS.map((day) => day.value)
 
 export interface SessionParts {
   /** `HH:MM`, as an `<input type="time">` expects. */
@@ -29,7 +36,7 @@ export interface SessionParts {
   /** `HH:MM`, as an `<input type="time">` expects. */
   end: string
   /** Day numbers, `'1'` (Monday) to `'7'` (Sunday). */
-  days: string[]
+  days: readonly string[]
 }
 
 /** The window used when opening the editor on a value that does not parse. */

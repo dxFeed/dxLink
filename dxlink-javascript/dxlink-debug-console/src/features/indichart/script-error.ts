@@ -37,11 +37,15 @@ export const describeScriptError = (
     return undefined
   }
 
+  // An internal failure takes precedence over any script error, as it did in
+  // dxlink-docs (chart-wrapper.ts returned early on it): the server failing to run the
+  // engine is the actionable fact, and a scriptError alongside it may be stale.
+  if (state.internalErrorMessage !== undefined) {
+    return { title: 'Internal error', message: state.internalErrorMessage }
+  }
+
   if (state.scriptError === undefined) {
-    // A disabled indicator with no script error means the server failed internally.
-    return state.internalErrorMessage !== undefined
-      ? { title: 'Internal error', message: state.internalErrorMessage }
-      : UNKNOWN
+    return UNKNOWN
   }
 
   const error = state.scriptError

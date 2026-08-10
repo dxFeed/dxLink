@@ -5,8 +5,8 @@ import { ChannelWidget } from './channel-widget'
 import type { TimestampedError } from '../../shared/lib/timestamped-error'
 
 const errors: TimestampedError[] = [
-  { type: 'INVALID_ARGUMENT', message: 'Unknown symbol', time: '10:00:01' },
-  { type: 'BAD_ACTION', message: 'Channel is not opened', time: '10:00:02' },
+  { id: 1, type: 'INVALID_ARGUMENT', message: 'Unknown symbol', time: '10:00:01' },
+  { id: 2, type: 'BAD_ACTION', message: 'Channel is not opened', time: '10:00:02' },
 ]
 
 const renderWidget = (props: Partial<Parameters<typeof ChannelWidget>[0]> = {}) =>
@@ -41,6 +41,20 @@ describe('ChannelWidget', () => {
 
     expect(screen.getByText('contract: AUTO')).toBeInTheDocument()
     expect(screen.queryByText(/space/)).not.toBeInTheDocument()
+  })
+
+  it('renders a list parameter readably', () => {
+    renderWidget({ parameters: { sources: ['NTV', 'DEX'] } })
+
+    expect(screen.getByText('sources: NTV, DEX')).toBeInTheDocument()
+  })
+
+  it('skips an empty list rather than showing a chip with nothing after the colon', () => {
+    // A DOM channel opened with no order source sends `sources: []`.
+    renderWidget({ parameters: { symbol: 'AAPL', sources: [] } })
+
+    expect(screen.getByText('symbol: AAPL')).toBeInTheDocument()
+    expect(screen.queryByText(/^sources:/)).not.toBeInTheDocument()
   })
 
   it('surfaces channel errors on the card, not the connection error center', () => {
