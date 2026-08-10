@@ -16,31 +16,60 @@ import { useState } from 'react'
 import type { FeedEventsByType, FeedViewModel } from './feed-view-model'
 import { useVM } from '../../shared/view-model'
 
-// Columns shown first when present; the rest follow alphabetically.
+// Columns shown first when present; the rest follow alphabetically. Used only when
+// the server has not reported an event-field order yet.
 const PRIORITY_FIELDS = ['eventSymbol', 'eventType']
 
-interface EventRow extends FeedEventData {
+export interface EventRow extends FeedEventData {
   id: string
 }
 
 const toRows = (bySymbol: Record<string, FeedEventData> | undefined): EventRow[] =>
-  bySymbol ? Object.entries(bySymbol).map(([symbol, event]) => ({ ...event, id: symbol })) : []
+  bySymbol ? Object.entries(bySymbol).map(([key, event]) => ({ ...event, id: key })) : []
 
-const buildColumns = (rows: EventRow[]): GridColDef[] => {
+/**
+ * Column order for one event type.
+ *
+ * Prefers the field order the server negotiated for this event type (`FeedConfig.
+ * eventFields`) — in a protocol debug console the order the protocol actually agreed
+ * on is information, not noise, so it is not re-sorted. `eventSymbol` is hoisted to
+ * the front to keep the row identity leftmost. Fields present on rows but absent from
+ * the negotiated list are appended alphabetically, so nothing received is ever hidden.
+ *
+ * Falls back to the previous behaviour (priority fields, then alphabetical) before the
+ * first config arrives, e.g. for the unknown-event bucket.
+ */
+export const buildColumns = (
+  rows: EventRow[],
+  negotiated: readonly string[] | undefined
+): GridColDef[] => {
   const keys = new Set<string>()
   for (const row of rows) {
     for (const key of Object.keys(row)) {
       if (key !== 'id') keys.add(key)
     }
   }
-  const rest = [...keys].filter((k) => !PRIORITY_FIELDS.includes(k)).sort()
-  const ordered = [...PRIORITY_FIELDS.filter((k) => keys.has(k)), ...rest]
+
+  let ordered: string[]
+  if (negotiated !== undefined && negotiated.length > 0) {
+    const inOrder = [
+      ...negotiated.filter((field) => field === 'eventSymbol'),
+      ...negotiated.filter((field) => field !== 'eventSymbol'),
+    ]
+    const extra = [...keys].filter((key) => !inOrder.includes(key)).sort()
+    ordered = [...inOrder, ...extra]
+  } else {
+    const rest = [...keys].filter((key) => !PRIORITY_FIELDS.includes(key)).sort()
+    ordered = [...PRIORITY_FIELDS.filter((key) => keys.has(key)), ...rest]
+  }
+
   return ordered.map((field) => ({ field, headerName: field, minWidth: 90, flex: 1 }))
 }
 
 /** Live received-events grid: one tab per event type, one row per symbol. */
 export const EventsTable = ({ vm }: { vm: FeedViewModel }) => {
   const events = useVM(vm, (s) => s.events)
+  const eventFields = useVM(vm, (s) => s.config.eventFields)
   const [activeType, setActiveType] = useState<string | null>(null)
   const [paused, setPaused] = useState(false)
   const [frozen, setFrozen] = useState<FeedEventsByType | null>(null)
@@ -50,7 +79,7 @@ export const EventsTable = ({ vm }: { vm: FeedViewModel }) => {
   const active = activeType !== null && types.includes(activeType) ? activeType : (types[0] ?? null)
 
   const rows = active !== null ? toRows(display[active]) : []
-  const columns = buildColumns(rows)
+  const columns = buildColumns(rows, active !== null ? eventFields[active] : undefined)
 
   const togglePause = () => {
     setFrozen(paused ? null : events)

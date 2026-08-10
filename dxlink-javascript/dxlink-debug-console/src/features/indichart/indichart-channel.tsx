@@ -27,6 +27,8 @@ import { IndiChartViewModel } from './indichart-view-model'
 import type { IndicatorOutputKind, IndicatorOutputMeta } from './indichart-view-model'
 import { ParameterField, initialParameterValue } from './parameter-field'
 import type { ParameterValue } from './parameter-field'
+import { DocLink } from '../../shared/components/doc-link'
+import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../../shared/lib/order-sources'
 import { useVM } from '../../shared/view-model'
 import { ChannelWidget } from '../channels/channel-widget'
 import type { IndiChartConfig } from '../channels/types'
@@ -389,14 +391,23 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
               size="small"
-              helperText="Candle symbol, e.g. AAPL{=d}"
+              helperText={
+                <>
+                  <DocLink href={CANDLE_SYMBOLS_DOC_URL}>Candle symbol</DocLink>, e.g. AAPL
+                  {'{=d}'}
+                </>
+              }
             />
             <TextField
               label="From time"
               value={fromTime}
               onChange={(e) => setFromTime(e.target.value.replace(/[^0-9]/g, ''))}
               size="small"
-              helperText="Unix ms, or 0 for full history"
+              helperText={
+                <>
+                  <DocLink href={EPOCH_MILLIS_DOC_URL}>Unix ms</DocLink>, or 0 for full history
+                </>
+              }
             />
             <Button
               variant="contained"

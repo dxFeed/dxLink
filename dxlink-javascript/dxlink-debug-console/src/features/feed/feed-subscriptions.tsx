@@ -1,9 +1,9 @@
 import AddIcon from '@mui/icons-material/Add'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
+import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
-import MenuItem from '@mui/material/MenuItem'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
@@ -13,6 +13,14 @@ import { useState } from 'react'
 
 import { feedSubKey } from './feed-view-model'
 import type { FeedSubKind, FeedSubscriptionInput, FeedViewModel } from './feed-view-model'
+import { DocLink } from '../../shared/components/doc-link'
+import { EVENT_TYPES, EVENT_TYPES_DOC_URL } from '../../shared/lib/event-types'
+import {
+  CANDLE_SYMBOLS_DOC_URL,
+  EPOCH_MILLIS_DOC_URL,
+  FEED_ORDER_SOURCES,
+  ORDER_SOURCES_DOC_URL,
+} from '../../shared/lib/order-sources'
 import { useVM } from '../../shared/view-model'
 
 // The channel always uses the default AUTO contract, which accepts all three
@@ -21,23 +29,6 @@ const SUB_KINDS: { value: FeedSubKind; label: string }[] = [
   { value: 'regular', label: 'Regular' },
   { value: 'indexed', label: 'Indexed' },
   { value: 'timeSeries', label: 'Time series' },
-]
-
-const EVENT_TYPES = [
-  'Quote',
-  'Trade',
-  'Candle',
-  'Summary',
-  'Profile',
-  'Greeks',
-  'TimeAndSale',
-  'Order',
-  'AnalyticOrder',
-  'SpreadOrder',
-  'Underlying',
-  'TheoPrice',
-  'Series',
-  'OptionSale',
 ]
 
 /** Human label for a subscription chip. */
@@ -102,44 +93,72 @@ export const SubscriptionManager = ({ vm }: { vm: FeedViewModel }) => {
             gridTemplateColumns: { xs: '1fr', md: `repeat(${2 + extraCols}, 1fr) auto` },
           }}
         >
-          <TextField
-            label="Event type"
-            select
+          {/* freeSolo: the list is a convenience, the server accepts any type it knows. */}
+          <Autocomplete
+            freeSolo
+            options={EVENT_TYPES}
             value={type}
-            onChange={(e) => setType(e.target.value)}
+            onInputChange={(_event, next) => setType(next)}
             size="small"
-            helperText="dxFeed event type to receive"
-          >
-            {EVENT_TYPES.map((t) => (
-              <MenuItem key={t} value={t}>
-                {t}
-              </MenuItem>
-            ))}
-          </TextField>
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Event type"
+                helperText={
+                  <>
+                    Event types on <DocLink href={EVENT_TYPES_DOC_URL}>kb.dxfeed.com</DocLink>
+                  </>
+                }
+              />
+            )}
+          />
           <TextField
             label="Symbol"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addSubscription()}
             size="small"
-            helperText={showFromTime ? 'Candle symbol, e.g. AAPL{=d}' : 'Market symbol, e.g. AAPL'}
+            helperText={
+              showFromTime ? (
+                <>
+                  <DocLink href={CANDLE_SYMBOLS_DOC_URL}>Candle symbol</DocLink>, e.g. AAPL{'{=d}'}
+                </>
+              ) : (
+                'Market symbol, e.g. AAPL'
+              )
+            }
           />
           {showSource && (
-            <TextField
-              label="Order source"
+            <Autocomplete
+              freeSolo
+              options={FEED_ORDER_SOURCES}
               value={source}
-              onChange={(e) => setSource(e.target.value)}
+              onInputChange={(_event, next) => setSource(next)}
               size="small"
-              helperText="e.g. NTV, DEX, ntv, DEFAULT"
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Order source"
+                  helperText={
+                    <>
+                      Order sources on <DocLink href={ORDER_SOURCES_DOC_URL}>kb.dxfeed.com</DocLink>
+                    </>
+                  }
+                />
+              )}
             />
           )}
           {showFromTime && (
             <TextField
               label="From time"
               value={fromTime}
-              onChange={(e) => setFromTime(e.target.value)}
+              onChange={(e) => setFromTime(e.target.value.replace(/[^0-9]/g, ''))}
               size="small"
-              helperText="Unix ms, or 0 for full history"
+              helperText={
+                <>
+                  <DocLink href={EPOCH_MILLIS_DOC_URL}>Unix ms</DocLink>, or 0 for full history
+                </>
+              }
             />
           )}
           <Button

@@ -7,6 +7,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import Accordion from '@mui/material/Accordion'
 import AccordionDetails from '@mui/material/AccordionDetails'
 import AccordionSummary from '@mui/material/AccordionSummary'
+import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -20,6 +21,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type { FeedViewModel } from './feed-view-model'
+import { EVENT_TYPES } from '../../shared/lib/event-types'
 import { useVM } from '../../shared/view-model'
 
 interface EventFieldRow {
@@ -64,12 +66,16 @@ const EventFieldsEditor = ({
     <Stack spacing={1}>
       {rows.map((row, index) => (
         <Stack key={index} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <TextField
-            label="Event type"
+          {/* Offers the known event types (as dxlink-docs did) without preventing
+              a type that is not on the list. */}
+          <Autocomplete
+            freeSolo
+            options={EVENT_TYPES}
             value={row.type}
-            onChange={(e) => update(index, { type: e.target.value })}
+            onInputChange={(_event, next) => update(index, { type: next })}
             size="small"
-            sx={{ width: 140, flexShrink: 0 }}
+            sx={{ width: 180, flexShrink: 0 }}
+            renderInput={(params) => <TextField {...params} label="Event type" />}
           />
           <TextField
             label="Fields (comma-separated)"

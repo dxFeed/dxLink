@@ -46,6 +46,29 @@ const INITIAL_CONFIG: FeedConfig = {
 
 const UNKNOWN = '(unknown)'
 
+/**
+ * Row key for a received event: the symbol, suffixed with `#source` when the event
+ * carries one.
+ *
+ * The suffix matters. `Order`-family events are published per order source, so the
+ * same symbol legitimately arrives from several sources at once (`AAPL` from `NTV`
+ * and from `DEX`). Keying on the symbol alone would make those overwrite each other
+ * and show one row where there should be several.
+ */
+export const feedEventKey = (event: FeedEventData): string => {
+  const symbol =
+    event.eventSymbol !== undefined && event.eventSymbol !== null
+      ? String(event.eventSymbol)
+      : UNKNOWN
+  const source = 'source' in event && event.source != null ? String(event.source) : ''
+
+  return source !== '' ? `${symbol}#${source}` : symbol
+}
+
+/** Group key for a received event: its type, or the unknown bucket. */
+export const feedEventType = (event: FeedEventData): string =>
+  typeof event.eventType === 'string' && event.eventType !== '' ? event.eventType : UNKNOWN
+
 // Coalesce window for incoming events before flushing to the store (~10fps).
 const FLUSH_INTERVAL_MS = 100
 
@@ -172,13 +195,8 @@ export class FeedViewModel implements ViewModel<FeedVMState> {
     this.store.setState((s) => {
       const events: FeedEventsByType = { ...s.events }
       for (const event of batch) {
-        const type =
-          typeof event.eventType === 'string' && event.eventType !== '' ? event.eventType : UNKNOWN
-        const symbol =
-          event.eventSymbol !== undefined && event.eventSymbol !== null
-            ? String(event.eventSymbol)
-            : UNKNOWN
-        events[type] = { ...(events[type] ?? {}), [symbol]: event }
+        const type = feedEventType(event)
+        events[type] = { ...(events[type] ?? {}), [feedEventKey(event)]: event }
       }
       return { events }
     })

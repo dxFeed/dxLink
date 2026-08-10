@@ -16,6 +16,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { ConfigChips } from './config-chips'
 import { FeedCandlesViewModel } from './feed-candles-view-model'
+import { DocLink } from '../../shared/components/doc-link'
+import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../../shared/lib/order-sources'
 import { useVM } from '../../shared/view-model'
 import { ChannelWidget } from '../channels/channel-widget'
 import type { FeedConfig } from '../channels/types'
@@ -111,14 +113,23 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
               onChange={(e) => setSymbol(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && subscribe()}
               size="small"
-              helperText="Candle symbol, e.g. AAPL{=d}"
+              helperText={
+                <>
+                  <DocLink href={CANDLE_SYMBOLS_DOC_URL}>Candle symbol</DocLink>, e.g. AAPL
+                  {'{=d}'}
+                </>
+              }
             />
             <TextField
               label="From time"
               value={fromTime}
               onChange={(e) => setFromTime(e.target.value.replace(/[^0-9]/g, ''))}
               size="small"
-              helperText="Unix ms, or 0 for full history"
+              helperText={
+                <>
+                  <DocLink href={EPOCH_MILLIS_DOC_URL}>Unix ms</DocLink>, or 0 for full history
+                </>
+              }
             />
             <Button
               variant="contained"
