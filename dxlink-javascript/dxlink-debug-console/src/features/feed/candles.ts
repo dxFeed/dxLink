@@ -58,6 +58,10 @@ const parseEventFlags = (event: IndexedEvent) => ({
 
 export interface DXLinkCandlesOptions {
   logLevel: DXLinkLogLevel
+  /** Feed qualification, forwarded to the underlying HISTORY feed. */
+  feed?: string
+  /** Feed space, forwarded to the underlying HISTORY feed. */
+  space?: string
 }
 
 /**

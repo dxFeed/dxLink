@@ -238,8 +238,9 @@ export const DomChannel = ({ title, config }: DomChannelProps) => {
 
   const channelState = useVM(vm, (s) => s.channelState)
   const snapshot = useVM(vm, (s) => s.snapshot)
-
-  const sources = parseSources(config.source)
+  const channelId = useVM(vm, (s) => s.channelId)
+  const channelParameters = useVM(vm, (s) => s.channelParameters)
+  const errors = useVM(vm, (s) => s.errors)
 
   return (
     <ChannelWidget
@@ -248,23 +249,12 @@ export const DomChannel = ({ title, config }: DomChannelProps) => {
       subtitle={`DOM · ${config.symbol || '—'}`}
       onClose={vm.close}
       status={<DomStatusChip state={channelState} />}
+      channelId={channelId}
+      parameters={channelParameters}
+      errors={errors}
+      onClearErrors={vm.clearErrors}
     >
       <Stack spacing={2}>
-        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
-          <Chip size="small" variant="outlined" label={`symbol: ${config.symbol}`} />
-          {sources.length > 0 ? (
-            sources.map((source) => (
-              <Chip key={source} size="small" variant="outlined" label={`source: ${source}`} />
-            ))
-          ) : (
-            <Chip size="small" variant="outlined" label="sources: (default)" />
-          )}
-          {config.feed && <Chip size="small" variant="outlined" label={`feed: ${config.feed}`} />}
-          {config.space && (
-            <Chip size="small" variant="outlined" label={`space: ${config.space}`} />
-          )}
-        </Stack>
-
         <ConfigurationSection vm={vm} />
 
         <Box>

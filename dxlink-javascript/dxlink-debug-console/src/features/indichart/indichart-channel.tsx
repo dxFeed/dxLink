@@ -300,6 +300,10 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
   const indicatorStates = useVM(vm, (s) => s.indicatorStates)
   const indicatorOutputs = useVM(vm, (s) => s.outputs)
   const subscription = useVM(vm, (s) => s.subscription)
+  const channelId = useVM(vm, (s) => s.channelId)
+  // `parameters` is deliberately not shown: for INDICHART it carries the full
+  // indicator source, which the panels below already render properly.
+  const errors = useVM(vm, (s) => s.errors)
 
   // Seed parameter values from the inParameters defaults as states arrive.
   useEffect(() => {
@@ -372,6 +376,9 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
       subtitle={`IndiChart · ${entries.length} indicator${entries.length === 1 ? '' : 's'}`}
       onClose={vm.close}
       status={statusChip}
+      channelId={channelId}
+      errors={errors}
+      onClearErrors={vm.clearErrors}
     >
       <Stack spacing={2}>
         <Box>

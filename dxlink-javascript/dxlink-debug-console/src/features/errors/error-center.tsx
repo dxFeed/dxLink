@@ -8,23 +8,23 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 
-export interface DraftError {
-  type: string
-  message: string
-  time: string
-}
+import type { TimestampedError } from '../../shared/lib/timestamped-error'
 
 interface ErrorCenterProps {
-  errors: DraftError[]
+  errors: readonly TimestampedError[]
   onClear?: () => void
+  /** Label on the trigger button — the scope these errors belong to. */
+  label?: string
+  size?: 'small' | 'medium' | 'large'
 }
 
 /**
- * Error center (draft / presentational only). A badge button that opens a
- * popover listing connection-level errors. Aggregates only connection errors;
- * channel-level errors live in their channel widgets.
+ * A badge button that opens a popover listing protocol errors, newest first.
+ *
+ * Used at both scopes: the connection panel passes the connection's errors, and each
+ * channel widget passes its own. Renders nothing when there is nothing to report.
  */
-export const ErrorCenter = ({ errors, onClear }: ErrorCenterProps) => {
+export const ErrorCenter = ({ errors, onClear, label = 'Errors', size }: ErrorCenterProps) => {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const count = errors.length
 
@@ -39,10 +39,11 @@ export const ErrorCenter = ({ errors, onClear }: ErrorCenterProps) => {
         <Button
           color="error"
           variant="outlined"
+          size={size}
           startIcon={<ErrorOutlineIcon />}
           onClick={(e) => setAnchor(e.currentTarget)}
         >
-          Errors
+          {label}
         </Button>
       </Badge>
       <Popover

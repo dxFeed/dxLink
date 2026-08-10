@@ -7,6 +7,8 @@ import {
 import type { DXLinkClient, DXLinkConnectionDetails, DXLinkError } from '@dxfeed/dxlink-api'
 import { createStore } from 'zustand/vanilla'
 
+import { prependError } from '../../shared/lib/timestamped-error'
+import type { TimestampedError } from '../../shared/lib/timestamped-error'
 import type { ViewModel } from '../../shared/view-model'
 
 /** Connection parameters entered in the form and passed to the client config. */
@@ -17,11 +19,7 @@ export interface ConnectionParams {
 }
 
 /** A connection-level error, timestamped for the error center. */
-export interface ConnectionError {
-  type: string
-  message: string
-  time: string
-}
+export type ConnectionError = TimestampedError
 
 export interface ConnectionVMState {
   connection: DXLinkConnectionState
@@ -158,12 +156,7 @@ export class ConnectionViewModel implements ViewModel<ConnectionVMState> {
   }
 
   private handleError = (error: DXLinkError): void => {
-    const entry: ConnectionError = {
-      type: error.type,
-      message: error.message,
-      time: new Date().toLocaleTimeString(),
-    }
-    this.store.setState((state) => ({ errors: [entry, ...state.errors] }))
+    this.store.setState((state) => ({ errors: prependError(state.errors, error) }))
   }
 
   /** Pull the current state straight off the client (e.g. right after connect()). */

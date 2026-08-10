@@ -5,7 +5,6 @@ import Divider from '@mui/material/Divider'
 import Stack from '@mui/material/Stack'
 import { useEffect, useState } from 'react'
 
-import { ConfigChips } from './config-chips'
 import { FeedChartChannel } from './feed-chart-channel'
 import { ConfigurationSection } from './feed-configuration'
 import { EventsTable } from './feed-events-table'
@@ -51,6 +50,9 @@ const FeedSubscriptionsChannel = ({ title, config }: FeedChannelProps) => {
     return () => vm.stop()
   }, [vm])
   const channelState = useVM(vm, (s) => s.channelState)
+  const channelId = useVM(vm, (s) => s.channelId)
+  const channelParameters = useVM(vm, (s) => s.channelParameters)
+  const errors = useVM(vm, (s) => s.errors)
 
   return (
     <ChannelWidget
@@ -59,9 +61,12 @@ const FeedSubscriptionsChannel = ({ title, config }: FeedChannelProps) => {
       subtitle="Feed · subscriptions"
       onClose={vm.close}
       status={<FeedStatusChip state={channelState} />}
+      channelId={channelId}
+      parameters={channelParameters}
+      errors={errors}
+      onClearErrors={vm.clearErrors}
     >
       <Stack spacing={2}>
-        <ConfigChips config={config} />
         <ConfigurationSection vm={vm} />
         <Divider />
         <SubscriptionManager vm={vm} />

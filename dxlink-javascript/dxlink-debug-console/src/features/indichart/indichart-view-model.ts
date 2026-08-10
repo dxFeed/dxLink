@@ -1,6 +1,7 @@
 import { DXLinkChannelState, DXLinkIndiChart } from '@dxfeed/dxlink-api'
 import type {
   DXLinkClient,
+  DXLinkError,
   DXLinkIndiChartCandle,
   DXLinkIndiChartIndicators,
   DXLinkIndiChartIndicatorsData,
@@ -10,6 +11,8 @@ import type {
 } from '@dxfeed/dxlink-api'
 import { createStore } from 'zustand/vanilla'
 
+import { prependError } from '../../shared/lib/timestamped-error'
+import type { TimestampedError } from '../../shared/lib/timestamped-error'
 import type { ViewModel } from '../../shared/view-model'
 
 export type ChartDataType = 'candles' | 'indicators' | 'update'
@@ -40,6 +43,12 @@ export interface IndiChartVMState {
   /** Per-indicator declared outputs (output/spline/shape/barColor/backgroundColor) from the state. */
   outputs: Record<string, IndicatorOutputMeta[]>
   subscription: { symbol: string; fromTime: number } | null
+  /** Protocol channel id, for correlating with a protocol log. Null until opened. */
+  channelId: number | null
+  /** Parameters this channel was actually opened with. Null until opened. */
+  channelParameters: Readonly<Record<string, unknown>> | null
+  /** Errors scoped to THIS channel — connection errors live on the connection VM. */
+  errors: TimestampedError[]
 }
 
 // The enabled indicator state carries one array per output kind (plural field names),
@@ -95,6 +104,9 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     indicatorStates: null,
     outputs: {},
     subscription: null,
+    channelId: null,
+    channelParameters: null,
+    errors: [],
   }))
 
   private readonly client: DXLinkClient
@@ -134,9 +146,15 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     chart.addCandleSnapshotListener(this.handleCandleSnapshot)
     chart.addIndicatorsSnapshotListener(this.handleIndicatorsSnapshot)
     chart.addUpdateListener(this.handleUpdate)
-    chart.getChannel().addStateChangeListener(this.handleState)
+    const channel = chart.getChannel()
+    channel.addStateChangeListener(this.handleState)
+    channel.addErrorListener(this.handleError)
     this.chart = chart
-    this.store.setState({ channelState: chart.getState() })
+    this.store.setState({
+      channelState: chart.getState(),
+      channelId: channel.id,
+      channelParameters: channel.parameters,
+    })
     // Re-apply an existing subscription after a StrictMode restart.
     const { subscription } = this.store.getState()
     if (subscription !== null) {
@@ -152,7 +170,9 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     chart.removeCandleSnapshotListener(this.handleCandleSnapshot)
     chart.removeIndicatorsSnapshotListener(this.handleIndicatorsSnapshot)
     chart.removeUpdateListener(this.handleUpdate)
-    chart.getChannel().removeStateChangeListener(this.handleState)
+    const channel = chart.getChannel()
+    channel.removeStateChangeListener(this.handleState)
+    channel.removeErrorListener(this.handleError)
     chart.close()
     this.resetCoordination()
   }
@@ -167,6 +187,10 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     this.resetCoordination()
     this.store.setState({ subscription, outputs: {} })
     this.chart?.setSubscription(subscription, parameters)
+  }
+
+  clearErrors = (): void => {
+    this.store.setState({ errors: [] })
   }
 
   close = (): void => {
@@ -195,6 +219,10 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
 
   private handleState = (state: DXLinkChannelState): void => {
     this.store.setState({ channelState: state })
+  }
+
+  private handleError = (error: DXLinkError): void => {
+    this.store.setState((s) => ({ errors: prependError(s.errors, error) }))
   }
 
   // --- ChartHolder snapshot/update coordination (ported verbatim in behaviour) ---

@@ -22,6 +22,7 @@ import type {
   FeedRequest,
   IndiChartRequest,
 } from './types'
+import { ErrorBoundary } from '../../shared/components/error-boundary'
 import { DomChannel } from '../dom/dom-channel'
 import { DomChannelRequest } from '../dom/dom-channel-request'
 import { FeedChannel } from '../feed/feed-channel'
@@ -167,7 +168,10 @@ export const ChannelsArea = () => {
       ) : (
         channels.map((channel) => (
           <Box key={channel.id} id={`channel-${channel.id}`} sx={{ scrollMarginTop: 80 }}>
-            {renderChannel(channel)}
+            {/* One failing channel must not take the others down with it. */}
+            <ErrorBoundary title={`${LABELS[channel.config.kind]} channel #${channel.id} failed`}>
+              {renderChannel(channel)}
+            </ErrorBoundary>
           </Box>
         ))
       )}

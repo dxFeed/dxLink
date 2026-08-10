@@ -14,7 +14,6 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 
-import { ConfigChips } from './config-chips'
 import { FeedCandlesViewModel } from './feed-candles-view-model'
 import { DocLink } from '../../shared/components/doc-link'
 import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../../shared/lib/order-sources'
@@ -55,7 +54,10 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
     if (client === null) {
       throw new Error('Feed chart channel opened without an active connection')
     }
-    return new FeedCandlesViewModel(client)
+    return new FeedCandlesViewModel(client, {
+      feed: config.feed || undefined,
+      space: config.space || undefined,
+    })
   })
 
   const chartRef = useRef<IndiChartHandle>(null)
@@ -76,6 +78,9 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
   const channelState = useVM(vm, (s) => s.channelState)
   const subscription = useVM(vm, (s) => s.subscription)
   const candleCount = useVM(vm, (s) => s.candleCount)
+  const channelId = useVM(vm, (s) => s.channelId)
+  const channelParameters = useVM(vm, (s) => s.channelParameters)
+  const errors = useVM(vm, (s) => s.errors)
 
   const subscribe = () => {
     setChartError(null)
@@ -91,10 +96,12 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
       subtitle="Feed · candle chart"
       onClose={vm.close}
       status={<StatusChip state={channelState} />}
+      channelId={channelId}
+      parameters={channelParameters}
+      errors={errors}
+      onClearErrors={vm.clearErrors}
     >
       <Stack spacing={2}>
-        <ConfigChips config={config} />
-
         <Box>
           <Typography variant="subtitle2" gutterBottom>
             Candle subscription

@@ -1,6 +1,13 @@
-import { DXLinkChannelState, DXLinkFeed, FeedContract, FeedDataFormat } from '@dxfeed/dxlink-api'
+import {
+  DXLinkChannelState,
+  DXLinkFeed,
+  DXLinkLogLevel,
+  FeedContract,
+  FeedDataFormat,
+} from '@dxfeed/dxlink-api'
 import type {
   DXLinkClient,
+  DXLinkError,
   FeedAcceptConfig,
   FeedConfig,
   FeedEventData,
@@ -10,6 +17,8 @@ import type {
 } from '@dxfeed/dxlink-api'
 import { createStore } from 'zustand/vanilla'
 
+import { prependError } from '../../shared/lib/timestamped-error'
+import type { TimestampedError } from '../../shared/lib/timestamped-error'
 import type { ViewModel } from '../../shared/view-model'
 
 export type FeedSubKind = 'regular' | 'indexed' | 'timeSeries'
@@ -36,6 +45,12 @@ export interface FeedVMState {
   /** Configuration the server reports back (FeedConfig). */
   config: FeedConfig
   events: FeedEventsByType
+  /** Protocol channel id, for correlating with a protocol log. Null until opened. */
+  channelId: number | null
+  /** Parameters this channel was actually opened with. Null until opened. */
+  channelParameters: Readonly<Record<string, unknown>> | null
+  /** Errors scoped to THIS channel — connection errors live on the connection VM. */
+  errors: TimestampedError[]
 }
 
 const INITIAL_CONFIG: FeedConfig = {
@@ -92,6 +107,9 @@ export class FeedViewModel implements ViewModel<FeedVMState> {
     subscriptions: [],
     config: INITIAL_CONFIG,
     events: {},
+    channelId: null,
+    channelParameters: null,
+    errors: [],
   }))
 
   private readonly client: DXLinkClient
@@ -111,11 +129,16 @@ export class FeedViewModel implements ViewModel<FeedVMState> {
     const feed = new DXLinkFeed(this.client, FeedContract.AUTO, {
       feed: this.params.feed,
       space: this.params.space,
+      // A debug console wants the protocol traffic in the browser log.
+      logLevel: DXLinkLogLevel.DEBUG,
     })
     feed.addEventListener(this.handleEvents)
     feed.addConfigChangeListener(this.handleConfig)
     feed.addStateChangeListener(this.handleState)
+    const channel = feed.getChannel()
+    channel.addErrorListener(this.handleError)
     this.feed = feed
+    this.store.setState({ channelId: channel.id, channelParameters: channel.parameters })
     // Re-apply any subscriptions already in the store (e.g. after a StrictMode restart).
     const { subscriptions } = this.store.getState()
     if (subscriptions.length > 0) {
@@ -137,6 +160,7 @@ export class FeedViewModel implements ViewModel<FeedVMState> {
     feed.removeEventListener(this.handleEvents)
     feed.removeConfigChangeListener(this.handleConfig)
     feed.removeStateChangeListener(this.handleState)
+    feed.getChannel().removeErrorListener(this.handleError)
     feed.close()
   }
 
@@ -167,6 +191,10 @@ export class FeedViewModel implements ViewModel<FeedVMState> {
 
   clearEvents = (): void => {
     this.store.setState({ events: {} })
+  }
+
+  clearErrors = (): void => {
+    this.store.setState({ errors: [] })
   }
 
   /** Closing the feed is terminal (CHANNEL_CANCEL) — same teardown as stop/dispose. */
@@ -208,6 +236,10 @@ export class FeedViewModel implements ViewModel<FeedVMState> {
 
   private handleState = (state: DXLinkChannelState): void => {
     this.store.setState({ channelState: state })
+  }
+
+  private handleError = (error: DXLinkError): void => {
+    this.store.setState((s) => ({ errors: prependError(s.errors, error) }))
   }
 }
 

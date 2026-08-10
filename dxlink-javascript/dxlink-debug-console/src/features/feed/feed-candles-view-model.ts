@@ -1,9 +1,11 @@
-import { DXLinkChannelState } from '@dxfeed/dxlink-api'
-import type { DXLinkClient, DXLinkIndiChartCandle } from '@dxfeed/dxlink-api'
+import { DXLinkChannelState, DXLinkLogLevel } from '@dxfeed/dxlink-api'
+import type { DXLinkClient, DXLinkError, DXLinkIndiChartCandle } from '@dxfeed/dxlink-api'
 import { createStore } from 'zustand/vanilla'
 
 import { DXLinkCandles } from './candles'
 import type { DXLinkCandleData, DXLinkCandleEvent } from './candles'
+import { prependError } from '../../shared/lib/timestamped-error'
+import type { TimestampedError } from '../../shared/lib/timestamped-error'
 import type { ViewModel } from '../../shared/view-model'
 
 /** How the chart consumes a batch of candles: a fresh snapshot or an incremental update. */
@@ -17,6 +19,12 @@ export interface CandlesVMState {
   subscription: { symbol: string; fromTime: number } | null
   candleCount: number
   lastUpdate: number | null
+  /** Protocol channel id, for correlating with a protocol log. Null until opened. */
+  channelId: number | null
+  /** Parameters this channel was actually opened with. Null until opened. */
+  channelParameters: Readonly<Record<string, unknown>> | null
+  /** Errors scoped to THIS channel — connection errors live on the connection VM. */
+  errors: TimestampedError[]
 }
 
 const toChartCandle = (event: DXLinkCandleEvent): DXLinkIndiChartCandle => ({
@@ -44,14 +52,19 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
     subscription: null,
     candleCount: 0,
     lastUpdate: null,
+    channelId: null,
+    channelParameters: null,
+    errors: [],
   }))
 
   private readonly client: DXLinkClient
+  private readonly params: { feed?: string; space?: string }
   private candles: DXLinkCandles | null = null
   private chartListener: CandleChartListener | null = null
 
-  constructor(client: DXLinkClient) {
+  constructor(client: DXLinkClient, params: { feed?: string; space?: string } = {}) {
     this.client = client
+    this.params = params
   }
 
   /** Register the chart sink (the view wires this to `chartRef.pushData`). */
@@ -61,11 +74,22 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
 
   start = (): void => {
     if (this.candles !== null) return
-    const candles = new DXLinkCandles(this.client)
+    const candles = new DXLinkCandles(this.client, {
+      feed: this.params.feed,
+      space: this.params.space,
+      // A debug console wants the protocol traffic in the browser log.
+      logLevel: DXLinkLogLevel.DEBUG,
+    })
     candles.addListener(this.handleData)
-    candles.getChannel().addStateChangeListener(this.handleState)
+    const channel = candles.getChannel()
+    channel.addStateChangeListener(this.handleState)
+    channel.addErrorListener(this.handleError)
     this.candles = candles
-    this.store.setState({ channelState: candles.getChannel().getState() })
+    this.store.setState({
+      channelState: channel.getState(),
+      channelId: channel.id,
+      channelParameters: channel.parameters,
+    })
     // Re-apply an existing subscription after a StrictMode restart.
     const { subscription } = this.store.getState()
     if (subscription !== null) {
@@ -78,7 +102,9 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
     if (candles === null) return
     this.candles = null
     candles.removeListener(this.handleData)
-    candles.getChannel().removeStateChangeListener(this.handleState)
+    const channel = candles.getChannel()
+    channel.removeStateChangeListener(this.handleState)
+    channel.removeErrorListener(this.handleError)
     candles.close()
   }
 
@@ -86,6 +112,10 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
     const subscription = { symbol, fromTime }
     this.store.setState({ subscription, candleCount: 0, lastUpdate: null })
     this.candles?.setSubscription(subscription)
+  }
+
+  clearErrors = (): void => {
+    this.store.setState({ errors: [] })
   }
 
   close = (): void => {
@@ -105,5 +135,9 @@ export class FeedCandlesViewModel implements ViewModel<CandlesVMState> {
 
   private handleState = (state: DXLinkChannelState): void => {
     this.store.setState({ channelState: state })
+  }
+
+  private handleError = (error: DXLinkError): void => {
+    this.store.setState((s) => ({ errors: prependError(s.errors, error) }))
   }
 }
