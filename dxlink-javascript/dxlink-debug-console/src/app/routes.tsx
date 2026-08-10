@@ -1,7 +1,19 @@
+import Box from '@mui/material/Box'
+import CircularProgress from '@mui/material/CircularProgress'
+import { Suspense, lazy } from 'react'
 import type { ReactElement } from 'react'
 
 import { ConsolePage } from '../pages/console-page'
-import { ProtocolPage } from '../pages/protocol-page'
+
+// The AsyncAPI viewer bundles its own parser and syntax highlighter and is far larger
+// than the rest of the app, so it is kept out of the initial chunk.
+const ProtocolPage = lazy(() => import('../pages/protocol-page'))
+
+const RouteFallback = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+    <CircularProgress />
+  </Box>
+)
 
 export interface RouteDef {
   /** Tab label shown in the app bar. */
@@ -18,5 +30,13 @@ export interface RouteDef {
  */
 export const ROUTES: readonly RouteDef[] = [
   { label: 'Console', path: '/', element: <ConsolePage /> },
-  { label: 'Protocol', path: '/protocol', element: <ProtocolPage /> },
+  {
+    label: 'Protocol',
+    path: '/protocol',
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <ProtocolPage />
+      </Suspense>
+    ),
+  },
 ]
