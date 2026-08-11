@@ -1,7 +1,8 @@
 # dxlink-debug-console — Architecture
 
-Design for the `@dxfeed/dxlink-debug-console` rebuild. For scope, decisions, phases and
-risks see [PLAN.md](./PLAN.md).
+Design for the `@dxfeed/dxlink-debug-console` rebuild. For what it replaced and the
+decisions taken along the way see [MIGRATION.md](./MIGRATION.md); for how to validate a
+change see [CLAUDE.md](./CLAUDE.md).
 
 The app follows **MVVM**. There is **no global store** — only ViewModels, each owning a
 local Zustand vanilla store.
@@ -98,7 +99,7 @@ their feature**; only cross-cutting code lives in `shared/`.
 
 ```
 dxlink-debug-console/
-  PLAN.md · ARCHITECTURE.md · index.html · vite.config.ts · package.json · tsconfig.json
+  ARCHITECTURE.md · CLAUDE.md · index.html · vite.config.ts · package.json · tsconfig.json
   src/
     main.tsx                     # createRoot + <App/>
     app/                         # bootstrap & shell ONLY

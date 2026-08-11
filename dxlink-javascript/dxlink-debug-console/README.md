@@ -61,7 +61,6 @@ as a private field and exposes UI state through its own Zustand store; views bin
 `useVM(vm, selector)` and call commands. Connection-level errors aggregate on the
 connection ViewModel, channel-level errors stay on the channel that produced them.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design, [PLAN.md](./PLAN.md) for the
-rebuild scope and phases, and [MIGRATION.md](./MIGRATION.md) for the parity status against
-the retired `dxlink-docs` and what remains. [HANDOFF.md](./HANDOFF.md) records the tasks
-that needed internal-registry access and how they went.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design, [CLAUDE.md](./CLAUDE.md) for how
+to validate a change against the dev servers, and [MIGRATION.md](./MIGRATION.md) for the
+parity record against the retired `dxlink-docs` and what remains.

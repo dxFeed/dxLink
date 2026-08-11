@@ -3,8 +3,8 @@
 Read this before verifying anything in this package by hand. It records which server does
 what, which checks are worth running, and the traps that cost time on the way here.
 
-Design is in [ARCHITECTURE.md](./ARCHITECTURE.md), parity status in
-[MIGRATION.md](./MIGRATION.md), the registry-access record in [HANDOFF.md](./HANDOFF.md).
+Design is in [ARCHITECTURE.md](./ARCHITECTURE.md); the parity record against the retired
+`dxlink-docs`, and what remains, is in [MIGRATION.md](./MIGRATION.md).
 
 ---
 

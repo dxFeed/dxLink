@@ -3,9 +3,8 @@
 Audit of the rebuild against `@dxfeed/dxlink-docs`, and what remains before that package
 can be retired. Started as a gap analysis; now tracks what has been closed.
 
-> Scope and the original phase breakdown are in [PLAN.md](./PLAN.md); the design is in
-> [ARCHITECTURE.md](./ARCHITECTURE.md). Everything in §4 and §5 that needs a machine with
-> internal-registry access is written up as ordered tasks in [HANDOFF.md](./HANDOFF.md).
+> The design is in [ARCHITECTURE.md](./ARCHITECTURE.md); how to re-run the verification in
+> [CLAUDE.md](./CLAUDE.md).
 
 ---
 
@@ -119,7 +118,7 @@ Also closed alongside these:
     chart views catch it and surface it as a chart error.
 - **`logLevel: DEBUG`** on Feed, DOM and Candles channels. **Not** IndiChart:
   `DXLinkIndiChart`'s constructor accepts no options at all, so its logger is fixed at
-  `WARN`. Changing `dxlink-api` is out of scope (PLAN.md §1), so this is recorded rather
+  `WARN`. Changing `dxlink-api` was out of scope for the rebuild, so this is recorded rather
   than worked around.
 - **Candle chart ignored feed/space** — `DXLinkCandles` never forwarded either to its
   HISTORY feed, so values entered in the request dialog were discarded. Now forwarded.
@@ -142,7 +141,7 @@ Also closed alongside these:
 |---|---|---|
 | 1 | ~~`pnpm-lock.yaml` not updated~~ | **Done.** Regenerated from a fresh resolution. This could not be done incrementally: the supply-chain gate rejected the pre-existing lockfile outright, because `@dxfeed/ui-kit@2.15.2` is no longer published to any reachable registry and two `@dxfeed/*` tarballs still pointed at jFrog for packages now served from npmjs. Retiring `dxlink-docs` (item 6) removed the ui-kit dependency and unblocked it. The lockfile lost ~1100 lines with docs' React 18 tree, and now contains no `dxfeed.jfrog.io` references at all. `@scarf/scarf` — analytics pulled in through `@asyncapi/react-component` — was added to `ignoredBuiltDependencies` rather than allowed to run its install script. One side effect: dev dependencies moved within their existing ranges, and Prettier `3.8.3 → 3.9.6` reformats union types, so six pre-existing files across five other packages were reformatted to keep `pnpm lint` green. That part of the diff is formatting only. |
 | 2 | ~~Runtime check of the editor and chart paths~~ | **Done.** INDICHART is served by `wss://dxlink-dxs-ws-dev.dxkube.com`, not the market-data relay. See §5 and [CLAUDE.md](./CLAUDE.md). |
-| 3 | Playwright E2E + mock `DXLinkWebSocketConnector` | PLAN.md phase 8 / risk 6. Unit coverage is now 88 tests, but there is no end-to-end pass. |
+| 3 | Playwright E2E + mock `DXLinkWebSocketConnector` | Unit coverage is 88 tests and the manual pass in [CLAUDE.md](./CLAUDE.md) is complete, but nothing is automated end to end. |
 | 4 | CI/CD, deploy, bundle budget | No CI config exists anywhere in this repository, so "mirror the dxlink-docs pipeline" needs the pipeline's actual location identified first — it is not in-tree. **This is now urgent rather than deferred:** `dxlink-docs` has been deleted, so whatever serves the deployed console must be repointed. |
 | 5 | ~~Parity sign-off against a live server~~ | **Done.** All nine regressions walked against live servers, plus light/dark and 375px. Three defects found and fixed — see §5. |
 | 6 | ~~Retire `dxlink-docs`~~ | **Done**, ahead of the original ordering, because item 1 could not complete while the package was in the workspace. Removed from `pnpm-workspace.yaml`, the root `docs` script, and the changeset `ignore` list; the directory (45 tracked files) is deleted, and `README.md`/`AGENTS.md` no longer point at it. `.claude/launch.json` already referenced only the debug console. That also removed `@dxfeed/ui-kit`, `styled-components`, `react-is`, the `rehype-*`/`remark-*`/`unified` chain and the React 18 type packages from the lockfile. **The deploy was not repointed — see item 4.** |
@@ -158,24 +157,12 @@ below was checked against the actual `@dxscript/*` packages.
 production Vite build all pass. The Protocol page renders in Chromium in light and dark
 mode, and the built output emits the spec asset and the separate lazy chunk.
 
-**Verified at runtime.** Services live on different servers — FEED/DOM on
+**Verified at runtime.** All nine regressions above, the editor, the chart's
+`Apply` / `Apply parameters` / `Reset` paths, channel-level error routing, light and dark,
+and 375px width. Services live on different servers — FEED/DOM on
 `wss://dxlink-md-ws-dev.dxkube.com`, INDICHART on `wss://dxlink-dxs-ws-dev.dxkube.com`.
-[CLAUDE.md](./CLAUDE.md) records which is which and how to walk each check.
-
-- the `DxScriptEditor` integration — mounts, highlights dxScript, shows the language logo,
-  and its "Try examples" picker opens with the full bundled sample list;
-- the request round-trip — text typed into an editor survives closing and reopening the
-  dialog, and arrives verbatim in the opened channel's `Source` panel;
-- **all nine regressions**, each against a live server: SESSION (#1) and COLOR (#2) via a
-  script declaring all six input types; Order rows not collapsing across sources (#3) and
-  `freeSolo` sources (#4); 18 event types (#5); documentation links (#6); negotiated
-  column order (#7); the six script-error categories with stack frames (#8); and
-  `Apply parameters` recomputing without reloading candles (#9);
-- the chart — candles and indicator splines render, `Apply` / `Apply parameters` / `Reset`
-  all behave, and `Reset` changes the channel id as designed;
-- channel-level error routing — a channel rejected by the server reports on its own card
-  rather than blanking the console;
-- light and dark, and 375px width.
+**[CLAUDE.md](./CLAUDE.md) is the procedure**: which server serves what, what each check
+proves, and how to repeat it.
 
 **What the editor actually does**, having been stubbed when §3 was first written:
 
@@ -208,7 +195,7 @@ surface in `indichart-channel.tsx` is covered), and the DOM service beyond openi
 
 ## 6. Open decisions
 
-**D1 — dxScript editor.** *Resolved: the first-party editor.* PLAN.md §2 had chosen
+**D1 — dxScript editor.** *Resolved: the first-party editor.* The rebuild plan had chosen
 CodeMirror 6 and accepted losing dxScript completion and diagnostics; that trade-off was
 reversed in favour of parity.
 
