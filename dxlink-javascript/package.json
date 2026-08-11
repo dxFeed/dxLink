@@ -21,7 +21,6 @@
     "test": "turbo run test",
     "format": "prettier --write **/*.{js,ts,tsx,d.ts,md}",
     "demo": "pnpm --filter @dxfeed/dxlink-api start",
-    "docs": "pnpm --filter @dxfeed/dxlink-docs start",
     "console": "pnpm --filter @dxfeed/dxlink-debug-console start",
     "changeset": "changeset"
   },

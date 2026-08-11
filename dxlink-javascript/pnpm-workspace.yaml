@@ -6,16 +6,15 @@ packages:
   - dxlink-dom
   - dxlink-indichart
   - dxlink-rpc
-  - dxlink-docs
   - dxlink-debug-console
 # esbuild and unrs-resolver are native modules that need their install scripts.
-# The other flagged packages (protobufjs, styled-components) don't, so skip them.
+# The other flagged packages (protobufjs, @scarf/scarf) don't, so skip them.
 onlyBuiltDependencies:
   - esbuild
   - unrs-resolver
 ignoredBuiltDependencies:
+  - '@scarf/scarf'
   - protobufjs
-  - styled-components
 
 # Supply-chain cooldown: don't install npm releases younger than this many minutes
 # (1440 = 1 day), giving a compromised publish time to be detected and yanked
@@ -26,7 +25,9 @@ minimumReleaseAgeExclude:
   - '@dxfeed/*'
   - '@dxscript/*'
 allowBuilds:
+  # Analytics/telemetry, pulled in by @asyncapi/react-component via @stoplight/spectral-*.
+  # Its install script phones home and nothing needs it to run.
+  '@scarf/scarf': false
   esbuild: true
   protobufjs: false
-  styled-components: false
   unrs-resolver: true

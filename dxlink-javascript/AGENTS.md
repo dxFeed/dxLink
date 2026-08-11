@@ -16,7 +16,7 @@ dxLink JavaScript API
 - Service scheduler keys must be instance-scoped (for example include channel id) to avoid collisions in a shared scheduler instance.
 
 ## Packages
-- `@dxfeed/dxlink-api` re-exports public API from all dxlink JavaScript packages, except `dxlink-docs`.
+- `@dxfeed/dxlink-api` re-exports public API from all dxlink JavaScript packages, except `dxlink-debug-console`.
 
 ## Development Commands
 - Run commands from `dxlink-javascript` directory.
