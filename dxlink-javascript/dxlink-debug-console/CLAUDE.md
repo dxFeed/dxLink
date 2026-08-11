@@ -3,8 +3,8 @@
 Read this before verifying anything in this package by hand. It records which server does
 what, which checks are worth running, and the traps that cost time on the way here.
 
-Design is in [ARCHITECTURE.md](./ARCHITECTURE.md); the parity record against the retired
-`dxlink-docs`, and what remains, is in [MIGRATION.md](./MIGRATION.md).
+Design is in [ARCHITECTURE.md](./ARCHITECTURE.md); what is still open is in
+[README.md](./README.md).
 
 ---
 
@@ -51,21 +51,21 @@ published sourcemaps reference sources it does not ship; the warnings are noise.
 
 ## What to walk, and what each check is actually proving
 
-Every item below is a behaviour that regressed once. The parenthesised number is the
-regression in MIGRATION.md §3.
+Every item below is a behaviour that broke at least once during the rebuild and was walked
+against a live server afterwards. They are the checks worth repeating.
 
 ### On the market-data URL
 
-- **Order sources do not collapse (#3).** Subscribe `Order` on `AAPL` twice under the
+- **Order sources do not collapse.** Subscribe `Order` on `AAPL` twice under the
   Indexed tab, once per source (`NTV`, `DEX`). You must get **two rows**. One row means
   the grid key lost its `#source` suffix.
-  The source field is a `freeSolo` Autocomplete (#4) — it accepts values off the list, and
+  The source field is a `freeSolo` Autocomplete — it accepts values off the list, and
   it does not upper-case them, so a typed `ntv` is subscribed as `ntv`.
-- **Column order follows the negotiated config (#7).** Columns must arrive in
+- **Column order follows the negotiated config.** Columns must arrive in
   `FeedConfig.eventFields` order — for `Quote` that is `eventSymbol, eventType, eventTime,
 sequence, timeNanoPart, bid*, ask*`. Alphabetical order means the negotiated order was
   dropped.
-- **All 18 event types (#5).** The event-type combobox must list 18, including
+- **All 18 event types.** The event-type combobox must list 18, including
   `DailyCandle`, `TradeETH`, `Configuration`, `Message`.
 
 ### On the dxScript URL
@@ -76,7 +76,7 @@ compiles as-is.
 There are two buttons, and each sits with what it acts on.
 
 - **Apply** — in the Subscription block, with the symbol. Candles load and the chart draws.
-- **Apply parameters (#9)** — **below the indicator panels**, with the inputs it acts on,
+- **Apply parameters** — **below the indicator panels**, with the inputs it acts on,
   and rendered only when some indicator declares inputs. The editor's default sample
   declares none, so with it the button is legitimately absent; paste the script below to
   see it. Indicators recompute with **no candle reload** — the chart must not blank or
@@ -105,15 +105,15 @@ function onTick() {
 
 That compiles to 6 inputs · 1 output and should render:
 
-- **COLOR (#2)** — `lineColor` shows a **red** swatch and `#FF0000`. Black means the
+- **COLOR** — `lineColor` shows a **red** swatch and `#FF0000`. Black means the
   dxScript palette lookup in `shared/lib/colors.ts` failed.
-- **SESSION (#1)** — a field with a trigger button, opening Interval/Raw modes, start and
+- **SESSION** — a field with a trigger button, opening Interval/Raw modes, start and
   end pickers, weekday toggles, a read-only indicator timezone and a result preview. A
   plain text box means the rich field regressed.
 - DOUBLE, BOOL, STRING and SOURCE render as number, switch, text and dropdown, each
   labelled with its type.
 
-For **script errors (#8)**, open a channel whose script calls something undefined inside
+For **script errors**, open a channel whose script calls something undefined inside
 `onTick`. Expect the category title (`Runtime error`, not a blanket "compilation error"),
 the message, `In script '1' at line N, column N`, and a **stack trace**. The collapsed
 summary line must name the same category as the alert below it.

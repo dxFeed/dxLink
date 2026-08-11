@@ -1,8 +1,7 @@
 # dxlink-debug-console — Architecture
 
-Design for the `@dxfeed/dxlink-debug-console` rebuild. For what it replaced and the
-decisions taken along the way see [MIGRATION.md](./MIGRATION.md); for how to validate a
-change see [CLAUDE.md](./CLAUDE.md).
+Design for the `@dxfeed/dxlink-debug-console` rebuild. For how to validate a change see
+[CLAUDE.md](./CLAUDE.md); for what is still open see [README.md](./README.md).
 
 The app follows **MVVM**. There is **no global store** — only ViewModels, each owning a
 local Zustand vanilla store.
