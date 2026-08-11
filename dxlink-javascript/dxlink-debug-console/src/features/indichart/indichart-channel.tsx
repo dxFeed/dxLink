@@ -91,7 +91,10 @@ const StatusChip = ({ state }: { state: DXLinkIndiChartIndicatorState | undefine
 const indicatorSummary = (entry: IndicatorEntry): string => {
   const { state, outputs } = entry
   if (state === undefined) return 'apply a subscription to compile'
-  if (!state.enabled) return 'compilation error'
+  // Name the category the server actually reported. Saying "compilation error" for every
+  // disabled indicator contradicts the alert below it, which titles a failing `onTick` a
+  // runtime error — the script compiled fine and then threw.
+  if (!state.enabled) return describeScriptError(state)?.title.toLowerCase() ?? 'script error'
   const inN = state.inParameters?.length ?? 0
   const outN = outputs.length
   return `${inN} input${inN === 1 ? '' : 's'} · ${outN} output${outN === 1 ? '' : 's'}`

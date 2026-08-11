@@ -98,15 +98,12 @@ export const ChannelsArea = () => {
   /**
    * Open the request dialog for a service.
    *
-   * Feed and DOM requests keep their values between opens, so several similar channels
-   * are quick to create. IndiChart cannot: its editor is uncontrolled and always mounts
-   * empty, so retaining the scripts would leave stale text in state behind a blank
-   * editor. Its request is reset instead.
+   * All three requests keep their values between opens, so several similar channels are
+   * quick to create. IndiChart used to be reset here, on the assumption that its editor
+   * was uncontrolled — it is not: `DxScriptEditor` takes a `script` prop and pushes it
+   * back into the editor, so the scripts are restored along with the state.
    */
   const openRequest = (kind: ChannelKind) => {
-    if (kind === 'indichart') {
-      setIndiRequest({ indicators: [createIndicatorEntry()] })
-    }
     setRequestKind(kind)
   }
 

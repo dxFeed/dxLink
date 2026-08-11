@@ -168,7 +168,16 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
     this.resetCoordination()
   }
 
-  /** Apply the symbol/fromTime and all indicator parameters together. */
+  /**
+   * Apply the symbol/fromTime and all indicator parameters together.
+   *
+   * `outputs` is deliberately left alone. An indicator's declared outputs come from its
+   * compiled state, which is scoped to the script — fixed for this channel's lifetime —
+   * not to the subscription. The server reports indicator states once, when the scripts
+   * compile, and does not repeat them for a re-subscribe; clearing the outputs here left
+   * the panel showing "0 outputs" with the Outputs section gone, while the chart went on
+   * drawing those very series.
+   */
   apply = (
     symbol: string,
     fromTime: number,
@@ -176,7 +185,7 @@ export class IndiChartViewModel implements ViewModel<IndiChartVMState> {
   ): void => {
     const subscription = { symbol, fromTime }
     this.resetCoordination()
-    this.store.setState({ subscription, outputs: {} })
+    this.store.setState({ subscription })
     this.chart?.setSubscription(subscription, parameters)
   }
 

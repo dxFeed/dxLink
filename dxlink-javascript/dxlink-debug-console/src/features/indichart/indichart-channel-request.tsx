@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 
+import { useResolvedColorScheme } from '../../shared/lib/color-scheme'
 import { MAX_INDICATORS, createIndicatorEntry } from '../channels/types'
 import type { IndiChartRequest } from '../channels/types'
 
@@ -24,18 +25,19 @@ interface IndiChartChannelRequestProps {
  * completion and its own bundled sample picker (it depends on `@dxscript/js-samples`) —
  * the same editor dxlink-docs used.
  *
- * The editor is **uncontrolled**: it owns its text and only reports changes through
- * `onChange`, with no prop to push text back in. Three consequences:
- *  - each editor starts empty, so the samples button is how you get a starting script;
- *  - the request cannot be re-populated after the dialog closes, which is why
- *    `channels-area` resets this request whenever the dialog opens. Restoring the
- *    previous text would show stale values in state behind an empty editor;
+ * The editor is **controlled** through its `script` prop, which it pushes back into the
+ * buffer whenever it changes. Two consequences:
+ *  - `script` is passed as `entry.code || undefined`. Passing `''` would mount the editor
+ *    empty; leaving it `undefined` lets the editor seed a new card with its first bundled
+ *    sample, which it then reports through `onChange` on mount. So a fresh card arrives
+ *    pre-filled and state agrees with what is on screen;
  *  - cards are keyed by entry id, never by array index. With an index key, removing a
  *    card makes React reuse the mounted editors for the entries that shifted down, so
  *    the visible scripts and the request state silently disagree and the channel opens
  *    with the wrong source.
  */
 export const IndiChartChannelRequest = ({ value, onChange }: IndiChartChannelRequestProps) => {
+  const colorScheme = useResolvedColorScheme()
   const setAt = (id: string, code: string) =>
     onChange({
       indicators: value.indicators.map((entry) => (entry.id === id ? { ...entry, code } : entry)),
@@ -71,11 +73,13 @@ export const IndiChartChannelRequest = ({ value, onChange }: IndiChartChannelReq
               )}
             </Stack>
             <DxScriptEditor
+              script={entry.code || undefined}
               onChange={(code) => setAt(entry.id, code)}
               placeholder="dxScript indicator source"
               height="260px"
               enableSamplesButton={true}
               showLangLogo={true}
+              colorScheme={colorScheme}
             />
           </CardContent>
         </Card>

@@ -13,6 +13,11 @@ import { ThemeModeToggle } from '../shared/components/theme-mode-toggle'
 /**
  * App shell: single-row "liquid glass" app bar with brand, inline nav and the
  * theme switcher, plus the routed page area. Built from stock MUI components.
+ *
+ * The bar stays one row at every width. The wordmark is the only thing that can be
+ * given up: below `sm` the brand collapses to the logo, which keeps the nav and the
+ * theme switcher on screen. Left as-is, the row measured 587px against a 375px
+ * viewport and pushed the switcher out of reach behind a horizontal scroll.
  */
 export const App = () => {
   const { pathname } = useLocation()
@@ -20,7 +25,7 @@ export const App = () => {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
       <AppBar position="sticky">
-        <Toolbar sx={{ gap: 2 }}>
+        <Toolbar sx={{ gap: { xs: 0.5, sm: 2 }, px: { xs: 1, sm: 3 } }}>
           <Box
             component={RouterLink}
             to="/"
@@ -37,13 +42,21 @@ export const App = () => {
             <Typography
               component="span"
               noWrap
-              sx={{ fontWeight: 700, fontSize: '1rem', lineHeight: 1 }}
+              sx={{
+                display: { xs: 'none', sm: 'block' },
+                fontWeight: 700,
+                fontSize: '1rem',
+                lineHeight: 1,
+              }}
             >
               dxLink.WebSocket
             </Typography>
           </Box>
 
-          <Box component="nav" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2 }}>
+          <Box
+            component="nav"
+            sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: { xs: 0, sm: 2 } }}
+          >
             {ROUTES.map((route) => {
               const active = route.path === pathname
               return (
