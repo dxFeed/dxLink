@@ -31,7 +31,8 @@ interface DomChannelProps {
   config: DomConfig
 }
 
-const parseSources = (raw: string): string[] =>
+/** Split a comma- or space-separated list into entries, dropping blanks. */
+const parseList = (raw: string): string[] =>
   raw
     .split(/[\s,]+/)
     .map((s) => s.trim())
@@ -116,11 +117,16 @@ const ConfigurationSection = ({ vm }: { vm: DomViewModel }) => {
   const applied = useVM(vm, (s) => s.config)
   const [aggPeriod, setAggPeriod] = useState('')
   const [depthLimit, setDepthLimit] = useState('')
+  const [orderFields, setOrderFields] = useState('')
 
   const apply = () =>
     vm.configure({
       acceptAggregationPeriod: aggPeriod.trim() === '' ? undefined : Number(aggPeriod),
       acceptDepthLimit: depthLimit.trim() === '' ? undefined : Number(depthLimit),
+      // Any field name is allowed through, deliberately. The server decides what it
+      // actually returns and may honour none of this — which is the point of asking from a
+      // debug console: the negotiated result renders below, next to what was requested.
+      acceptOrderFields: orderFields.trim() === '' ? undefined : parseList(orderFields),
     })
 
   return (
@@ -157,11 +163,12 @@ const ConfigurationSection = ({ vm }: { vm: DomViewModel }) => {
               />
             </Box>
             <TextField
-              label="Accept order fields"
-              value="Not available"
+              label="Accept order fields (comma-separated)"
+              value={orderFields}
+              onChange={(e) => setOrderFields(e.target.value)}
               size="small"
-              disabled
               fullWidth
+              helperText="Empty = server default. The server may return fewer fields, or different ones — compare with Order fields under “Applied by server”."
             />
             <Box>
               <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={apply}>
@@ -226,7 +233,7 @@ export const DomChannel = ({ title, config }: DomChannelProps) => {
     }
     return new DomViewModel(client, {
       symbol: config.symbol,
-      sources: parseSources(config.source),
+      sources: parseList(config.source),
       feed: config.feed || undefined,
       space: config.space || undefined,
     })

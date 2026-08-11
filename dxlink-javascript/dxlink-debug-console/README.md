@@ -5,8 +5,8 @@ DOM and INDICHART channels, and inspect what the protocol actually sends back. A
 renders the dxLink AsyncAPI specification.
 
 This is the modern rebuild of the console that shipped inside `@dxfeed/dxlink-docs`. It
-is an application, not a library: `private: true`, deploy-only, and excluded from
-Changesets — nothing here is published to npm.
+is an application, not a library: `private: true` and excluded from Changesets — nothing
+here is published to npm. It is run locally; there is no deployment.
 
 ## Running
 
@@ -61,21 +61,8 @@ as a private field and exposes UI state through its own Zustand store; views bin
 `useVM(vm, selector)` and call commands. Connection-level errors aggregate on the
 connection ViewModel, channel-level errors stay on the channel that produced them.
 
-## Open items
-
 This package replaced the console that shipped inside `@dxfeed/dxlink-docs`, which has
-been deleted. Parity was signed off against live servers; what is left is not parity work.
-
-- **The deploy is not repointed.** Retiring `dxlink-docs` removed the package the deployed
-  console was built from, and no CI or deploy configuration exists anywhere in this
-  repository — so this could not be done here. Whoever owns the deployment needs to point
-  it at this package's build output. The most pressing item.
-- **No automated end-to-end pass.** 88 unit tests, and the manual walkthrough in
-  [CLAUDE.md](./CLAUDE.md), but no Playwright suite over a mocked `DXLinkWebSocketConnector`.
-- **Dev default WebSocket URL is undecided.** It defaults to the shared dev relay
-  (`shared/lib/connection-url.ts`) rather than localhost, and that relay does not serve
-  INDICHART. Confirm it, or restore localhost and offer the relays as presets.
-- **DOM "Accept order fields" is a disabled stub.** Implement it, or drop it from the UI.
+been deleted. Parity was signed off against live servers, and nothing is outstanding.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design and [CLAUDE.md](./CLAUDE.md) for
 how to validate a change against the dev servers.

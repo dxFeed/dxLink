@@ -74,7 +74,8 @@ export const ChannelsArea = () => {
   })
   const [domRequest, setDomRequest] = useState<DomRequest>({
     symbol: 'AAPL',
-    source: '',
+    // AGGREGATE is the price-level source that works without picking a venue.
+    source: 'AGGREGATE',
     feed: '',
     space: '',
   })

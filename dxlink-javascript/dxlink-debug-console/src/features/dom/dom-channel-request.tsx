@@ -6,6 +6,8 @@ import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
+import { DocLink } from '../../shared/components/doc-link'
+import { ORDER_SOURCES_DOC_URL } from '../../shared/lib/order-sources'
 import type { DomRequest } from '../channels/types'
 
 interface DomChannelRequestProps {
@@ -31,7 +33,13 @@ export const DomChannelRequest = ({ value, onChange }: DomChannelRequestProps) =
       onChange={(e) => onChange({ ...value, source: e.target.value })}
       size="small"
       fullWidth
-      helperText="Order sources, comma/space separated (e.g. NTV, DEX). Empty = server default."
+      helperText={
+        <>
+          Price level sources, comma/space separated — <code>AGGREGATE</code>, <code>REGIONAL</code>
+          , or a venue in lower case such as <code>ntv</code> or <code>glbx</code>. Full list on{' '}
+          <DocLink href={ORDER_SOURCES_DOC_URL}>kb.dxfeed.com</DocLink>.
+        </>
+      }
     />
     <Accordion disableGutters variant="outlined" sx={{ '&::before': { display: 'none' } }}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
