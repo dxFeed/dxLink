@@ -17,13 +17,16 @@ pnpm install
 pnpm console          # or: pnpm --filter @dxfeed/dxlink-debug-console dev
 ```
 
-The dev server listens on <http://localhost:4280> (`dxlink-docs` uses 4200, so both can
-run side by side). The connection form is pre-filled with the shared dev relay in
-development, and with a URL derived from `window.location` in production builds.
+The dev server listens on <http://localhost:4280>. The connection form is pre-filled with
+the shared dev relay in development, and with a URL derived from `window.location` in
+production builds.
 
-> **Note:** `@dxscript/dxlink-dxcharts-lite` and `@dxscript/js-samples` are published only
-> to dxFeed's internal registry, so `pnpm install` needs access to it. Without those
-> credentials the package cannot be installed or built.
+> **Note:** `@dxscript/dxlink-dxcharts-lite` and `@dxscript/dxlink-dxscript-editor` are
+> published only to dxFeed's internal registry, so `pnpm install` needs access to it.
+> Without those credentials the package cannot be installed or built.
+>
+> The dev relay does **not** support the INDICHART service, so IndiChart channels are
+> rejected there. Point the connection form at an endpoint that enables it to use them.
 
 ## Checks
 
@@ -59,5 +62,6 @@ as a private field and exposes UI state through its own Zustand store; views bin
 connection ViewModel, channel-level errors stay on the channel that produced them.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design, [PLAN.md](./PLAN.md) for the
-rebuild scope and phases, and [MIGRATION.md](./MIGRATION.md) for the parity status
-against `dxlink-docs` and what remains before it can be retired.
+rebuild scope and phases, and [MIGRATION.md](./MIGRATION.md) for the parity status against
+the retired `dxlink-docs` and what remains. [HANDOFF.md](./HANDOFF.md) records the tasks
+that needed internal-registry access and how they went.
