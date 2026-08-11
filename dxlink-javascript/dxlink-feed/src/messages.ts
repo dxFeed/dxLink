@@ -1,15 +1,15 @@
 import { type DXLinkChannelMessage } from '@dxfeed/dxlink-core'
 
 export enum FeedContract {
-  'AUTO' = 'AUTO',
-  'TICKER' = 'TICKER',
-  'HISTORY' = 'HISTORY',
-  'STREAM' = 'STREAM',
+  AUTO = 'AUTO',
+  TICKER = 'TICKER',
+  HISTORY = 'HISTORY',
+  STREAM = 'STREAM',
 }
 
 export enum FeedDataFormat {
-  'FULL' = 'FULL',
-  'COMPACT' = 'COMPACT',
+  FULL = 'FULL',
+  COMPACT = 'COMPACT',
 }
 
 export interface FeedParameters {
@@ -72,10 +72,7 @@ export interface FeedDataMessage {
 }
 
 export type FeedMessage =
-  | FeedSetupMessage
-  | FeedConfigMessage
-  | FeedSubscriptionMessage
-  | FeedDataMessage
+  FeedSetupMessage | FeedConfigMessage | FeedSubscriptionMessage | FeedDataMessage
 
 export const isFeedFullData = (
   data: FeedEventData[] | FeedCompactEventData

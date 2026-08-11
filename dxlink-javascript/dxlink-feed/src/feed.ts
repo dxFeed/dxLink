@@ -88,7 +88,8 @@ export interface FeedConfig {
  */
 export type DXLinkFeedConfigChangeListener = (config: FeedConfig) => void
 
-export type DXLinkFeedSubscription = Subscription | TimeSeriesSubscription | IndexedEventSubscription
+export type DXLinkFeedSubscription =
+  Subscription | TimeSeriesSubscription | IndexedEventSubscription
 
 /**
  * Get a unique key for the subscription.
