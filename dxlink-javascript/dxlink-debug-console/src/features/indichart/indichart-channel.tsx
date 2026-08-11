@@ -7,7 +7,6 @@ import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import InsightsIcon from '@mui/icons-material/Insights'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import TuneIcon from '@mui/icons-material/Tune'
 import Accordion from '@mui/material/Accordion'
 import AccordionDetails from '@mui/material/AccordionDetails'
@@ -396,15 +395,6 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
     vm.applyParameters(values)
   }
 
-  /** Drop the subscription and clear the chart, leaving the channel open. */
-  const reset = () => {
-    setChartError(null)
-    setHasData(false)
-    chartRef.current?.reset()
-    setResetKey((k) => k + 1)
-    vm.reset()
-  }
-
   const statusChip =
     channelState === DXLinkChannelState.CLOSED ? (
       <Chip size="small" variant="outlined" label="closed" />
@@ -525,35 +515,20 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
           </Stack>
 
           {hasInputs && (
-            <>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ mt: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+            <Box sx={{ mt: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<TuneIcon />}
+                onClick={applyParameters}
+                disabled={subscription === null}
               >
-                <Button
-                  variant="outlined"
-                  startIcon={<TuneIcon />}
-                  onClick={applyParameters}
-                  disabled={subscription === null}
-                >
-                  Apply parameters
-                </Button>
-                <Button
-                  color="inherit"
-                  startIcon={<RestartAltIcon />}
-                  onClick={reset}
-                  disabled={subscription === null}
-                >
-                  Reset
-                </Button>
-              </Stack>
+                Apply parameters
+              </Button>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                <b>Apply parameters</b> recomputes the indicators against the candles already
-                loaded. <b>Reset</b> drops the subscription and clears the chart, leaving the
-                channel open.
+                Recomputes the indicators against the candles already loaded, without
+                re-subscribing.
               </Typography>
-            </>
+            </Box>
           )}
         </Box>
 

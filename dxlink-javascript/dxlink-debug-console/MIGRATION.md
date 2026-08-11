@@ -93,7 +93,7 @@ deploy repoint, now urgent because of the retirement, and an automated end-to-en
 | 6 | Documentation links dropped | kb.dxfeed.com event types and order sources, candle symbols, currentmillis.com — back on the feed, candle-chart and IndiChart forms |
 | 7 | Grid columns sorted alphabetically | Ordered by the negotiated `FeedConfig.eventFields`; received-but-unnegotiated fields appended so nothing is hidden |
 | 8 | Script errors showed type, message, line only | All six categories, RUNTIME stack frames, internal failures, and unrecognised types shown rather than swallowed |
-| 9 | Parameters only applied by re-subscribing, refetching all candles | `Apply parameters` calls `updateIndicatorsParameters`; `Reset` clears without closing the channel. Both sit under the indicator panels, beside the parameters they act on, and appear only when an indicator declares inputs |
+| 9 | Parameters only applied by re-subscribing, refetching all candles | `Apply parameters` calls `updateIndicatorsParameters`. It sits under the indicator panels, beside the parameters it acts on, and appears only when an indicator declares inputs |
 
 Also closed alongside these:
 
@@ -158,7 +158,7 @@ production Vite build all pass. The Protocol page renders in Chromium in light a
 mode, and the built output emits the spec asset and the separate lazy chunk.
 
 **Verified at runtime.** All nine regressions above, the editor, the chart's
-`Apply` / `Apply parameters` / `Reset` paths, channel-level error routing, light and dark,
+`Apply` and `Apply parameters` paths, channel-level error routing, light and dark,
 and 375px width. Services live on different servers — FEED/DOM on
 `wss://dxlink-md-ws-dev.dxkube.com`, INDICHART on `wss://dxlink-dxs-ws-dev.dxkube.com`.
 **[CLAUDE.md](./CLAUDE.md) is the procedure**: which server serves what, what each check

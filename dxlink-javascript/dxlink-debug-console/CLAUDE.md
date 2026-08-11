@@ -73,22 +73,19 @@ sequence, timeNanoPart, bid*, ask*`. Alphabetical order means the negotiated ord
 Open an IndiChart channel. The editor seeds itself with its first bundled sample, which
 compiles as-is.
 
-- **Apply** — candles load and the chart draws. It lives with the symbol, which is what it
-  acts on.
-- **Apply parameters (#9) and Reset** sit **below the indicator panels**, with the
-  parameters they act on, and are rendered only when some indicator declares inputs. The
-  editor's default sample declares none, so with it these two buttons are legitimately
-  absent — paste the script below to see them.
-- **Apply parameters (#9)** — indicators recompute with **no candle reload**. The chart
-  must not blank or reset. If the loading overlay reappears, it re-subscribed instead of
-  calling `updateIndicatorsParameters`.
-- **Reset** — chart clears, channel stays usable, and **the channel id changes**. That is
-  correct: the protocol cannot cancel an INDICHART subscription short of replacing it, so
-  the VM closes and reopens the channel.
-- **Indicator states are sent once, at compile.** They are re-sent when the channel
-  reopens (so `Reset` repopulates them) but **not** for a re-subscribe. Anything derived
-  from them — `outputs` especially — must therefore survive `Apply`. Clearing it there
-  once left the panel reading "0 outputs" while the chart drew those very series.
+There are two buttons, and each sits with what it acts on.
+
+- **Apply** — in the Subscription block, with the symbol. Candles load and the chart draws.
+- **Apply parameters (#9)** — **below the indicator panels**, with the inputs it acts on,
+  and rendered only when some indicator declares inputs. The editor's default sample
+  declares none, so with it the button is legitimately absent; paste the script below to
+  see it. Indicators recompute with **no candle reload** — the chart must not blank or
+  reset. If the loading overlay reappears, it re-subscribed instead of calling
+  `updateIndicatorsParameters`.
+- **Indicator states are sent once, at compile**, and are **not** repeated for a
+  re-subscribe. Anything derived from them — `outputs` especially — must therefore survive
+  `Apply`. Clearing it there once left the panel reading "0 outputs" while the chart drew
+  those very series.
 
 To exercise the parameter fields, there is no bundled sample with colour or session
 inputs. Paste a script that declares them:
