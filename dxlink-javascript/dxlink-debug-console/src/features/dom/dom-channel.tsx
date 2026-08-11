@@ -66,23 +66,45 @@ const Ladder = ({ snapshot }: { snapshot: DomSnapshot }) => {
   }
 
   const cell = (order: DepthOfMarketOrder | undefined, side: 'bid' | 'ask') => {
-    const color = side === 'bid' ? 'success.main' : 'error.main'
-    return order ? (
+    if (order === undefined) {
+      return (
+        <>
+          <TableCell />
+          <TableCell />
+        </>
+      )
+    }
+
+    const size = (
+      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+        {num(order.size)}
+      </TableCell>
+    )
+    const price = (
+      <TableCell
+        align="right"
+        sx={{
+          color: side === 'bid' ? 'success.main' : 'error.main',
+          fontVariantNumeric: 'tabular-nums',
+          fontWeight: 600,
+        }}
+      >
+        {num(order.price)}
+      </TableCell>
+    )
+
+    // The ladder is mirrored around the spread — sizes outside, prices meeting in the
+    // middle — so the two sides emit their cells in opposite order to match the header
+    // row: `Bid size | Bid | Ask | Ask size`.
+    return side === 'bid' ? (
       <>
-        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-          {num(order.size)}
-        </TableCell>
-        <TableCell
-          align="right"
-          sx={{ color, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}
-        >
-          {num(order.price)}
-        </TableCell>
+        {size}
+        {price}
       </>
     ) : (
       <>
-        <TableCell />
-        <TableCell />
+        {price}
+        {size}
       </>
     )
   }
@@ -117,7 +139,9 @@ const ConfigurationSection = ({ vm }: { vm: DomViewModel }) => {
   const applied = useVM(vm, (s) => s.config)
   const [aggPeriod, setAggPeriod] = useState('')
   const [depthLimit, setDepthLimit] = useState('')
-  const [orderFields, setOrderFields] = useState('')
+  // What the server actually returns today, so the request starts from reality. Any other
+  // field can be typed in — the server decides, and the negotiated result renders beside it.
+  const [orderFields, setOrderFields] = useState('price, size')
 
   const apply = () =>
     vm.configure({

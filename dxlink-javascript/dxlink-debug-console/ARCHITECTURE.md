@@ -15,8 +15,10 @@ MODEL        @dxfeed/dxlink-api — DXLinkWebSocketClient, DXLinkFeed, … (list
 ```
 
 ## 1. ViewModels
+
 Every dxlink-api entity is wrapped in a **ViewModel** — a plain class that:
-- owns the underlying dxlink-api instance **as a private field** (kept *off* the store),
+
+- owns the underlying dxlink-api instance **as a private field** (kept _off_ the store),
 - registers the model's `add*Listener` wiring **once** and maps it into store state,
 - holds UI state in a **per-VM Zustand vanilla store** (`createStore`),
 - exposes typed **commands** (`connect`, `configure`, `addSubscription`, `setAuthToken`, …),
@@ -24,20 +26,23 @@ Every dxlink-api entity is wrapped in a **ViewModel** — a plain class that:
 - has `dispose()` to remove listeners + close the model.
 
 ViewModels:
+
 - **`ConnectionViewModel`** (page-scoped) — owns the `DXLinkWebSocketClient`; state:
   `connection · auth · details · channels[] · errors[]`; commands: `connect / disconnect /
-  reconnect / setAuthToken / openFeed / openDom / openCandles / openScript / closeChannel`.
+reconnect / setAuthToken / openFeed / openDom / openCandles / openScript / closeChannel`.
 - **`FeedViewModel` / `DomViewModel` / `CandlesViewModel` / `IndiChartViewModel`** — one per
   open channel; `CandlesViewModel` ports the `DXLinkCandles` flag/snapshot logic + `SortedList`,
   `IndiChartViewModel` ports the `chart-wrapper.ts` `ChartHolder` logic.
 
 Views bind through a single helper — no `useEffect` listener plumbing, no 260-line god component:
+
 ```ts
-const useVM = (vm, selector) => useStore(vm.store, selector)   // wraps useStore
-const connection = useVM(connectionVM, s => s.connection)      // re-renders only on this slice
+const useVM = (vm, selector) => useStore(vm.store, selector) // wraps useStore
+const connection = useVM(connectionVM, (s) => s.connection) // re-renders only on this slice
 ```
 
 ## 2. Ownership, lifecycle & scope (nothing global but the theme)
+
 ```
 main.tsx
 └── <ThemeProvider>                         ← GLOBAL (theme spans all routes) ✅
@@ -51,6 +56,7 @@ main.tsx
         │                 └── <ChannelWidget vm={feedVM}>   useVM(feedVM, …)
         └── "/protocol" <AsyncApiViewer>      ← independent, no VM
 ```
+
 - `ConnectionViewModel` lives for the Console page's mount lifetime; `dispose()` on unmount
   closes the socket. The page provides it to its subtree via a small context (avoids
   prop-drilling) — it is **not** mounted at the app root.
@@ -69,6 +75,7 @@ main.tsx
   reconnect on return. An overlay/persist variant is a possible future UX change, not in scope.
 
 ## 3. Reactive data flow (one VM — same shape for all)
+
 ```
             ┌──────────────── dxlink-api entity (e.g. DXLinkFeed) ────────────────┐
             │  add*Listener(...)  ◀── wired ONCE inside the VM                     │
@@ -88,6 +95,7 @@ main.tsx
         │             <FeedConfigForm> / <FeedSubscriptionForm> (RHF + zod)  │
         └─────────────────────────────────────────────────────────────────────┘
 ```
+
 The live dxlink objects stay as private VM fields; only UI state goes in the store.
 
 ## 4. Directory layout
@@ -137,6 +145,7 @@ aggregates them so `ConnectionViewModel` opens channels without hard-importing e
 kind = new feature folder + register its descriptor.
 
 ## 5. Schema-driven indicator parameter form
+
 The IndiChart in/out parameters (`DOUBLE | STRING | BOOL | COLOR | SOURCE | SESSION | ENUM`)
 become a single dynamic renderer driven by parameter metadata → a zod schema built at
 runtime → react-hook-form. SESSION keeps its dedicated dialog (interval/raw modes, day
@@ -145,20 +154,22 @@ selection, timezone). COLOR keeps the dxScript color-name ⇄ hex mapping.
 ## 6. UI/UX design
 
 ### 6.1 Stock-MUI mapping (what we use instead of custom UI)
-| Current custom piece | Stock MUI replacement |
-|---|---|
-| `ContentTemplate` / `Paper` panels | `Card` + `CardHeader` + `CardContent` |
-| `TextField` wrapper, `Select` wrapper | `TextField`, `Select` / `Autocomplete` |
-| Connection status dot | `Chip` (color by state) |
-| Errors dropdown | `Alert` / `Snackbar` + `Menu`/`Popover` |
-| Buttons / icon buttons | `Button`, `IconButton` + `Tooltip` |
-| Channel widget shell | `Card` + `Accordion` (collapsible) + `Tabs` |
-| Dialogs (e.g. SESSION editor) | `Dialog` |
-| Feed/DOM tables | `@mui/x-data-grid` (`DataGrid`) |
-| Forms layout | `Grid` / `Stack` |
-| Genuine gaps → keep custom | JSON view; CodeMirror editor wrapper |
+
+| Current custom piece                  | Stock MUI replacement                       |
+| ------------------------------------- | ------------------------------------------- |
+| `ContentTemplate` / `Paper` panels    | `Card` + `CardHeader` + `CardContent`       |
+| `TextField` wrapper, `Select` wrapper | `TextField`, `Select` / `Autocomplete`      |
+| Connection status dot                 | `Chip` (color by state)                     |
+| Errors dropdown                       | `Alert` / `Snackbar` + `Menu`/`Popover`     |
+| Buttons / icon buttons                | `Button`, `IconButton` + `Tooltip`          |
+| Channel widget shell                  | `Card` + `Accordion` (collapsible) + `Tabs` |
+| Dialogs (e.g. SESSION editor)         | `Dialog`                                    |
+| Feed/DOM tables                       | `@mui/x-data-grid` (`DataGrid`)             |
+| Forms layout                          | `Grid` / `Stack`                            |
+| Genuine gaps → keep custom            | JSON view; CodeMirror editor wrapper        |
 
 ### 6.2 UX improvements (over current console)
+
 - Theme follows the OS by default (`prefers-color-scheme`); in-app control to switch System / Light / Dark, persisted to localStorage (current app is light-only).
 - Persisted connection presets and last-used params; shareable URL state for tab + URL.
 - Connection status as a clear badge; explicit reconnect control.
