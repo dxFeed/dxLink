@@ -10,44 +10,52 @@ can be retired. Started as a gap analysis; now tracks what has been closed.
 
 ## 1. Status
 
-| | Then | Now |
-|---|---|---|
+|                                   | Then    | Now          |
+| --------------------------------- | ------- | ------------ |
 | Feature areas at parity or better | 8 of 11 | **11 of 11** |
-| Features missing outright | 2 | **0** |
-| Behavioural regressions | 9 | **0** |
-| Packaging / infra items | 6 | 3 |
-| Tests | 7 | **78** |
+| Features missing outright         | 2       | **0**        |
+| Behavioural regressions           | 9       | **0**        |
+| Packaging / infra items           | 6       | 3            |
+| Tests                             | 7       | **86**       |
 
 Both missing features are implemented: the Protocol page renders the AsyncAPI
 specification, and the dxScript editor is back. All nine behavioural regressions are
 fixed.
 
+A subsequent code-review pass over this work found fourteen further defects in it — the
+worst being indicator cards keyed by array index behind an uncontrolled editor, and an
+IndiChart reset that cleared the UI without stopping the stream. All are fixed; see the
+`fix(debug-console): correctness fixes from code review` and
+`refactor(debug-console): dedupe channel-error state` commits.
+
 **`dxlink-docs` is not yet retired.** What blocks it is no longer feature parity but
 §4: a sign-off pass against a live server, and confirming where the deploy comes from.
+[HANDOFF.md](./HANDOFF.md) sets out those remaining tasks for an agent with access to the
+internal registry.
 
 ---
 
 ## 2. Parity matrix
 
-| Area | `dxlink-docs` | `dxlink-debug-console` | Status |
-|---|---|---|---|
-| App shell, nav, routing | `layout/layout.tsx`, light-only | `app/App.tsx`, system/light/dark | ✅ better |
-| Connection | `debug-console/connection.tsx` | `features/connection/*` | ✅ better (adds Reconnect) |
-| Authorization | `debug-console/authorization.tsx` | `features/auth/auth-panel.tsx` | ✅ better (tri-state gating) |
-| Connection errors | `debug-console/errors.tsx` | `features/errors/error-center.tsx` | ✅ better (timestamps, clear) |
-| Channel-level errors | `channel-widget.tsx` | per-channel VM → widget error center | ✅ fixed |
-| Channels manager | `channels-manager.tsx` | `features/channels/channels-area.tsx` | ✅ better (per-kind dialogs) |
-| Feed — configuration | `feed-channel-manager.tsx` | `features/feed/feed-configuration.tsx` | ✅ parity |
-| Feed — subscriptions | `feed-subscriptions.tsx` | `features/feed/feed-subscriptions.tsx` | ✅ fixed |
-| Feed — data tables | `feed-data.tsx` | `features/feed/feed-events-table.tsx` | ✅ fixed |
-| DOM | `dom-*.tsx` | `features/dom/*` | ✅ parity |
-| Candles + chart | `candles/*`, `candles-*.tsx` | `features/feed/candles.ts`, `feed-chart-channel.tsx` | ✅ parity |
-| IndiChart — data flow | `chart-wrapper.ts` | `features/indichart/indichart-view-model.ts` | ✅ parity (multi-indicator = better) |
-| IndiChart — script editor | `@dxscript/dxlink-dxscript-editor` | same package | ✅ fixed |
-| IndiChart — parameters | `parameter-field.tsx` | `parameter-field.tsx` + `session-parameter-field.tsx` | ✅ fixed |
-| IndiChart — script errors | 6 categories + stack | `script-error.ts`, same 6 + stack | ✅ fixed |
-| IndiChart — live param apply | `updateIndicatorsParameters` | `applyParameters` command | ✅ fixed |
-| Protocol / AsyncAPI page | `protocol/asyncapi.tsx` | `pages/protocol-page.tsx` | ✅ fixed |
+| Area                         | `dxlink-docs`                      | `dxlink-debug-console`                                | Status                               |
+| ---------------------------- | ---------------------------------- | ----------------------------------------------------- | ------------------------------------ |
+| App shell, nav, routing      | `layout/layout.tsx`, light-only    | `app/App.tsx`, system/light/dark                      | ✅ better                            |
+| Connection                   | `debug-console/connection.tsx`     | `features/connection/*`                               | ✅ better (adds Reconnect)           |
+| Authorization                | `debug-console/authorization.tsx`  | `features/auth/auth-panel.tsx`                        | ✅ better (tri-state gating)         |
+| Connection errors            | `debug-console/errors.tsx`         | `features/errors/error-center.tsx`                    | ✅ better (timestamps, clear)        |
+| Channel-level errors         | `channel-widget.tsx`               | per-channel VM → widget error center                  | ✅ fixed                             |
+| Channels manager             | `channels-manager.tsx`             | `features/channels/channels-area.tsx`                 | ✅ better (per-kind dialogs)         |
+| Feed — configuration         | `feed-channel-manager.tsx`         | `features/feed/feed-configuration.tsx`                | ✅ parity                            |
+| Feed — subscriptions         | `feed-subscriptions.tsx`           | `features/feed/feed-subscriptions.tsx`                | ✅ fixed                             |
+| Feed — data tables           | `feed-data.tsx`                    | `features/feed/feed-events-table.tsx`                 | ✅ fixed                             |
+| DOM                          | `dom-*.tsx`                        | `features/dom/*`                                      | ✅ parity                            |
+| Candles + chart              | `candles/*`, `candles-*.tsx`       | `features/feed/candles.ts`, `feed-chart-channel.tsx`  | ✅ parity                            |
+| IndiChart — data flow        | `chart-wrapper.ts`                 | `features/indichart/indichart-view-model.ts`          | ✅ parity (multi-indicator = better) |
+| IndiChart — script editor    | `@dxscript/dxlink-dxscript-editor` | same package                                          | ✅ fixed                             |
+| IndiChart — parameters       | `parameter-field.tsx`              | `parameter-field.tsx` + `session-parameter-field.tsx` | ✅ fixed                             |
+| IndiChart — script errors    | 6 categories + stack               | `script-error.ts`, same 6 + stack                     | ✅ fixed                             |
+| IndiChart — live param apply | `updateIndicatorsParameters`       | `applyParameters` command                             | ✅ fixed                             |
+| Protocol / AsyncAPI page     | `protocol/asyncapi.tsx`            | `pages/protocol-page.tsx`                             | ✅ fixed                             |
 
 ---
 
@@ -62,9 +70,9 @@ fixed.
   otherwise sit in the 1.1 MB initial bundle. The AsyncAPI stylesheet is light-only, so
   the viewer subtree is pinned to a light surface — inheriting the app palette rendered
   dark text on dark.
-  *Correction to the earlier draft of this document: the relative path to
+  _Correction to the earlier draft of this document: the relative path to
   `dxlink-specification/asyncapi.yml` is **identical** to the one in dxlink-docs, not one
-  segment shallower — `src/pages` sits at the same depth as that package's `src/protocol`.*
+  segment shallower — `src/pages` sits at the same depth as that package's `src/protocol`._
 
 - **dxScript editor.** `DxScriptEditor` at `1.12.0-SNAPSHOT` — the version already in the
   lockfile, which declares `react >=18` and so accepts React 19. It is **uncontrolled**:
@@ -77,17 +85,17 @@ fixed.
 
 ### Regressions
 
-| # | Was | Now |
-|---|---|---|
-| 1 | SESSION parameters degraded to a plain text field | `session-parameter-field.tsx`: interval mode with time pickers and weekday toggles, raw mode, presets when `options` constrains them. Format logic in `shared/lib/session.ts`, round-trip tested |
-| 2 | COLOR lost the dxScript palette, so `RED` silently became black | `shared/lib/colors.ts` resolves all 26 names, hex with or without alpha, and the `{ value }` wrapper |
-| 3 | Feed rows keyed on `eventSymbol` alone, collapsing Order sources | `feedEventKey` appends `#source`, as dxlink-docs did |
-| 4 | Free-text order source | Autocomplete over the 34 predefined sources, `freeSolo` so unlisted ones still work |
-| 5 | 14 of 18 event types | All 18, restoring DailyCandle, TradeETH, Configuration, Message — also offered in the event-fields editor, which had no list at all |
-| 6 | Documentation links dropped | kb.dxfeed.com event types and order sources, candle symbols, currentmillis.com — back on the feed, candle-chart and IndiChart forms |
-| 7 | Grid columns sorted alphabetically | Ordered by the negotiated `FeedConfig.eventFields`; received-but-unnegotiated fields appended so nothing is hidden |
-| 8 | Script errors showed type, message, line only | All six categories, RUNTIME stack frames, internal failures, and unrecognised types shown rather than swallowed |
-| 9 | Parameters only applied by re-subscribing, refetching all candles | `Apply parameters` calls `updateIndicatorsParameters`; `Reset` clears without closing the channel |
+| #   | Was                                                               | Now                                                                                                                                                                                              |
+| --- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | SESSION parameters degraded to a plain text field                 | `session-parameter-field.tsx`: interval mode with time pickers and weekday toggles, raw mode, presets when `options` constrains them. Format logic in `shared/lib/session.ts`, round-trip tested |
+| 2   | COLOR lost the dxScript palette, so `RED` silently became black   | `shared/lib/colors.ts` resolves all 26 names, hex with or without alpha, and the `{ value }` wrapper                                                                                             |
+| 3   | Feed rows keyed on `eventSymbol` alone, collapsing Order sources  | `feedEventKey` appends `#source`, as dxlink-docs did                                                                                                                                             |
+| 4   | Free-text order source                                            | Autocomplete over the 34 predefined sources, `freeSolo` so unlisted ones still work                                                                                                              |
+| 5   | 14 of 18 event types                                              | All 18, restoring DailyCandle, TradeETH, Configuration, Message — also offered in the event-fields editor, which had no list at all                                                              |
+| 6   | Documentation links dropped                                       | kb.dxfeed.com event types and order sources, candle symbols, currentmillis.com — back on the feed, candle-chart and IndiChart forms                                                              |
+| 7   | Grid columns sorted alphabetically                                | Ordered by the negotiated `FeedConfig.eventFields`; received-but-unnegotiated fields appended so nothing is hidden                                                                               |
+| 8   | Script errors showed type, message, line only                     | All six categories, RUNTIME stack frames, internal failures, and unrecognised types shown rather than swallowed                                                                                  |
+| 9   | Parameters only applied by re-subscribing, refetching all candles | `Apply parameters` calls `updateIndicatorsParameters`; `Reset` clears without closing the channel                                                                                                |
 
 Also closed alongside these:
 
@@ -102,11 +110,11 @@ Also closed alongside these:
   not show parameters — for that service they carry the whole indicator source.
 - **Channel failures contained**, by two separate mechanisms, because they fail in two
   different places:
-  - *Render* — channel cards are wrapped in an error boundary, as is the lazy Protocol
+  - _Render_ — channel cards are wrapped in an error boundary, as is the lazy Protocol
     route. Three channels construct their VM in a `useState` initializer that throws
     without a live client; that throw remains (it is a clear programmer error) but can no
     longer blank the console and take every other open channel with it.
-  - *Protocol dispatch* — `chartRef.pushData` is called synchronously from the WebSocket
+  - _Protocol dispatch_ — `chartRef.pushData` is called synchronously from the WebSocket
     frame handler, which does not guard its listeners. A throw there is invisible to React
     (it is not a render error) and would abort that frame for every other channel, so both
     chart views catch it and surface it as a chart error.
@@ -128,14 +136,14 @@ Also closed alongside these:
 
 ## 4. What remains
 
-| # | Item | Note |
-|---|---|---|
-| 1 | **`pnpm-lock.yaml` not updated** | Two dependencies were added (`@asyncapi/react-component`, `@dxscript/dxlink-dxscript-editor`) and one removed (`@dxscript/js-samples`). The lockfile was left alone deliberately: `@dxfeed/*` and `@dxscript/*` resolve from dxFeed's internal Artifactory, which the authoring environment could not reach, so a regenerated lockfile would have rewritten those entries to public URLs. **Run `pnpm install` to refresh it.** |
-| 2 | **Runtime check of the editor and chart paths** | See §5. |
-| 3 | Playwright E2E + mock `DXLinkWebSocketConnector` | PLAN.md phase 8 / risk 6. Unit coverage is now 78 tests, but there is no end-to-end pass. |
-| 4 | CI/CD, deploy, bundle budget | No CI config exists anywhere in this repository, so "mirror the dxlink-docs pipeline" needs the pipeline's actual location identified first — it is not in-tree. |
-| 5 | Parity sign-off against a live server | Walk §2 against the dev WS endpoint; dark-mode and responsive QA. |
-| 6 | Retire `dxlink-docs` | Once 1–5 are done: repoint the deploy, then remove the package from `pnpm-workspace.yaml`, drop the root `docs` script, delete the directory, and drop its entry from the changeset `ignore` list. That also removes `@dxfeed/ui-kit`, `styled-components`, `react-is`, the `rehype-*`/`remark-*`/`unified` chain and the React 18 type packages from the lockfile. Update `.claude/launch.json` and the root `README.md` if they still point at docs. |
+| #   | Item                                             | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **`pnpm-lock.yaml` not updated**                 | Two dependencies were added (`@asyncapi/react-component`, `@dxscript/dxlink-dxscript-editor`) and one removed (`@dxscript/js-samples`). The lockfile was left alone deliberately: `@dxfeed/*` and `@dxscript/*` resolve from dxFeed's internal Artifactory, which the authoring environment could not reach, so a regenerated lockfile would have rewritten those entries to public URLs. **Run `pnpm install` to refresh it.**                        |
+| 2   | **Runtime check of the editor and chart paths**  | See §5.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 3   | Playwright E2E + mock `DXLinkWebSocketConnector` | PLAN.md phase 8 / risk 6. Unit coverage is now 78 tests, but there is no end-to-end pass.                                                                                                                                                                                                                                                                                                                                                              |
+| 4   | CI/CD, deploy, bundle budget                     | No CI config exists anywhere in this repository, so "mirror the dxlink-docs pipeline" needs the pipeline's actual location identified first — it is not in-tree.                                                                                                                                                                                                                                                                                       |
+| 5   | Parity sign-off against a live server            | Walk §2 against the dev WS endpoint; dark-mode and responsive QA.                                                                                                                                                                                                                                                                                                                                                                                      |
+| 6   | Retire `dxlink-docs`                             | Once 1–5 are done: repoint the deploy, then remove the package from `pnpm-workspace.yaml`, drop the root `docs` script, delete the directory, and drop its entry from the changeset `ignore` list. That also removes `@dxfeed/ui-kit`, `styled-components`, `react-is`, the `rehype-*`/`remark-*`/`unified` chain and the React 18 type packages from the lockfile. Update `.claude/launch.json` and the root `README.md` if they still point at docs. |
 
 ---
 
@@ -162,7 +170,7 @@ the built output confirmed to emit the spec asset and the separate lazy chunk.
 
 ## 6. Open decisions
 
-**D1 — dxScript editor.** *Resolved: the first-party editor.* PLAN.md §2 had chosen
+**D1 — dxScript editor.** _Resolved: the first-party editor._ PLAN.md §2 had chosen
 CodeMirror 6 and accepted losing dxScript completion and diagnostics; that trade-off was
 reversed in favour of parity.
 
