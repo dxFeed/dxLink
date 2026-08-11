@@ -359,6 +359,14 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
 
   const errorCount = entries.filter((e) => e.state !== undefined && !e.state.enabled).length
 
+  // The parameter controls sit with the parameters they act on, and only exist when there
+  // are some. Inputs are declared by the compiled state, so this stays false until the
+  // scripts compile — and for indicator sets that take no inputs at all, such as the
+  // editor's default sample, the controls never appear.
+  const hasInputs = entries.some(
+    ({ state }) => state !== undefined && state.enabled && (state.inParameters?.length ?? 0) > 0
+  )
+
   const setParam = (indicator: string, name: string, value: ParameterValue) =>
     setValues((prev) => ({ ...prev, [indicator]: { ...(prev[indicator] ?? {}), [name]: value } }))
 
@@ -470,32 +478,8 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
               Apply
             </Button>
           </Box>
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ mt: 1.5, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
-          >
-            <Button
-              variant="outlined"
-              startIcon={<TuneIcon />}
-              onClick={applyParameters}
-              disabled={subscription === null}
-            >
-              Apply parameters
-            </Button>
-            <Button
-              color="inherit"
-              startIcon={<RestartAltIcon />}
-              onClick={reset}
-              disabled={subscription === null}
-            >
-              Reset
-            </Button>
-          </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            <b>Apply</b> re-subscribes and reloads the candles. <b>Apply parameters</b> recomputes
-            the indicators against the candles already loaded. <b>Reset</b> drops the subscription
-            and clears the chart, leaving the channel open.
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: 'block' }}>
+            <b>Apply</b> re-subscribes and reloads the candles.
           </Typography>
         </Box>
 
@@ -539,6 +523,38 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
               />
             ))}
           </Stack>
+
+          {hasInputs && (
+            <>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ mt: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+              >
+                <Button
+                  variant="outlined"
+                  startIcon={<TuneIcon />}
+                  onClick={applyParameters}
+                  disabled={subscription === null}
+                >
+                  Apply parameters
+                </Button>
+                <Button
+                  color="inherit"
+                  startIcon={<RestartAltIcon />}
+                  onClick={reset}
+                  disabled={subscription === null}
+                >
+                  Reset
+                </Button>
+              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                <b>Apply parameters</b> recomputes the indicators against the candles already
+                loaded. <b>Reset</b> drops the subscription and clears the chart, leaving the
+                channel open.
+              </Typography>
+            </>
+          )}
         </Box>
 
         {chartError !== null && (

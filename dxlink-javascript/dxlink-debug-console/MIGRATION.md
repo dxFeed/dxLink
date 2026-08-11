@@ -93,7 +93,7 @@ deploy repoint, now urgent because of the retirement, and an automated end-to-en
 | 6 | Documentation links dropped | kb.dxfeed.com event types and order sources, candle symbols, currentmillis.com — back on the feed, candle-chart and IndiChart forms |
 | 7 | Grid columns sorted alphabetically | Ordered by the negotiated `FeedConfig.eventFields`; received-but-unnegotiated fields appended so nothing is hidden |
 | 8 | Script errors showed type, message, line only | All six categories, RUNTIME stack frames, internal failures, and unrecognised types shown rather than swallowed |
-| 9 | Parameters only applied by re-subscribing, refetching all candles | `Apply parameters` calls `updateIndicatorsParameters`; `Reset` clears without closing the channel |
+| 9 | Parameters only applied by re-subscribing, refetching all candles | `Apply parameters` calls `updateIndicatorsParameters`; `Reset` clears without closing the channel. Both sit under the indicator panels, beside the parameters they act on, and appear only when an indicator declares inputs |
 
 Also closed alongside these:
 

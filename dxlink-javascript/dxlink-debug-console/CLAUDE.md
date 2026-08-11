@@ -73,7 +73,12 @@ sequence, timeNanoPart, bid*, ask*`. Alphabetical order means the negotiated ord
 Open an IndiChart channel. The editor seeds itself with its first bundled sample, which
 compiles as-is.
 
-- **Apply** — candles load and the chart draws.
+- **Apply** — candles load and the chart draws. It lives with the symbol, which is what it
+  acts on.
+- **Apply parameters (#9) and Reset** sit **below the indicator panels**, with the
+  parameters they act on, and are rendered only when some indicator declares inputs. The
+  editor's default sample declares none, so with it these two buttons are legitimately
+  absent — paste the script below to see them.
 - **Apply parameters (#9)** — indicators recompute with **no candle reload**. The chart
   must not blank or reset. If the loading overlay reappears, it re-subscribed instead of
   calling `updateIndicatorsParameters`.
