@@ -16,8 +16,8 @@
   "dependencies": {
     "@asyncapi/react-component": "2.5.0",
     "@dxfeed/dxlink-api": "workspace:*",
-    "@dxscript/dxlink-dxcharts-lite": "1.13.0-SNAPSHOT-2",
-    "@dxscript/dxlink-dxscript-editor": "1.12.0-SNAPSHOT",
+    "@dxscript/dxlink-dxcharts-lite": "2.0.0-SNAPSHOT-20260629-142303",
+    "@dxscript/dxlink-dxscript-editor": "2.0.0-SNAPSHOT-20260629-142303",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@fontsource-variable/inter": "^5.2.8",

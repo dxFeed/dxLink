@@ -87,11 +87,11 @@ importers:
         specifier: workspace:*
         version: link:../dxlink-api
       '@dxscript/dxlink-dxcharts-lite':
-        specifier: 1.13.0-SNAPSHOT-2
-        version: 1.13.0-SNAPSHOT-2(@dxfeed/dxlink-indichart@0.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rxjs@7.8.2)
+        specifier: 2.0.0-SNAPSHOT-20260629-142303
+        version: 2.0.0-SNAPSHOT-20260629-142303(@dxfeed/dxlink-indichart@0.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rxjs@7.8.2)
       '@dxscript/dxlink-dxscript-editor':
-        specifier: 1.12.0-SNAPSHOT
-        version: 1.12.0-SNAPSHOT(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: 2.0.0-SNAPSHOT-20260629-142303
+        version: 2.0.0-SNAPSHOT-20260629-142303(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
@@ -405,20 +405,20 @@ packages:
   '@dxfeed/dxlink-indichart@0.9.0':
     resolution: {integrity: sha512-v81fuveawcki3m6AA8HqIU6dLlpw8KXeMie7ds7gWaa8PmFHQ1xcl68/ejTHJ9kPGycHoBY64E2zvPKQc+cPHw==}
 
-  '@dxscript/dxlink-dxcharts-lite@1.13.0-SNAPSHOT-2':
-    resolution: {integrity: sha512-1/RSpG2Ys0hi0/8BDNtmuHx1mgnIbmyhxyf4ZVZlcbfZcpPbtVvUk0xUqz9GyqdApuhWC5IxUtD9K4tuY1+Q+g==}
+  '@dxscript/dxlink-dxcharts-lite@2.0.0-SNAPSHOT-20260629-142303':
+    resolution: {integrity: sha512-m3+VN80ojgqC6W2VUMGAy8qzwoj3wTrCw7M65psis7Yf3TaytYoCCNzg6XNfscXc1fisCY3ZwGkr3GvrD4ykKA==}
     peerDependencies:
       '@dxfeed/dxlink-indichart': ^0.9.0
       react: '>=18'
       react-dom: '>=18'
 
-  '@dxscript/dxlink-dxscript-editor@1.12.0-SNAPSHOT':
-    resolution: {integrity: sha512-jnR5qacdh5Gt4ieNUvRuvkzxt3rUbXGqLfcJNP9t7UEJ9AhQAD6U/XAigRefyWo9HsIRYhQ1Khce/NlD2c/6cw==}
+  '@dxscript/dxlink-dxscript-editor@2.0.0-SNAPSHOT-20260629-142303':
+    resolution: {integrity: sha512-MSSKOyTIoQivBN+ZAeaPCTaZJCOo1Twvhl6SM6/y1XJfmCi8Hbb1QrkGJdSsowDeHdsdgmKfVBBu3h2uJpJrMA==}
     peerDependencies:
       react: '>=18'
 
-  '@dxscript/js-samples@1.10.0':
-    resolution: {integrity: sha512-o0DjsNhrHRHIAKTjtCGKDnav6kkgllcH+iQ5ZQUSehMm2zImIFYHmZFjdsPaShuPy8Ja1xzvzHoPLKmZ+sABaQ==}
+  '@dxscript/js-samples@2.0.0-SNAPSHOT-20260629-142303':
+    resolution: {integrity: sha512-15E45yLhQJ05JUpF4ykCaVZ3RrxbnLKuxU7UJarZogClvjLl6pry3pQmSF9/KCNfjtxS+mEP3740H1EZbizT6w==}
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -3941,7 +3941,7 @@ snapshots:
     dependencies:
       '@dxfeed/dxlink-core': 0.9.0
 
-  '@dxscript/dxlink-dxcharts-lite@1.13.0-SNAPSHOT-2(@dxfeed/dxlink-indichart@0.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rxjs@7.8.2)':
+  '@dxscript/dxlink-dxcharts-lite@2.0.0-SNAPSHOT-20260629-142303(@dxfeed/dxlink-indichart@0.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rxjs@7.8.2)':
     dependencies:
       '@devexperts/dxcharts-lite': 2.7.33(rxjs@7.8.2)
       '@dxfeed/dxlink-indichart': 0.9.0
@@ -3950,16 +3950,16 @@ snapshots:
     transitivePeerDependencies:
       - rxjs
 
-  '@dxscript/dxlink-dxscript-editor@1.12.0-SNAPSHOT(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@dxscript/dxlink-dxscript-editor@2.0.0-SNAPSHOT-20260629-142303(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@dxscript/js-samples': 1.10.0
+      '@dxscript/js-samples': 2.0.0-SNAPSHOT-20260629-142303
       ace-builds: 1.35.4
       react: 19.2.8
       react-ace: 12.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     transitivePeerDependencies:
       - react-dom
 
-  '@dxscript/js-samples@1.10.0': {}
+  '@dxscript/js-samples@2.0.0-SNAPSHOT-20260629-142303': {}
 
   '@emnapi/core@1.10.0':
     dependencies:
