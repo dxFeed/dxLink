@@ -6,6 +6,7 @@ packages:
   - dxlink-dom
   - dxlink-indichart
   - dxlink-rpc
+  - dxlink-protobuf-es
   - dxlink-debug-console
 # esbuild and unrs-resolver are native modules that need their install scripts.
 # The other flagged packages (protobufjs, @scarf/scarf) don't, so skip them.

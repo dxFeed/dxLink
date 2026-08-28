@@ -62,6 +62,9 @@ importers:
       '@dxfeed/dxlink-indichart':
         specifier: workspace:*
         version: link:../dxlink-indichart
+      '@dxfeed/dxlink-protobuf-es':
+        specifier: workspace:*
+        version: link:../dxlink-protobuf-es
       '@dxfeed/dxlink-rpc':
         specifier: workspace:*
         version: link:../dxlink-rpc
@@ -177,6 +180,22 @@ importers:
       '@dxfeed/dxlink-core':
         specifier: workspace:*
         version: link:../dxlink-core
+
+  dxlink-protobuf-es:
+    dependencies:
+      '@dxfeed/dxlink-core':
+        specifier: workspace:*
+        version: link:../dxlink-core
+      '@dxfeed/dxlink-rpc':
+        specifier: workspace:*
+        version: link:../dxlink-rpc
+    devDependencies:
+      '@bufbuild/protobuf':
+        specifier: ^2.12.0
+        version: 2.14.0
+      rxjs:
+        specifier: ^7.5.2
+        version: 7.8.2
 
   dxlink-rpc:
     dependencies:
@@ -302,6 +321,9 @@ packages:
   '@bramus/specificity@2.4.2':
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
+
+  '@bufbuild/protobuf@2.14.0':
+    resolution: {integrity: sha512-C3UGsiCwSprE2NKIIFA3hCDlpXTMCAXRZuEVp88L1GY36Y41+rYL5fryE+nOFhp4p4JPQvdV8PQ4DWgHgeTE+w==}
 
   '@changesets/apply-release-plan@7.1.1':
     resolution: {integrity: sha512-9qPCm/rLx/xoOFXIHGB229+4GOL76S4MC+7tyOuTsR6+1jYlfFDQORdvwR5hDA6y4FL2BPt3qpbcQIS+dW85LA==}
@@ -3761,6 +3783,8 @@ snapshots:
   '@bramus/specificity@2.4.2':
     dependencies:
       css-tree: 3.2.1
+
+  '@bufbuild/protobuf@2.14.0': {}
 
   '@changesets/apply-release-plan@7.1.1':
     dependencies:

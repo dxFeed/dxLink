@@ -1,9 +1,9 @@
 {
-  "name": "@dxfeed/dxlink-api",
+  "name": "@dxfeed/dxlink-protobuf-es",
   "version": "0.9.0",
   "private": false,
   "sideEffects": false,
-  "description": "dxLink API provides access to market data from dxFeed services",
+  "description": "Binds protobuf-es service descriptors to the dxLink RPC transport, producing typed rxjs clients",
   "source": "src/index.ts",
   "exports": {
     ".": {
@@ -21,23 +21,24 @@
   "module": "build/index.mjs",
   "types": "build/index.d.ts",
   "scripts": {
-    "start": "vite ./demo",
-    "prepublishOnly": "pnpm run build",
+    "prepublishOnly": "pnpm run build && pnpm run test",
     "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean --out-dir build",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dxfeed/dxlink-core": "workspace:*",
-    "@dxfeed/dxlink-websocket-client": "workspace:*",
-    "@dxfeed/dxlink-feed": "workspace:*",
-    "@dxfeed/dxlink-dom": "workspace:*",
-    "@dxfeed/dxlink-indichart": "workspace:*",
-    "@dxfeed/dxlink-rpc": "workspace:*",
-    "@dxfeed/dxlink-protobuf-es": "workspace:*"
+    "@dxfeed/dxlink-rpc": "workspace:*"
+  },
+  "peerDependencies": {
+    "@bufbuild/protobuf": "^2.12.0",
+    "rxjs": ">=7.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^6.0.2",
-    "vite": "^8.0.16"
+    "@bufbuild/protobuf": "^2.12.0",
+    "rxjs": "^7.5.2"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [
@@ -55,23 +56,19 @@
     "url": "https://github.com/dxfeed/dxlink/issues"
   },
   "homepage": "https://dxfeed.com/",
+  "keywords": [
+    "api",
+    "rpc",
+    "client",
+    "protobuf",
+    "protobuf-es",
+    "rxjs",
+    "observable",
+    "dxfeed",
+    "dxlink"
+  ],
   "files": [
     "/build",
     "/package.json"
-  ],
-  "keywords": [
-    "api",
-    "feed",
-    "client",
-    "financial-data",
-    "market-data",
-    "market-data-feeds",
-    "market-api",
-    "stock-market",
-    "stock-price-data",
-    "real-time-data",
-    "historical-data",
-    "dxfeed",
-    "dxlink"
   ]
 }
