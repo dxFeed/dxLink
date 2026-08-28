@@ -131,6 +131,7 @@ dxlink-debug-console/
       dom/         dom-view-model.ts (+descriptor) · dom-open-form.tsx · dom-ladder.tsx
       candles/     candles-view-model.ts (+descriptor) · candles-subscription-form.tsx · candles-chart.tsx   # ports DXLinkCandles + SortedList
       indichart/   indichart-view-model.ts (+descriptor) · script-editor.tsx · parameter-form.tsx · indichart-chart.tsx · script-errors.tsx   # ports ChartHolder
+      rpc/         rpc-view-model.ts · rpc-channel-request.tsx · rpc-channel.tsx · descriptors.ts   # binds protobuf descriptors via @dxfeed/dxlink-protobuf-es
     shared/                      # cross-cutting ONLY
       view-model.ts              # ViewModel base + useVM(vm, selector) hook
       components/                # genuine gaps only: JsonView, CodeMirrorEditor
@@ -139,7 +140,7 @@ dxlink-debug-console/
   e2e/                           # Playwright specs   (unit tests colocated as *.test.ts)
 ```
 
-Channel-feature dependency direction (acyclic): `connection → channels → {feed, dom, candles, indichart} → shared`.
+Channel-feature dependency direction (acyclic): `connection → channels → {feed, dom, candles, indichart, rpc} → shared`.
 Each channel feature exports a descriptor `{ kind, service, create(client, params) }`; `channel-registry.ts`
 aggregates them so `ConnectionViewModel` opens channels without hard-importing each feature. Adding a channel
 kind = new feature folder + register its descriptor.

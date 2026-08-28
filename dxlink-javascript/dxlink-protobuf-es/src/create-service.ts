@@ -18,7 +18,7 @@ const bindService = (
   service: DescService,
   options: DXLinkServiceOptions
 ): DXLinkDynamicServiceClient => {
-  const { logLevel, jsonReadOptions, jsonWriteOptions } = options
+  const { logLevel, jsonReadOptions, jsonWriteOptions, skipUnsupportedMethods } = options
 
   // `DxLinkRpcService` fills in its own default log level, so pass the key only when it was set.
   const rpc = new DxLinkRpcService(
@@ -69,6 +69,9 @@ const bindService = (
         break
       }
       default:
+        if (skipUnsupportedMethods === true) {
+          break
+        }
         throw new DXLinkUnsupportedMethodKindError(service.typeName, method.name, method.methodKind)
     }
   }
@@ -100,7 +103,8 @@ const bindService = (
  * @param client - dxLink client that owns the channels.
  * @param service - Generated `GenService` descriptor, as emitted by `protoc-gen-es`.
  * @param options - Log level and protobuf-JSON options.
- * @throws {DXLinkUnsupportedMethodKindError} If the service declares a client-streaming method.
+ * @throws {DXLinkUnsupportedMethodKindError} If the service declares a client-streaming method
+ * and `skipUnsupportedMethods` is not set.
  * @see {@link createDXLinkDynamicService} for descriptors resolved at runtime.
  */
 export const createDXLinkService = <S extends GenServiceMethods>(
@@ -131,7 +135,8 @@ export const createDXLinkService = <S extends GenServiceMethods>(
  * @param client - dxLink client that owns the channels.
  * @param service - Service descriptor resolved from a registry.
  * @param options - Log level and protobuf-JSON options.
- * @throws {DXLinkUnsupportedMethodKindError} If the service declares a client-streaming method.
+ * @throws {DXLinkUnsupportedMethodKindError} If the service declares a client-streaming method
+ * and `skipUnsupportedMethods` is not set.
  */
 export const createDXLinkDynamicService = (
   client: DXLinkClient,

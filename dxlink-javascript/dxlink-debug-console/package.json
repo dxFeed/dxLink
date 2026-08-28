@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@asyncapi/react-component": "2.5.0",
+    "@bufbuild/protobuf": "^2.12.0",
     "@dxfeed/dxlink-api": "workspace:*",
+    "@dxfeed/dxlink-protobuf-es": "workspace:*",
     "@dxscript/dxlink-dxcharts-lite": "2.0.0-SNAPSHOT-20260629-142303",
     "@dxscript/dxlink-dxscript-editor": "2.0.0-SNAPSHOT-20260629-142303",
     "@emotion/react": "^11.14.0",
@@ -30,6 +32,7 @@
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.77.0",
     "react-router-dom": "^7.16.0",
+    "rxjs": "^7.8.2",
     "zod": "^4.4.0",
     "zustand": "^5.0.0"
   },

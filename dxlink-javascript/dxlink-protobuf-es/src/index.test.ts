@@ -68,8 +68,10 @@ const fileDescriptorSet = create(FileDescriptorSetSchema, {
           ],
         },
         {
-          name: 'ClientStreamingService',
+          // A service the wire can carry only in part — one supported method, one not.
+          name: 'MixedService',
           method: [
+            { name: 'Echo', inputType: '.test.v1.Ping', outputType: '.test.v1.Pong' },
             {
               name: 'Collect',
               inputType: '.test.v1.Ping',
@@ -91,17 +93,17 @@ const getService = (typeName: string): DescService => {
   return service
 }
 
-export const TestService = getService('test.v1.TestService')
-export const ClientStreamingService = getService('test.v1.ClientStreamingService')
+const TestService = getService('test.v1.TestService')
+const MixedService = getService('test.v1.MixedService')
 
-export type Ping = Message<'test.v1.Ping'> & { value: string }
-export type Pong = Message<'test.v1.Pong'> & { value: string }
+type Ping = Message<'test.v1.Ping'> & { value: string }
+type Pong = Message<'test.v1.Pong'> & { value: string }
 
 /**
  * {@link TestService} typed the way `protoc-gen-es` would type it, so the type-level mapping from
  * method kinds to client signatures can be asserted without running codegen in the tests.
  */
-export const TypedTestService = TestService as unknown as GenService<{
+const TypedTestService = TestService as unknown as GenService<{
   unary: { methodKind: 'unary'; input: GenMessage<Ping>; output: GenMessage<Pong> }
   serverStream: {
     methodKind: 'server_streaming'
@@ -297,9 +299,19 @@ test('rejects a bidirectional call that is not given a stream of requests', () =
 test('rejects client-streaming methods while binding the service', () => {
   const mock = createMockClient()
 
-  expect(() => createDXLinkDynamicService(mock.client, ClientStreamingService)).toThrow(
+  expect(() => createDXLinkDynamicService(mock.client, MixedService)).toThrow(
     DXLinkUnsupportedMethodKindError
   )
+})
+
+test('leaves unsupported methods out of the client when asked to skip them', () => {
+  const mock = createMockClient()
+
+  const service = createDXLinkDynamicService(mock.client, MixedService, {
+    skipUnsupportedMethods: true,
+  })
+
+  expect(Object.keys(service)).toEqual(['echo'])
 })
 
 test('forwards the retry option to the channel', () => {

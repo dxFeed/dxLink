@@ -1,7 +1,8 @@
 # dxLink Debug Console
 
 A protocol debug console for dxLink: open a WebSocket connection, authorize, open FEED,
-DOM and INDICHART channels, and inspect what the protocol actually sends back. Also
+DOM and INDICHART channels, and inspect what the protocol actually sends back. Point it at
+a set of protobuf service definitions and it will call any RPC method in them too. Also
 renders the dxLink AsyncAPI specification.
 
 This is the modern rebuild of the console that shipped inside `@dxfeed/dxlink-docs`. It
@@ -52,7 +53,7 @@ src/
   app/         providers, theme, app shell, routes
   pages/       route-level compositions (console, protocol)
   features/    one slice per concern; ViewModel co-located with its views
-    connection/  auth/  errors/  channels/  feed/  dom/  indichart/
+    connection/  auth/  errors/  channels/  feed/  dom/  indichart/  rpc/
   shared/      view-model helpers, cross-cutting components and lib
 ```
 

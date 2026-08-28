@@ -86,9 +86,15 @@ importers:
       '@asyncapi/react-component':
         specifier: 2.5.0
         version: 2.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@bufbuild/protobuf':
+        specifier: ^2.12.0
+        version: 2.14.0
       '@dxfeed/dxlink-api':
         specifier: workspace:*
         version: link:../dxlink-api
+      '@dxfeed/dxlink-protobuf-es':
+        specifier: workspace:*
+        version: link:../dxlink-protobuf-es
       '@dxscript/dxlink-dxcharts-lite':
         specifier: 2.0.0-SNAPSHOT-20260629-142303
         version: 2.0.0-SNAPSHOT-20260629-142303(@dxfeed/dxlink-indichart@0.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rxjs@7.8.2)
@@ -131,6 +137,9 @@ importers:
       react-router-dom:
         specifier: ^7.16.0
         version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
       zod:
         specifier: ^4.4.0
         version: 4.4.3

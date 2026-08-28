@@ -78,3 +78,7 @@ Client-streaming methods are rejected with `DXLinkUnsupportedMethodKindError` wh
 bound: the dxLink v1.0 wire has no graceful request half-close, so the server is never told that
 the requests ended and cannot know when to answer. Bidirectional streaming does not need that
 signal — it is a long-lived duplex subscription.
+
+Pass `{ skipUnsupportedMethods: true }` to leave those methods out of the client instead of
+throwing. That suits a descriptor picked at runtime, where one unsupported method should not make
+the rest of the service unreachable.

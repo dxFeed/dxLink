@@ -26,6 +26,15 @@ export interface DXLinkServiceOptions {
    */
   logLevel?: DXLinkLogLevel
   /**
+   * Leave methods the dxLink wire cannot carry out of the client instead of throwing.
+   *
+   * Binding a descriptor chosen at runtime — in a debug console, say — should not fail
+   * outright because one method of the service is client-streaming; the rest are still
+   * callable. Skipped methods are simply absent from the returned client.
+   * @default false
+   */
+  skipUnsupportedMethods?: boolean
+  /**
    * Options passed to `toJson` when encoding requests.
    *
    * The defaults produce canonical protobuf-JSON, which is what the server's `dxlink-ws-json`

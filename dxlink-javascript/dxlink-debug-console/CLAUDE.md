@@ -19,6 +19,7 @@ service, change the URL and reconnect.
 | ----------------------- | ------------------------------------ |
 | FEED, DOM, candle chart | `wss://dxlink-md-ws-dev.dxkube.com`  |
 | **INDICHART**           | `wss://dxlink-dxs-ws-dev.dxkube.com` |
+| **RPC**                 | whichever endpoint hosts the service |
 
 The market-data relay answers an INDICHART channel request with
 `BAD_ACTION — Unsupported service: 'INDICHART'`. That is the server declining, not a
@@ -117,6 +118,39 @@ For **script errors**, open a channel whose script calls something undefined ins
 `onTick`. Expect the category title (`Runtime error`, not a blanket "compilation error"),
 the message, `In script '1' at line N, column N`, and a **stack trace**. The collapsed
 summary line must name the same category as the alert below it.
+
+### RPC channels
+
+The RPC channel calls a method of a protobuf service. It has no built-in service list: it
+is given a `FileDescriptorSet` and builds the registry in the browser, so it needs one to
+walk at all. Any will do — an endpoint that serves one, or a local file from
+`buf build -o descriptors.binpb`. Both the binary format and protobuf-JSON are accepted,
+told apart by the first non-whitespace byte.
+
+- **The pickers come from the descriptor set.** After Load, the dialog reports how many
+  services it found, and the service and method pickers fill from it. Each method carries
+  its dxLink interaction model — `REQUEST_RESPONSE`, `REQUEST_STREAM`, `STREAM_STREAM` —
+  and a **client-streaming method is listed but not selectable**, tagged `STREAM_RESPONSE`.
+  That is the wire's missing half-close, not a console bug; `@dxfeed/dxlink-protobuf-es`
+  refuses those methods too.
+- **The request form is generated, not written.** Picking a method rebuilds the fields from
+  `method.input`. What the controls write is canonical protobuf-JSON, so a 64-bit field is
+  a **string** (`"quantity": "10"`) and an enum is its **value name** (`"side": "BUY"`) —
+  numbers there would mean the template was built from the ECMAScript shapes instead. The
+  Request JSON box below edits the same value and is what is sent.
+- **A bad request is caught before the channel opens.** Rename a field in the JSON box to
+  something the message does not declare: an error names the field and `Open channel` goes
+  disabled. A silently dropped typo is the failure this form exists to prevent.
+- **Send another request** appears only for `STREAM_STREAM`, and is disabled once the call
+  completes or fails — there is no channel left to send on.
+- **Sent must show 1 for a unary call**, not 2. The card's message log is reset by
+  `RpcViewModel.start()` for exactly this reason: StrictMode mounts, unmounts and remounts
+  the view, and the store outlives that cycle.
+
+None of the dev relays implement an RPC service, so the call is expected to end in
+`BAD_ACTION — Unsupported service: '<name>'` on the channel's own card. That is the whole
+path proven — descriptor to registry to picker to form to `CHANNEL_REQUEST` on the wire —
+short of a server that answers.
 
 ### Theme and width
 
