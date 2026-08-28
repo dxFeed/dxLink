@@ -1,10 +1,12 @@
-import { create, createFileRegistry, type DescService, type Message } from '@bufbuild/protobuf'
-import type { GenMessage, GenService } from '@bufbuild/protobuf/codegenv2'
+import { readFileSync } from 'node:fs'
+
 import {
-  FieldDescriptorProto_Label,
-  FieldDescriptorProto_Type,
-  FileDescriptorSetSchema,
-} from '@bufbuild/protobuf/wkt'
+  createFileRegistry,
+  type DescService,
+  fromBinary,
+  type MessageInitShape,
+} from '@bufbuild/protobuf'
+import { FileDescriptorSetSchema } from '@bufbuild/protobuf/wkt'
 import type {
   DXLinkChannel,
   DXLinkChannelMessage,
@@ -18,74 +20,35 @@ import { type Observable, Subject } from 'rxjs'
 import { expect, test } from 'vitest'
 
 import {
+  Flavour,
+  MixedService,
+  NamingService,
+  type PingSchema,
+  type Pong,
+  TestService,
+} from './gen/test/gen/v1/test_service_pb'
+
+import {
   createDXLinkDynamicService,
   createDXLinkService,
+  type DXLinkServiceClient,
   DXLinkUnsupportedMethodKindError,
 } from './'
 
 // --- Descriptors ---
 //
-// Built the way a runtime consumer would build them — from a `FileDescriptorSet` rather than from
-// generated code — so the binding is exercised against real `DescService` / `DescMessage` objects
-// without a codegen step.
+// Two views of one fixture, `proto/test/gen/v1/test_service.proto`. The generated code under
+// `src/gen/test/` is what a consumer with a codegen step binds; `src/gen/test_service.binpb` is
+// the `FileDescriptorSet` buf builds from the same file, which is what a consumer that resolves
+// descriptors from a server gets — the debug console, for one. Both must bind the same way, and
+// generating them from one source is what makes that comparison mean anything.
 
-const stringField = (name: string) => ({
-  name,
-  jsonName: name,
-  number: 1,
-  label: FieldDescriptorProto_Label.OPTIONAL,
-  type: FieldDescriptorProto_Type.STRING,
-})
+const descriptorSet = fromBinary(
+  FileDescriptorSetSchema,
+  readFileSync(new URL('./gen/test_service.binpb', import.meta.url))
+)
 
-const fileDescriptorSet = create(FileDescriptorSetSchema, {
-  file: [
-    {
-      name: 'test/v1/test.proto',
-      package: 'test.v1',
-      syntax: 'proto3',
-      messageType: [
-        { name: 'Ping', field: [stringField('value')] },
-        { name: 'Pong', field: [stringField('value')] },
-      ],
-      service: [
-        {
-          name: 'TestService',
-          method: [
-            { name: 'Unary', inputType: '.test.v1.Ping', outputType: '.test.v1.Pong' },
-            {
-              name: 'ServerStream',
-              inputType: '.test.v1.Ping',
-              outputType: '.test.v1.Pong',
-              serverStreaming: true,
-            },
-            {
-              name: 'BidiStream',
-              inputType: '.test.v1.Ping',
-              outputType: '.test.v1.Pong',
-              clientStreaming: true,
-              serverStreaming: true,
-            },
-          ],
-        },
-        {
-          // A service the wire can carry only in part — one supported method, one not.
-          name: 'MixedService',
-          method: [
-            { name: 'Echo', inputType: '.test.v1.Ping', outputType: '.test.v1.Pong' },
-            {
-              name: 'Collect',
-              inputType: '.test.v1.Ping',
-              outputType: '.test.v1.Pong',
-              clientStreaming: true,
-            },
-          ],
-        },
-      ],
-    },
-  ],
-})
-
-const registry = createFileRegistry(fileDescriptorSet)
+const registry = createFileRegistry(descriptorSet)
 
 const getService = (typeName: string): DescService => {
   const service = registry.getService(typeName)
@@ -93,25 +56,20 @@ const getService = (typeName: string): DescService => {
   return service
 }
 
-const TestService = getService('test.v1.TestService')
-const MixedService = getService('test.v1.MixedService')
-
-type Ping = Message<'test.v1.Ping'> & { value: string }
-type Pong = Message<'test.v1.Pong'> & { value: string }
+const RuntimeTestService = getService('test.gen.v1.TestService')
+const RuntimeMixedService = getService('test.gen.v1.MixedService')
 
 /**
- * {@link TestService} typed the way `protoc-gen-es` would type it, so the type-level mapping from
- * method kinds to client signatures can be asserted without running codegen in the tests.
+ * A decoded `Pong` carrying only `value` — proto3 fills the rest of the message with defaults,
+ * whether the descriptor came from generated code or from the descriptor set.
  */
-const TypedTestService = TestService as unknown as GenService<{
-  unary: { methodKind: 'unary'; input: GenMessage<Ping>; output: GenMessage<Pong> }
-  serverStream: {
-    methodKind: 'server_streaming'
-    input: GenMessage<Ping>
-    output: GenMessage<Pong>
-  }
-  bidiStream: { methodKind: 'bidi_streaming'; input: GenMessage<Ping>; output: GenMessage<Pong> }
-}>
+const pong = (value: string) => ({
+  $typeName: 'test.gen.v1.Pong',
+  value,
+  flavour: Flavour.UNSPECIFIED,
+  nested: [],
+  extra: {},
+})
 
 // --- Mock client ---
 
@@ -205,18 +163,18 @@ const payloadsOf = (channel: MockChannel) => channel.sent.map((message) => messa
 test('binds one client method per rpc, keyed by its ECMAScript name', () => {
   const mock = createMockClient()
 
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
 
   expect(Object.keys(service)).toEqual(['unary', 'serverStream', 'bidiStream'])
 })
 
 test('opens a channel per call, named by service type name and proto method name', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
 
   const sub = service.unary!({ value: 'ping' }).subscribe()
 
-  expect(mock.lastChannel.service).toBe('test.v1.TestService')
+  expect(mock.lastChannel.service).toBe('test.gen.v1.TestService')
   expect(mock.lastChannel.parameters['methodName']).toBe('Unary')
 
   sub.unsubscribe()
@@ -224,7 +182,7 @@ test('opens a channel per call, named by service type name and proto method name
 
 test('encodes unary requests as protobuf-JSON and decodes the response', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
   const received: unknown[] = []
   let completed = false
 
@@ -241,7 +199,7 @@ test('encodes unary requests as protobuf-JSON and decodes the response', () => {
   mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 'pong' } })
   mock.lastChannel.simulateClose()
 
-  expect(received).toEqual([{ $typeName: 'test.v1.Pong', value: 'pong' }])
+  expect(received).toEqual([pong('pong')])
   expect(completed, 'unary call completes when the server closes the channel').toBe(true)
 
   sub.unsubscribe()
@@ -249,7 +207,7 @@ test('encodes unary requests as protobuf-JSON and decodes the response', () => {
 
 test('decodes every response of a server-streaming call', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
   const received: unknown[] = []
 
   const sub = service.serverStream!({ value: 'ping' }).subscribe({
@@ -260,17 +218,14 @@ test('decodes every response of a server-streaming call', () => {
   mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 'one' } })
   mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 'two' } })
 
-  expect(received).toEqual([
-    { $typeName: 'test.v1.Pong', value: 'one' },
-    { $typeName: 'test.v1.Pong', value: 'two' },
-  ])
+  expect(received).toEqual([pong('one'), pong('two')])
 
   sub.unsubscribe()
 })
 
 test('encodes each request of a bidirectional call', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
   const requests = new Subject<Record<string, unknown>>()
   const received: unknown[] = []
 
@@ -284,14 +239,14 @@ test('encodes each request of a bidirectional call', () => {
   mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 'reply' } })
 
   expect(payloadsOf(mock.lastChannel)).toEqual([{ value: 'first' }, { value: 'second' }])
-  expect(received).toEqual([{ $typeName: 'test.v1.Pong', value: 'reply' }])
+  expect(received).toEqual([pong('reply')])
 
   sub.unsubscribe()
 })
 
 test('rejects a bidirectional call that is not given a stream of requests', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
 
   expect(() => service.bidiStream!({ value: 'ping' })).toThrow(/expects an Observable/)
 })
@@ -299,7 +254,7 @@ test('rejects a bidirectional call that is not given a stream of requests', () =
 test('rejects client-streaming methods while binding the service', () => {
   const mock = createMockClient()
 
-  expect(() => createDXLinkDynamicService(mock.client, MixedService)).toThrow(
+  expect(() => createDXLinkDynamicService(mock.client, RuntimeMixedService)).toThrow(
     DXLinkUnsupportedMethodKindError
   )
 })
@@ -307,7 +262,7 @@ test('rejects client-streaming methods while binding the service', () => {
 test('leaves unsupported methods out of the client when asked to skip them', () => {
   const mock = createMockClient()
 
-  const service = createDXLinkDynamicService(mock.client, MixedService, {
+  const service = createDXLinkDynamicService(mock.client, RuntimeMixedService, {
     skipUnsupportedMethods: true,
   })
 
@@ -316,7 +271,7 @@ test('leaves unsupported methods out of the client when asked to skip them', () 
 
 test('forwards the retry option to the channel', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
 
   const withRetry = service.unary!({ value: 'ping' }, { retry: true }).subscribe()
   expect(mock.lastChannel.options).toEqual({ reconnect: true })
@@ -329,7 +284,7 @@ test('forwards the retry option to the channel', () => {
 
 test('reports which method failed when a response cannot be decoded', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
   let error: unknown
 
   const sub = service.serverStream!({ value: 'ping' }).subscribe({
@@ -340,35 +295,152 @@ test('reports which method failed when a response cannot be decoded', () => {
   mock.lastChannel.simulateOpen()
   mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 42 } })
 
-  expect(String(error)).toContain('test.v1.TestService/ServerStream')
+  expect(String(error)).toContain('test.gen.v1.TestService/ServerStream')
 
   sub.unsubscribe()
 })
 
 test('reports which method failed when a request cannot be encoded', () => {
   const mock = createMockClient()
-  const service = createDXLinkDynamicService(mock.client, TestService)
+  const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
 
-  expect(() => service.unary!({ value: 42 })).toThrow(/test\.v1\.TestService\/Unary/)
+  expect(() => service.unary!({ value: 42 })).toThrow(/test\.gen\.v1\.TestService\/Unary/)
 })
 
-test('infers request and response types from a generated service descriptor', () => {
-  const mock = createMockClient()
-  const service = createDXLinkService(mock.client, TypedTestService)
+// --- The typed path ---
+//
+// Everything below binds `src/gen/`, which is real `protoc-gen-es` output rather than a
+// hand-written approximation of it, so that the type mapping is asserted against what the
+// generator actually emits. `pnpm typecheck` is half of these tests: the annotations and the
+// `@ts-expect-error` comments fail the build if inference drifts.
 
-  // Signatures and message types come from the descriptor — `pnpm typecheck` asserts them.
+type Expect<T extends true> = T
+type Equal<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false
+
+// Taken from an actual binding rather than rebuilt from the descriptor, so the assertions below
+// describe what a caller really gets back.
+const _typedClient = createDXLinkService(createMockClient().client, TestService)
+type TypedClient = typeof _typedClient
+
+// Requests are init shapes of the descriptor's input; responses are its output.
+type _Unary = Expect<Equal<ReturnType<TypedClient['unary']>, Observable<Pong>>>
+type _ServerStream = Expect<Equal<ReturnType<TypedClient['serverStream']>, Observable<Pong>>>
+type _BidiStream = Expect<Equal<ReturnType<TypedClient['bidiStream']>, Observable<Pong>>>
+type _Request = Expect<
+  Equal<Parameters<TypedClient['unary']>[0], MessageInitShape<typeof PingSchema>>
+>
+
+// Bidirectional methods take a stream and nothing else; the rest take a request and options.
+type _BidiArity = Expect<Equal<Parameters<TypedClient['bidiStream']>['length'], 1>>
+type _UnaryArity = Expect<Equal<Parameters<TypedClient['unary']>['length'], 1 | 2>>
+
+// A client-streaming method is `never`, so calling it cannot compile.
+type _ClientStreaming = Expect<
+  Equal<DXLinkServiceClient<typeof MixedService.method>['collect'], never>
+>
+
+test('infers request and response types from generated code', () => {
+  const mock = createMockClient()
+  // No cast: the generated `GenService` is passed straight in.
+  const service = createDXLinkService(mock.client, TestService)
+
   const unary: Observable<Pong> = service.unary({ value: 'ping' })
   const serverStream: Observable<Pong> = service.serverStream({ value: 'ping' }, { retry: true })
-  const bidiStream: Observable<Pong> = service.bidiStream(new Subject<{ value: string }>())
+  const bidiStream: Observable<Pong> = service.bidiStream(
+    new Subject<MessageInitShape<typeof PingSchema>>()
+  )
 
   const received: Pong[] = []
   const sub = unary.subscribe((response) => received.push(response))
   mock.lastChannel.simulateOpen()
   mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 'pong' } })
 
-  expect(received).toEqual([{ $typeName: 'test.v1.Pong', value: 'pong' }])
+  expect(received).toEqual([pong('pong')])
   expect(serverStream).toBeDefined()
   expect(bidiStream).toBeDefined()
 
   sub.unsubscribe()
+})
+
+test('leaves undeclared request fields to the compiler, not to the runtime', () => {
+  const mock = createMockClient()
+  const service = createDXLinkService(mock.client, TestService)
+
+  // Requests are built from an init shape, and protobuf-es drops init keys it does not
+  // recognise — so an undeclared field is a compile error and a silent omission on the wire,
+  // not a thrown one. The console's request form is the place that rejects them, because it
+  // goes through `fromJson` instead.
+  // @ts-expect-error `nope` is not a field of test.gen.v1.Ping
+  const sub = service.unary({ value: 'ping', nope: 'dropped' }).subscribe()
+  mock.lastChannel.simulateOpen()
+
+  expect(payloadsOf(mock.lastChannel)).toEqual([{ value: 'ping' }])
+
+  sub.unsubscribe()
+})
+
+test('rejects a generated bidirectional call that is not given a stream', () => {
+  const mock = createMockClient()
+  const service = createDXLinkService(mock.client, TestService)
+
+  // @ts-expect-error a bidirectional method needs a stream of requests
+  expect(() => service.bidiStream({ value: 'ping' })).toThrow(/expects an Observable/)
+})
+
+test('encodes every field kind of a generated message as protobuf-JSON', () => {
+  const mock = createMockClient()
+  const service = createDXLinkService(mock.client, TestService)
+
+  const sub = service
+    .unary({
+      value: 'ping',
+      sentAtMillis: 1n,
+      flavour: Flavour.SALTED,
+      nested: [{ label: 'first' }],
+      extra: { key: 'value' },
+    })
+    .subscribe()
+  mock.lastChannel.simulateOpen()
+
+  // int64 as a string, the enum by its proto name, the snake_case field by its deduced json_name.
+  expect(payloadsOf(mock.lastChannel)).toEqual([
+    {
+      value: 'ping',
+      sentAtMillis: '1',
+      flavour: 'FLAVOUR_SALTED',
+      nested: [{ label: 'first' }],
+      extra: { key: 'value' },
+    },
+  ])
+
+  sub.unsubscribe()
+})
+
+test('keys generated methods by their ECMAScript name and calls them by their proto name', () => {
+  const mock = createMockClient()
+  const service = createDXLinkService(mock.client, NamingService)
+
+  // `RPCPing` and `ping_pong` are what the wire carries; the client is keyed by what
+  // protoc-gen-es named them, which is neither camelCase nor unchanged in general.
+  expect(Object.keys(service)).toEqual(['rPCPing', 'ping_pong'])
+
+  const first = service.rPCPing({ value: 'ping' }).subscribe()
+  expect(mock.lastChannel.parameters['methodName']).toBe('RPCPing')
+  first.unsubscribe()
+
+  const second = service.ping_pong({ value: 'ping' }).subscribe()
+  expect(mock.lastChannel.parameters['methodName']).toBe('ping_pong')
+  second.unsubscribe()
+})
+
+test('rejects client-streaming methods declared by generated code', () => {
+  const mock = createMockClient()
+
+  expect(() => createDXLinkService(mock.client, MixedService)).toThrow(
+    DXLinkUnsupportedMethodKindError
+  )
+  expect(
+    Object.keys(createDXLinkService(mock.client, MixedService, { skipUnsupportedMethods: true }))
+  ).toEqual(['echo'])
 })

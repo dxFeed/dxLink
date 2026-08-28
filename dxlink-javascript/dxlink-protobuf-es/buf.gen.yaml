@@ -1,0 +1,14 @@
+# Regenerates the test fixture. `json_types` and `valid_types` mirror how the protobuf-es code
+# this package is meant to bind is generated in practice, which is what makes `GenMessage` carry
+# its second type argument.
+version: v2
+inputs:
+  - directory: proto
+plugins:
+  - local: protoc-gen-es
+    out: src/gen
+    opt:
+      - target=ts
+      - import_extension=none
+      - json_types=true
+      - valid_types=protovalidate_required

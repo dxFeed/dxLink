@@ -82,3 +82,22 @@ signal — it is a long-lived duplex subscription.
 Pass `{ skipUnsupportedMethods: true }` to leave those methods out of the client instead of
 throwing. That suits a descriptor picked at runtime, where one unsupported method should not make
 the rest of the service unreachable.
+
+## Tests
+
+Both paths are bound against one fixture, `proto/test/gen/v1/test_service.proto`, which declares
+a service per interaction model — including the client-streaming method the wire cannot carry —
+plus the field kinds whose protobuf-JSON form is worth pinning down. `buf` turns it into the two
+things a consumer can hold:
+
+| Committed artifact              |                                                            |
+| ------------------------------- | ---------------------------------------------------------- |
+| `src/gen/**/test_service_pb.ts` | `protoc-gen-es` output, bound by `createDXLinkService`     |
+| `src/gen/test_service.binpb`    | `FileDescriptorSet`, bound by `createDXLinkDynamicService` |
+
+Generating both from one source is what lets the tests assert that the two paths agree. The output
+is committed, so running the tests needs no codegen step. After editing the fixture:
+
+```sh
+pnpm run generate
+```
