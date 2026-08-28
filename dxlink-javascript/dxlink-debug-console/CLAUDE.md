@@ -19,7 +19,7 @@ service, change the URL and reconnect.
 | ----------------------- | ------------------------------------ |
 | FEED, DOM, candle chart | `wss://dxlink-md-ws-dev.dxkube.com`  |
 | **INDICHART**           | `wss://dxlink-dxs-ws-dev.dxkube.com` |
-| **RPC**                 | whichever endpoint hosts the service |
+| **RPC**                 | a dxLink server that hosts it        |
 
 The RPC channel also needs service definitions, and those come over HTTP rather than the
 socket: a dxLink server publishes a `FileDescriptorSet` at `/proto/docs`. That endpoint sends
@@ -129,8 +129,8 @@ summary line must name the same category as the alert below it.
 
 The RPC channel calls a method of a protobuf service. It has no built-in service list: it
 is given a `FileDescriptorSet` and builds the registry in the browser, so it needs one to
-walk at all. Any will do — `/proto/docs` through the dev proxy, or a local file from
-`buf build -o descriptors.binpb`. Both the binary format and protobuf-JSON are accepted,
+walk at all. Any will do — `/proto/docs` from a server serving the console, or a local file
+from `buf build -o descriptors.binpb`. Both the binary format and protobuf-JSON are accepted,
 told apart by the first non-whitespace byte.
 
 - **The fetch asks for binary.** `/proto/docs` negotiates on `Accept` and treats a wildcard
@@ -173,10 +173,28 @@ request template. It must be `{"accountId": "", "descriptors": []}` — canonica
 one entry per field. A single `""` key means the deduction was dropped, and every request
 built here is malformed.
 
-None of the dev relays implement an RPC service, so the call is expected to end in
-`BAD_ACTION — Unsupported service: '<name>'` on the channel's own card. That is the whole
-path proven — descriptor to registry to picker to form to `CHANNEL_REQUEST` on the wire —
-short of a server that answers.
+**The end-to-end walk.** Point the connection form at a dxLink server that hosts RPC
+services; it publishes its own definitions on `/proto/docs`. Such a server generally
+**requires authorization**, and closes the socket 30 seconds after connect if none arrives —
+`TIMEOUT — The timeout for AUTH has been reached`. So authorize promptly: a socket left
+sitting is the usual reason the Channels area disappears mid-session.
+
+Authorized, load `/proto/docs`, pick `AccountService` · `GetAccounts` — its request has no
+fields, so the template is `{}` — and open the channel. Expect the card to reach **completed**
+with `Sent 1` / `Received 1`, and the response to decode as protobuf-JSON:
+
+```json
+{ "accounts": [ { "id": "…", "status": "ACCOUNT_STATUS_ACTIVE",
+                  "cashType": "ACCOUNT_CASH_TYPE_CASH", "instrumentTypes": ["INSTRUMENT_TYPE_STOCK", …] } ] }
+```
+
+Three things in that payload are the ones worth reading: keys are **camelCase**, `id` is a
+**string** because it is an int64, and enums are their **value names**. Keys under a single
+`""` mean the `json_name` deduction regressed, and the request would never have been read.
+
+Against a server that does not implement the service — the market-data relay, say — the same
+walk ends in `BAD_ACTION — Unsupported service: '<name>'` on the channel's own card, which
+still exercises everything up to the wire.
 
 ### Theme and width
 
