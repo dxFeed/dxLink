@@ -1,13 +1,15 @@
-import { create, toBinary, toJsonString } from '@bufbuild/protobuf'
+import { clone, create, toBinary, toJsonString } from '@bufbuild/protobuf'
 import {
   FieldDescriptorProto_Label,
   FieldDescriptorProto_Type,
   FileDescriptorSetSchema,
 } from '@bufbuild/protobuf/wkt'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createRequestTemplate,
+  fetchDescriptorSet,
+  fieldsWithoutJsonName,
   isMethodSupported,
   listServices,
   parseDescriptorSet,
@@ -115,6 +117,54 @@ describe('isMethodSupported', () => {
   })
 })
 
+describe('a descriptor set that omits json_name', () => {
+  // dxLink's own /proto/docs serves one: only the bundled google/protobuf files carry
+  // json_name, and protobuf-es reports the missing name as an empty string.
+  const stripped = () => {
+    const copy = clone(FileDescriptorSetSchema, descriptorSet)
+    for (const file of copy.file) {
+      for (const message of file.messageType) {
+        for (const f of message.field) f.jsonName = ''
+      }
+    }
+
+    return toBinary(FileDescriptorSetSchema, copy)
+  }
+
+  const strippedOrderMessage = () => {
+    const message = parseDescriptorSet(stripped()).getMessage('demo.v1.Order')
+    if (message === undefined) throw new Error('missing test descriptor')
+
+    return message
+  }
+
+  it('keys the template by the protobuf field name instead of collapsing onto one empty key', () => {
+    expect(Object.keys(createRequestTemplate(strippedOrderMessage()))).toEqual([
+      'symbol',
+      'quantity',
+      'live',
+      'price',
+      'side',
+    ])
+  })
+
+  it('names the fields that will be lost on the wire', () => {
+    // The template repair is cosmetic: protobuf-es still encodes from the descriptor, so
+    // every one of these fields goes out under one empty key. Only the endpoint can fix it.
+    expect(fieldsWithoutJsonName(strippedOrderMessage()).map((f) => f.name)).toEqual([
+      'symbol',
+      'quantity',
+      'live',
+      'price',
+      'side',
+    ])
+  })
+
+  it('reports nothing for a descriptor set that carries json_name', () => {
+    expect(fieldsWithoutJsonName(orderMessage())).toEqual([])
+  })
+})
+
 describe('createRequestTemplate', () => {
   it('opens the editor on the shape of the message, in protobuf-JSON terms', () => {
     // 64-bit integers are strings in protobuf-JSON and enums are their value names — a
@@ -155,5 +205,55 @@ describe('parseRequest', () => {
     const result = parseRequest(orderMessage(), '{"live":"yes"}')
 
     expect(result).toHaveProperty('error', expect.stringContaining('live'))
+  })
+})
+
+describe('fetchDescriptorSet', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('asks for the binary representation, and for nothing that matches JSON', async () => {
+    // dxLink's schema endpoint negotiates on Accept and treats a wildcard as a vote for
+    // JSON, so a request that carries one gets the larger representation back.
+    const fetchMock = vi.fn().mockResolvedValue(new Response(binary(), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchDescriptorSet('/proto/docs')
+
+    const accept = String(fetchMock.mock.calls[0]?.[1]?.headers?.Accept)
+    expect(accept).toContain('application/protobuf')
+    expect(accept).not.toContain('*')
+    expect(accept).not.toContain('json')
+  })
+
+  it('reads whichever representation the endpoint actually serves', async () => {
+    // The Accept header is a request, not a guarantee: an endpoint that only speaks
+    // protobuf-JSON still has to work.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(json(), { status: 200 })))
+
+    const registry = await fetchDescriptorSet('/proto/docs')
+
+    expect(listServices(registry).map((s) => s.typeName)).toEqual([
+      'demo.v1.AccountService',
+      'demo.v1.OrderService',
+    ])
+  })
+
+  it('reports the status when the endpoint refuses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 404, statusText: 'Not Found' }))
+    )
+
+    await expect(fetchDescriptorSet('/proto/docs')).rejects.toThrow('404')
+  })
+
+  it('explains an opaque network failure, keeping the original as the cause', async () => {
+    const cause = new TypeError('Failed to fetch')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(cause))
+
+    await expect(fetchDescriptorSet('http://elsewhere/proto/docs')).rejects.toThrow(/cross-origin/)
+    await expect(fetchDescriptorSet('http://elsewhere/proto/docs')).rejects.toMatchObject({ cause })
   })
 })

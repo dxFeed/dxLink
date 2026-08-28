@@ -2,6 +2,9 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "skipLibCheck": true,
+    // `ES2022.Error` for `new Error(message, { cause })`, used to keep the original failure
+    // attached when a descriptor set cannot be fetched.
+    "lib": ["ES2020", "ES2022.Error", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "node"]
   },
   "include": ["src", "vite.config.ts"],

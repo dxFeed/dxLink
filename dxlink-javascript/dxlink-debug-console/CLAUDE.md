@@ -21,6 +21,12 @@ service, change the URL and reconnect.
 | **INDICHART**           | `wss://dxlink-dxs-ws-dev.dxkube.com` |
 | **RPC**                 | whichever endpoint hosts the service |
 
+The RPC channel also needs service definitions, and those come over HTTP rather than the
+socket: a dxLink server publishes a `FileDescriptorSet` at `/proto/docs`. That endpoint sends
+no CORS headers and answers a preflight with 403, so it can only be fetched same-origin —
+either the console is served by the same server, or something local puts them on one origin.
+Failing that, load a descriptor set from a file instead.
+
 The market-data relay answers an INDICHART channel request with
 `BAD_ACTION — Unsupported service: 'INDICHART'`. That is the server declining, not a
 console bug — the channel opens, is rejected, and closes, and the error lands on that
@@ -123,9 +129,16 @@ summary line must name the same category as the alert below it.
 
 The RPC channel calls a method of a protobuf service. It has no built-in service list: it
 is given a `FileDescriptorSet` and builds the registry in the browser, so it needs one to
-walk at all. Any will do — an endpoint that serves one, or a local file from
+walk at all. Any will do — `/proto/docs` through the dev proxy, or a local file from
 `buf build -o descriptors.binpb`. Both the binary format and protobuf-JSON are accepted,
 told apart by the first non-whitespace byte.
+
+- **The fetch asks for binary.** `/proto/docs` negotiates on `Accept` and treats a wildcard
+  as a vote for JSON, so a request that does not ask gets the larger representation — 243 KB
+  against 114 KB when this was written. Check the network tab: the response must come back
+  `Content-Type: application/protobuf`. Note that asking for a media type makes a
+  cross-origin request preflighted, which is a second reason that endpoint has to be
+  same-origin or CORS-enabled.
 
 - **The pickers come from the descriptor set.** After Load, the dialog reports how many
   services it found, and the service and method pickers fill from it. Each method carries
@@ -146,6 +159,15 @@ told apart by the first non-whitespace byte.
 - **Sent must show 1 for a unary call**, not 2. The card's message log is reset by
   `RpcViewModel.start()` for exactly this reason: StrictMode mounts, unmounts and remounts
   the view, and the store outlives that cycle.
+
+**A descriptor set can arrive without `json_name`, and dxLink's own does.** Only the bundled
+`google/protobuf/*` files in `/proto/docs` carry it; the API's own fields are missing it (474
+of 895 fields when this was written). protobuf-es reports the missing name as an empty
+string, so without care every field of a message collapses onto one `""` key. The console
+falls back to the protobuf field name for what it shows and edits — the request form must
+list `account_id`, not a single blank key — and warns on the method, because the fallback is
+only cosmetic: encoding still runs off the descriptor, so the request goes out as `{"": …}`
+and all but the last field is lost. That is the descriptor set's to fix, not the console's.
 
 None of the dev relays implement an RPC service, so the call is expected to end in
 `BAD_ACTION — Unsupported service: '<name>'` on the channel's own card. That is the whole
