@@ -12,6 +12,7 @@ import {
   ScalarType,
   toJson,
 } from '@bufbuild/protobuf'
+import { protoCamelCase } from '@bufbuild/protobuf/reflect'
 import { type FileDescriptorSet, FileDescriptorSetSchema } from '@bufbuild/protobuf/wkt'
 
 /**
@@ -76,9 +77,39 @@ const decodeDescriptorSet = (bytes: Uint8Array): FileDescriptorSet => {
   return fromBinary(FileDescriptorSetSchema, bytes)
 }
 
+/**
+ * Fill in the JSON name of every field whose descriptor omits it.
+ *
+ * `json_name` is optional on the wire and is meant to be deduced from the field name when
+ * absent, but protobuf-es assigns it straight through, so a descriptor set without it leaves
+ * every field reporting an empty JSON name. Encoding then puts each field of a message under
+ * the same `""` key and all but the last is lost; decoding rejects the real names.
+ *
+ * dxLink's own `/proto/docs` serves such a set — only the bundled `google/protobuf/*` files
+ * carry `json_name` — so this is repaired here rather than left to the server. The deduction is
+ * protobuf's own, via the `protoCamelCase` protobuf-es uses for the same purpose elsewhere.
+ *
+ * Mutating descriptors is safe here and nowhere else: the registry was just built from these
+ * bytes and nothing else has seen it yet. Extension fields are left alone — their JSON name is
+ * the bracketed type name, not a deduction.
+ */
+const deduceMissingJsonNames = (registry: FileRegistry): FileRegistry => {
+  for (const desc of registry) {
+    if (desc.kind !== 'message') continue
+    for (const field of desc.fields) {
+      if (field.jsonName === '') {
+        // The descriptor types are readonly, which is right for every other consumer.
+        ;(field as { jsonName: string }).jsonName = protoCamelCase(field.name)
+      }
+    }
+  }
+
+  return registry
+}
+
 /** Build a registry from the bytes of a `FileDescriptorSet`. */
 export const parseDescriptorSet = (bytes: Uint8Array): FileRegistry =>
-  createFileRegistry(decodeDescriptorSet(bytes))
+  deduceMissingJsonNames(createFileRegistry(decodeDescriptorSet(bytes)))
 
 /**
  * Media types that ask a schema endpoint for the binary representation.
@@ -131,30 +162,6 @@ export const listServices = (registry: FileRegistry): DescService[] => {
 }
 
 /**
- * The JSON key of a field.
- *
- * `json_name` is normally written into the descriptor by the compiler, but a descriptor set can
- * reach us without it — dxLink's own `/proto/docs` serves one, where only the bundled
- * `google/protobuf/*` files carry it. protobuf-es reports the missing name as an empty string,
- * which would collapse every field of a message onto one `""` key. The protobuf field name is
- * always present and is accepted by protobuf-JSON parsers, so it stands in.
- * @see {@link fieldsWithoutJsonName}
- */
-export const jsonKey = (field: DescField): string =>
-  field.jsonName === '' ? field.name : field.jsonName
-
-/**
- * Fields of a message whose descriptor declares no `json_name`.
- *
- * Worth reporting, because {@link jsonKey} only repairs what the console shows: encoding still
- * goes through protobuf-es, which writes the empty name it was given, so every such field ends
- * up under one `""` key on the wire and all but the last is lost. Only the descriptor set can
- * fix that.
- */
-export const fieldsWithoutJsonName = (message: DescMessage): DescField[] =>
-  message.fields.filter((field) => field.jsonName === '')
-
-/**
  * A protobuf-JSON placeholder for a field, so the request editor opens on the shape of the
  * message rather than on `{}`. Canonical protobuf-JSON is what goes on the wire, so what the
  * user edits is what is sent — 64-bit integers as strings, bytes as base64, enums by name.
@@ -190,7 +197,7 @@ const fieldTemplate = (field: DescField): JsonValue => {
 
 /** A protobuf-JSON skeleton of a request message, one entry per declared field. */
 export const createRequestTemplate = (message: DescMessage): Record<string, JsonValue> =>
-  Object.fromEntries(message.fields.map((field) => [jsonKey(field), fieldTemplate(field)]))
+  Object.fromEntries(message.fields.map((field) => [field.jsonName, fieldTemplate(field)]))
 
 /**
  * Parse a request message from the protobuf-JSON in the editor.

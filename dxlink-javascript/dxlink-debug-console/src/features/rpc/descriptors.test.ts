@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createRequestTemplate,
   fetchDescriptorSet,
-  fieldsWithoutJsonName,
+  formatMessage,
   isMethodSupported,
   listServices,
   parseDescriptorSet,
@@ -119,7 +119,7 @@ describe('isMethodSupported', () => {
 
 describe('a descriptor set that omits json_name', () => {
   // dxLink's own /proto/docs serves one: only the bundled google/protobuf files carry
-  // json_name, and protobuf-es reports the missing name as an empty string.
+  // json_name, and protobuf-es assigns it straight through instead of deducing it.
   const stripped = () => {
     const copy = clone(FileDescriptorSetSchema, descriptorSet)
     for (const file of copy.file) {
@@ -138,7 +138,27 @@ describe('a descriptor set that omits json_name', () => {
     return message
   }
 
-  it('keys the template by the protobuf field name instead of collapsing onto one empty key', () => {
+  it('deduces the JSON name from the field name', () => {
+    expect(strippedOrderMessage().fields.map((f) => f.jsonName)).toEqual([
+      'symbol',
+      'quantity',
+      'live',
+      'price',
+      'side',
+    ])
+  })
+
+  it('encodes a request under the deduced names, not one empty key', () => {
+    // Left alone, every field of the message lands on `""` and all but the last is lost —
+    // a request no server can read.
+    const message = strippedOrderMessage()
+    const parsed = parseRequest(message, '{"symbol":"AAPL","quantity":"10"}')
+    if ('error' in parsed) throw new Error(parsed.error)
+
+    expect(formatMessage(message, parsed.message)).toEqual({ symbol: 'AAPL', quantity: '10' })
+  })
+
+  it('keys the request template by the deduced names', () => {
     expect(Object.keys(createRequestTemplate(strippedOrderMessage()))).toEqual([
       'symbol',
       'quantity',
@@ -146,22 +166,6 @@ describe('a descriptor set that omits json_name', () => {
       'price',
       'side',
     ])
-  })
-
-  it('names the fields that will be lost on the wire', () => {
-    // The template repair is cosmetic: protobuf-es still encodes from the descriptor, so
-    // every one of these fields goes out under one empty key. Only the endpoint can fix it.
-    expect(fieldsWithoutJsonName(strippedOrderMessage()).map((f) => f.name)).toEqual([
-      'symbol',
-      'quantity',
-      'live',
-      'price',
-      'side',
-    ])
-  })
-
-  it('reports nothing for a descriptor set that carries json_name', () => {
-    expect(fieldsWithoutJsonName(orderMessage())).toEqual([])
   })
 })
 

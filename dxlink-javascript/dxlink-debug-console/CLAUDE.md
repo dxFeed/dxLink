@@ -162,12 +162,16 @@ told apart by the first non-whitespace byte.
 
 **A descriptor set can arrive without `json_name`, and dxLink's own does.** Only the bundled
 `google/protobuf/*` files in `/proto/docs` carry it; the API's own fields are missing it (474
-of 895 fields when this was written). protobuf-es reports the missing name as an empty
-string, so without care every field of a message collapses onto one `""` key. The console
-falls back to the protobuf field name for what it shows and edits — the request form must
-list `account_id`, not a single blank key — and warns on the method, because the fallback is
-only cosmetic: encoding still runs off the descriptor, so the request goes out as `{"": …}`
-and all but the last field is lost. That is the descriptor set's to fix, not the console's.
+of 895 fields when this was written). `json_name` is optional on the wire and meant to be
+deduced from the field name when absent, but protobuf-es assigns it straight through, so the
+fields come back reporting an empty JSON name — which would put every field of a message
+under one `""` key on the wire, losing all but the last, and reject the real names on the way
+back. `parseDescriptorSet` deduces the missing ones with protobuf-es's own `protoCamelCase`.
+
+The check: load `/proto/docs`, pick `AccountMetricsService.GetAccountMetrics`, and read the
+request template. It must be `{"accountId": "", "descriptors": []}` — canonical camelCase,
+one entry per field. A single `""` key means the deduction was dropped, and every request
+built here is malformed.
 
 None of the dev relays implement an RPC service, so the call is expected to end in
 `BAD_ACTION — Unsupported service: '<name>'` on the channel's own card. That is the whole

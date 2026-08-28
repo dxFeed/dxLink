@@ -27,9 +27,7 @@ import { useMemo, useRef, useState } from 'react'
 import {
   createRequestTemplate,
   fetchDescriptorSet,
-  fieldsWithoutJsonName,
   isMethodSupported,
-  jsonKey,
   listServices,
   methodModel,
   parseRequest,
@@ -107,12 +105,12 @@ const RequestFields = ({
   }
 
   const set = (field: DescField, fieldValue: JsonValue) =>
-    onChange(stringify({ ...parsed, [jsonKey(field)]: fieldValue }))
+    onChange(stringify({ ...parsed, [field.jsonName]: fieldValue }))
 
   return (
     <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
       {fields.map((field) => {
-        const current = parsed[jsonKey(field)]
+        const current = parsed[field.jsonName]
 
         if (field.fieldKind === 'enum') {
           return (
@@ -359,17 +357,6 @@ export const RpcChannelRequest = ({ value, onChange }: RpcChannelRequestProps) =
           {method !== undefined && (
             <Stack spacing={1.5}>
               <Typography variant="subtitle2">Request · {method.input.typeName}</Typography>
-              {fieldsWithoutJsonName(method.input).length > 0 && (
-                <Alert severity="warning">
-                  This descriptor set declares no <code>json_name</code> for{' '}
-                  {fieldsWithoutJsonName(method.input)
-                    .map((field) => field.name)
-                    .join(', ')}
-                  . Requests are encoded by protobuf-es from the descriptor, so those fields all go
-                  on the wire under one empty key and every one but the last is lost. The endpoint
-                  serving the descriptor set has to populate <code>json_name</code>.
-                </Alert>
-              )}
               <RequestFields
                 message={method.input}
                 json={value.json}
