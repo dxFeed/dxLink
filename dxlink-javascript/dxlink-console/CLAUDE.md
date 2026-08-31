@@ -35,12 +35,23 @@ IndiChart always needs the URL changed by hand.
 
 ## Running it
 
+The libraries are published packages now, so the app resolves their `build/` output rather than
+their source. **Build first, or the dev server serves whatever was built last** — which is the
+most confusing failure mode here, because a stale build looks like a working app that ignores
+your edit:
+
 ```bash
+pnpm -C dxlink-javascript turbo run build --filter './dxlink-console/*'
 pnpm --filter @dxfeed/dxlink-debug-console dev
 ```
 
-Serves <http://localhost:4280>. After a dependency change, run it once with `--force` or
-Vite keeps serving the previous pre-bundle.
+Serves <http://localhost:4280>. While working inside `core`, `market-data` or `rpc`, run that
+package's `tsup … --watch` alongside the dev server, or rebuild by hand after each edit — there
+is no longer HMR across the package boundary.
+
+After a dependency change, run the dev server once with `--force`, or Vite keeps serving the
+previous pre-bundle. Adding a dependency to a package that is already running also needs a
+restart, or its import fails to resolve and every request 500s with a blank page.
 
 ## Checks
 

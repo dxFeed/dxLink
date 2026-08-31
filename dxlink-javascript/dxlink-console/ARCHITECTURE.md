@@ -149,10 +149,22 @@ dxlink-javascript/dxlink-console/
                · components/{dxfeed-logo,theme-mode-toggle}
 ```
 
-Every package is `private: true` and none is published. Because the only consumer is our own
-Vite app, they need no build step: each `main` points at `src/index.ts`, Vite resolves the
-workspace source directly, and HMR works across package boundaries. Publishing means adding
-tsup builds, `exports` maps and peer-dependency declarations — a separate decision.
+The three libraries are published; the app is not. Each library follows the same packaging as
+the rest of the workspace: a tsup build to `build/`, dual ESM/CJS behind a conditional
+`exports` map, and `files: ["/build", "/package.json"]`. React, MUI and emotion are
+**peer** dependencies, because each has to be one instance shared with the host — a second
+React breaks the hooks, a second MUI theme context leaves the console unstyled, a second
+emotion cache loses the styles.
+
+The cost of that is paid in development: the app now consumes `build/`, not `src/`, so a
+`turbo run build` has to precede running it and a library edit needs a rebuild to appear.
+That is deliberate — the alternative, a `publishConfig` override keeping `main` on the source
+in-repo, was considered and dropped in favour of manifests that say exactly what they publish.
+
+`market-data` is the one deviation: it omits `sideEffects` rather than declaring `false`,
+because its chart channels import dxcharts-lite's stylesheet and a bundler told the package is
+side-effect-free may drop that import. Its subpath exports (`/feed`, `/dom`, `/indichart`)
+already give the granularity `sideEffects` would have bought, so nothing is lost.
 
 Dependency direction (acyclic, and enforced by the package boundary rather than by
 convention): `app → {market-data, rpc} → core`. Nothing points back up. Unit tests sit beside

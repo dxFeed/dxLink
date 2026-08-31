@@ -5,12 +5,10 @@ DOM and INDICHART channels, and inspect what the protocol actually sends back. P
 a set of protobuf service definitions and it will call any RPC method in them too. Also
 renders the dxLink AsyncAPI specification.
 
-This is the modern rebuild of the console that shipped inside `@dxfeed/dxlink-docs`. Nothing
-here is published to npm — all four packages are `private: true` and excluded from Changesets,
-and the app is run locally with no deployment. The packages are nonetheless shaped to be
-consumed rather than only run: core styles itself and reads no globals, so a host can render
-the console inside a page it does not own (see [Embedding](#embedding)). Publishing is a
-separate, open decision.
+This is the modern rebuild of the console that shipped inside `@dxfeed/dxlink-docs`. The three
+library packages are published to npm; the app itself is `private: true`, excluded from
+Changesets, run locally, with no deployment. Core styles itself and reads no globals, so a host
+can render the console inside a page it does not own — see [Embedding](#embedding).
 
 ## Running
 
@@ -110,8 +108,17 @@ A host that already has a `ThemeProvider` above the page leaves `theme` out, and
 applies; that is what the app does. See ARCHITECTURE.md §9 for why each of these is necessary
 rather than merely tidy.
 
-Note this is the theming half of embedding only. Publishing — reversing `private: true`, build
-steps, `exports` maps, peer deps — is a separate, open decision; see [Layout](#layout).
+Install what you need. A docs site wanting the connection, auth and the RPC channel takes
+`core` and `rpc` and never pulls the market-data dependency tree:
+
+```sh
+pnpm add @dxfeed/dxlink-console-core @dxfeed/dxlink-console-rpc
+```
+
+React, MUI and emotion are peer dependencies — the host provides them, so there is one React,
+one theme context and one emotion cache. In Next.js, add the packages to `transpilePackages`
+only if you consume them from source; the published builds need no transpilation. The console
+is client-only, so render it from a `'use client'` component of your own.
 
 ## Checks
 
@@ -139,8 +146,11 @@ Four packages, dependencies pointing downward — `app → {market-data, rpc} �
 | `rpc/` — `@dxfeed/dxlink-console-rpc` | The RPC channel, over `@dxfeed/dxlink-protobuf-es`. |
 | `app/` — `@dxfeed/dxlink-debug-console` | This app. Composes the three, and is the first consumer of the same contract any host would use. |
 
-All four are `private: true` and unpublished; none has a build step, because the only
-consumer is this Vite app and it resolves the workspace source directly.
+`core`, `market-data` and `rpc` are published, each with a tsup build to `build/` and dual
+ESM/CJS behind a conditional `exports` map. The app is `private: true` and stays in the
+Changesets `ignore` list. Because the app consumes the libraries' `build/` output rather than
+their source, **`turbo run build` has to run before the dev server**, and a library edit needs
+a rebuild to show up.
 
 The point of the boundary: **core and rpc install no `@dxscript`, no dxcharts and no data
 grid.** An RPC-only console depends on those two and never sees the market-data dependency
