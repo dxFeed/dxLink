@@ -10,10 +10,6 @@ import type { DXLinkLogLevel } from '@dxfeed/dxlink-core'
 import type { DxLinkRpcCallOptions } from '@dxfeed/dxlink-rpc'
 import type { Observable } from 'rxjs'
 
-// Re-exported so consumers can name generated service descriptors without importing
-// `@bufbuild/protobuf/codegenv2` directly.
-export type { GenService, GenServiceMethods } from '@bufbuild/protobuf/codegenv2'
-export type { DescMethod, DescService } from '@bufbuild/protobuf'
 export type { DxLinkRpcCallOptions } from '@dxfeed/dxlink-rpc'
 
 /**
