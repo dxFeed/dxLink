@@ -101,3 +101,8 @@ is committed, so running the tests needs no codegen step. After editing the fixt
 ```sh
 pnpm run generate
 ```
+
+`buf` and `protoc-gen-es` are devDependencies of the **workspace root**, not of this package —
+nothing on the `build` / `test` / `typecheck` path needs them, and keeping codegen tooling out of
+a library package also keeps its transitive TypeScript from shadowing the one the workspace
+typechecks with.
