@@ -21,9 +21,9 @@ import { useEffect, useState } from 'react'
 
 import { DomViewModel } from './dom-view-model'
 import type { DomSnapshot } from './dom-view-model'
+import type { DomConfig } from './types'
 import { useVM } from '../../shared/view-model'
 import { ChannelWidget } from '../channels/channel-widget'
-import type { DomConfig } from '../channels/types'
 import { useConnectionVM } from '../connection/connection-context'
 
 interface DomChannelProps {

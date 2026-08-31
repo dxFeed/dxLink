@@ -8,6 +8,7 @@ import { useMemo } from 'react'
 import { Link as RouterLink, Route, Routes, useLocation } from 'react-router-dom'
 
 import { createRoutes } from './routes'
+import type { ErasedChannelPlugin } from '../features/channels/plugin'
 import { DxFeedLogo } from '../shared/components/dxfeed-logo'
 import { ThemeModeToggle } from '../shared/components/theme-mode-toggle'
 import type { ConsoleConfig } from '../shared/lib/console-config'
@@ -21,9 +22,15 @@ import type { ConsoleConfig } from '../shared/lib/console-config'
  * theme switcher on screen. Left as-is, the row measured 587px against a 375px
  * viewport and pushed the switcher out of reach behind a horizontal scroll.
  */
-export const App = ({ config }: { config: ConsoleConfig }) => {
+export const App = ({
+  config,
+  channels,
+}: {
+  config: ConsoleConfig
+  channels: readonly ErasedChannelPlugin[]
+}) => {
   const { pathname } = useLocation()
-  const routes = useMemo(() => createRoutes(config), [config])
+  const routes = useMemo(() => createRoutes(config, channels), [config, channels])
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>

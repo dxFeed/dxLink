@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 
 import { AuthPanel } from '../features/auth/auth-panel'
 import { ChannelsArea } from '../features/channels/channels-area'
+import type { ErasedChannelPlugin } from '../features/channels/plugin'
 import { ConnectionProvider } from '../features/connection/connection-context'
 import { ConnectionPanel } from '../features/connection/connection-panel'
 import { ConnectionViewModel } from '../features/connection/connection-view-model'
@@ -15,6 +16,13 @@ import { useOwnedViewModel, useVM } from '../shared/view-model'
 export interface ConsolePageProps {
   /** Initial values for the console's forms; see {@link ConsoleConfig}. */
   config?: ConsoleConfig
+  /**
+   * The channel services this console offers.
+   *
+   * Required: which services exist is a composition decision, and a host that leaves the
+   * market-data plugins out never imports their code.
+   */
+  channels: readonly ErasedChannelPlugin[]
 }
 
 /**
@@ -36,7 +44,7 @@ export interface ConsolePageProps {
  * from instead of the page reaching for globals. Omitted, it falls back to the page
  * location alone — enough for a standalone console, and free of any build-time assumption.
  */
-export const ConsolePage = ({ config }: ConsolePageProps) => {
+export const ConsolePage = ({ config, channels }: ConsolePageProps) => {
   const vm = useOwnedViewModel(() => new ConnectionViewModel())
   const resolved = useMemo(
     () => config ?? resolveConsoleConfig({ location: window.location }),
@@ -57,7 +65,7 @@ export const ConsolePage = ({ config }: ConsolePageProps) => {
         <Stack spacing={3}>
           <ConnectionPanel />
           {needsAuth && !everAuthorized && <AuthPanel />}
-          {everAuthorized && <ChannelsArea key={sessionId} />}
+          {everAuthorized && <ChannelsArea key={sessionId} channels={channels} />}
         </Stack>
       </ConnectionProvider>
     </ConsoleConfigProvider>

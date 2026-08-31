@@ -9,9 +9,9 @@ import Stack from '@mui/material/Stack'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 
+import { MAX_INDICATORS, createIndicatorEntry } from './types'
+import type { IndiChartRequest } from './types'
 import { useResolvedColorScheme } from '../../shared/lib/color-scheme'
-import { MAX_INDICATORS, createIndicatorEntry } from '../channels/types'
-import type { IndiChartRequest } from '../channels/types'
 
 interface IndiChartChannelRequestProps {
   value: IndiChartRequest

@@ -7,19 +7,9 @@ import { afterEach } from 'vitest'
 // scheduling work against a DOM that the next test has already replaced.
 afterEach(cleanup)
 
-// dxcharts-lite calls `window.matchMedia` at module load, to watch the device pixel ratio.
-// jsdom does not implement it, so importing anything that reaches the chart — the channels
-// area, via the feed chart channel — throws before a test can run. A stub that matches
-// nothing is enough: nothing under test depends on a media query.
-if (typeof window.matchMedia !== 'function') {
-  window.matchMedia = (media: string): MediaQueryList => ({
-    media,
-    matches: false,
-    onchange: null,
-    addListener: () => undefined,
-    removeListener: () => undefined,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  })
+// jsdom implements no layout, so it has no `scrollIntoView`. The channels area scrolls a
+// freshly opened channel into view, which makes this a hard requirement for any test that
+// opens one. Scrolling is not what those tests are about, so a no-op is enough.
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = () => undefined
 }

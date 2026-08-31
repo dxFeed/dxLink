@@ -29,11 +29,11 @@ import type { IndicatorOutputKind, IndicatorOutputMeta } from './indichart-view-
 import { ParameterField, initialParameterValue } from './parameter-field'
 import type { ParameterValue } from './parameter-field'
 import { describeScriptError } from './script-error'
+import type { IndiChartConfig } from './types'
 import { DocLink } from '../../shared/components/doc-link'
 import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../../shared/lib/order-sources'
 import { useVM } from '../../shared/view-model'
 import { ChannelWidget } from '../channels/channel-widget'
-import type { IndiChartConfig } from '../channels/types'
 import { useConnectionVM } from '../connection/connection-context'
 
 import '@dxscript/dxlink-dxcharts-lite/styles.css'

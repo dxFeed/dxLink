@@ -104,48 +104,57 @@ The live dxlink objects stay as private VM fields; only UI state goes in the sto
 
 Layered, feature-sliced: **`app → pages → features → shared`** (dependencies point downward;
 features never import pages, pages never import other pages). ViewModels are **co-located with
-their feature**; only cross-cutting code lives in `shared/`.
+their feature**; only cross-cutting code lives in `shared/`. Unit tests sit beside what they
+test as `*.test.ts(x)` and are elided below.
 
 ```
 dxlink-debug-console/
-  ARCHITECTURE.md · CLAUDE.md · index.html · vite.config.ts · package.json · tsconfig.json
+  ARCHITECTURE.md · README.md · CLAUDE.md · index.html · vite.config.ts · package.json · tsconfig.json
   src/
-    main.tsx                     # createRoot + <App/>
+    main.tsx                     # resolves the profile + channel list, then createRoot + <App/>
     app/                         # bootstrap & shell ONLY
-      App.tsx                    # providers (Theme, Router) + layout chrome (AppBar/Tabs) + <Outlet/>
+      App.tsx                    # providers (Theme, Router) + layout chrome (AppBar/nav) + <Routes/>
       theme.ts                   # MUI colorSchemes (light + dark, system default)
-      routes.tsx                 # route path → page
+      routes.tsx                 # createRoutes(config, channels) — route path → page
+      console-config.ts          # resolveAppConsoleConfig() — the only reader of globals (§7)
+      channels.ts                # createAppChannels() — the only module naming all four services (§8)
     pages/                       # route-level compositions (thin; assemble features)
-      console-page.tsx           # creates page-scoped ConnectionViewModel + <VMProvider>; renders connection/auth/channels
+      console-page.tsx           # creates page-scoped ConnectionViewModel + provider; connection/auth/channels
       protocol-page.tsx          # renders the AsyncAPI viewer (no VM)
-    features/                    # feature slices: VM + views + schema, CO-LOCATED
+    features/                    # feature slices: VM + views + types, CO-LOCATED
       connection/
-        connection-view-model.ts # owns DXLinkWebSocketClient + connection/auth/errors + channels[]
-        connection-context.tsx   # VMProvider / useConnectionVM (consumed within the page subtree)
-        connection-panel.tsx · connection-form.tsx · schema.ts
+        connection-view-model.ts # owns DXLinkWebSocketClient + connection/auth/errors state
+        connection-context.tsx   # provider / useConnectionVM — also the channel-plugin host API (§8)
+        connection-panel.tsx
       auth/        auth-panel.tsx
       errors/      error-center.tsx
       channels/
-        channel-view-model.ts    # ChannelViewModel base/interface
-        channel-registry.ts      # kind → feature descriptor; how connection opens channels
-        channels-area.tsx · channel-widget.tsx
-      feed/        feed-view-model.ts (+exports channel descriptor) · feed-config-form.tsx · feed-subscription-form.tsx · feed-events-table.tsx · schema.ts
-      dom/         dom-view-model.ts (+descriptor) · dom-open-form.tsx · dom-ladder.tsx
-      candles/     candles-view-model.ts (+descriptor) · candles-subscription-form.tsx · candles-chart.tsx   # ports DXLinkCandles + SortedList
-      indichart/   indichart-view-model.ts (+descriptor) · script-editor.tsx · parameter-form.tsx · indichart-chart.tsx · script-errors.tsx   # ports ChartHolder
-      rpc/         rpc-view-model.ts · rpc-channel-request.tsx · rpc-channel.tsx · descriptors.ts   # binds protobuf descriptors via @dxfeed/dxlink-protobuf-es
+        plugin.ts                # ChannelPlugin contract + defineChannelPlugin (§8)
+        types.ts                 # DraftChannel — { id, kind, config: unknown }
+        channels-area.tsx        # registry-driven: add-buttons, request dialog, open channels
+        channel-widget.tsx       # the collapsible card every channel body sits in
+      feed/        plugin.tsx · types.ts · feed-view-model.ts · feed-candles-view-model.ts · feed-channel.tsx · feed-channel-request.tsx · feed-chart-channel.tsx · feed-configuration.tsx · feed-subscriptions.tsx · feed-events-table.tsx · candles.ts · sorted-list.ts
+      dom/         plugin.tsx · types.ts · dom-view-model.ts · dom-channel.tsx · dom-channel-request.tsx
+      indichart/   plugin.tsx · types.ts · indichart-view-model.ts · indichart-channel.tsx · indichart-channel-request.tsx · parameter-field.tsx · session-parameter-field.tsx · script-error.ts
+      rpc/         plugin.tsx · types.ts · rpc-view-model.ts · rpc-channel.tsx · rpc-channel-request.tsx · descriptors.ts   # binds protobuf descriptors via @dxfeed/dxlink-protobuf-es
     shared/                      # cross-cutting ONLY
-      view-model.ts              # ViewModel base + useVM(vm, selector) hook
-      components/                # genuine gaps only: JsonView, CodeMirrorEditor
-      lib/                       # order-sources, event-types, formatters, color-map, session-parse, coalesce
-      hooks/
-  e2e/                           # Playwright specs   (unit tests colocated as *.test.ts)
+      view-model.ts              # ViewModel + useVM(vm, selector) + useOwnedViewModel + createViewModelContext
+      components/                # doc-link · dxfeed-logo · error-boundary · theme-mode-toggle
+      lib/                       # console-config(+context) · channel-kinds · connection-url · channel-errors · timestamped-error · order-sources · event-types · colors · color-scheme · session
+    test/setup.ts                # jest-dom, Testing Library cleanup, jsdom gaps
 ```
 
-Channel-feature dependency direction (acyclic): `connection → channels → {feed, dom, candles, indichart, rpc} → shared`.
-Each channel feature exports a descriptor `{ kind, service, create(client, params) }`; `channel-registry.ts`
-aggregates them so `ConnectionViewModel` opens channels without hard-importing each feature. Adding a channel
-kind = new feature folder + register its descriptor.
+Channel-feature dependency direction (acyclic): `connection → channels → {feed, dom, indichart,
+rpc} → shared`, with one edge added on top — `app/channels.ts` imports each service's plugin,
+because composition is the app's job.
+
+**Each channel feature exports a descriptor**, as this design always intended: `plugin.tsx`
+declares a `ChannelPlugin` and `app/channels.ts` aggregates them, so `ChannelsArea` renders
+channels without hard-importing any feature. Adding a channel kind = new feature folder +
+register its plugin. The one departure from the original sketch is the layer: the descriptor
+registers *UI* per service (add-button, request form, channel body) rather than teaching
+`ConnectionViewModel` how to open channels, because each channel view model already opens its
+own channel off the client it is handed. §8 has the contract.
 
 ## 5. Schema-driven indicator parameter form
 
@@ -212,6 +221,42 @@ would make locking a lie), and **a locked field ignores its query parameter**.
 it as a prop and provides it through `ConsoleConfigProvider`, so an embedding host with its
 own answers passes them in and the page reaches for nothing.
 
-> Sections 1–6 above are the design written before the rebuild and have drifted from the
-> code in places — several files they name (`connection-form.tsx`, `channel-registry.ts`,
-> `candles/`, `e2e/`, `hooks/`) do not exist. This section describes what is there.
+## 8. Channel registry
+
+The descriptor §4 describes, in full. `ChannelsArea` knows nothing about FEED, DOM,
+INDICHART or RPC; each service is a `ChannelPlugin` (`features/channels/plugin.ts`) carrying
+everything the area used to hardcode as a four-way switch:
+
+| | |
+| --- | --- |
+| `kind`, `label`, `icon` | the add-button, the channel title, the error-boundary name |
+| `dialogTitle`, `dialogMaxWidth` | the request dialog |
+| `createRequest()` | the value the request form starts from, seeded once per plugin |
+| `RequestForm` | the form itself, `{ value, onChange }` |
+| `canOpen?(request)` | whether "Open channel" is enabled |
+| `buildConfig(request)` | request → channel config, or `null` when it cannot be opened |
+| `Channel` | the opened channel, `{ title, config }` |
+
+Plugins reach the connection exactly as the channel components always have —
+`useConnectionVM()` for the view model, `useVM` to read its state. Those two are the whole
+host API; there is no plugin-specific context.
+
+`DraftChannel.config` is `unknown`. It was produced by the plugin named by `kind` and is only
+ever handed back to that same plugin, so no config type — and no config *dependency* — needs
+to reach this feature. That is what keeps `@bufbuild/protobuf`, dxcharts and the dxScript
+editor out of `features/channels/`. The types are checked inside each plugin, by
+`defineChannelPlugin`, which is also the single place the erasure happens.
+
+`ConsolePage` and `ChannelsArea` take the plugin list as a **required** prop, never a default:
+which services exist is a composition decision (`app/channels.ts`), not something a component
+should assume. A console that should not offer market data leaves those plugins out and never
+imports their code — the difference between filtering a button and not shipping a dependency.
+
+Two filters, doing different jobs: the registered plugins say which services exist in this
+build, and the profile's `channelKinds` (§7) says which of those this deployment offers. The
+second filters add-buttons only — an already-open channel keeps rendering, so a profile that
+disagrees with what is on screen degrades instead of crashing.
+
+> Sections 1–3, 5 and 6 above are the design written before the rebuild and have drifted from
+> the code in wording and in small details. §4 has been brought back in line with the tree,
+> and §§7–8 were written against it.

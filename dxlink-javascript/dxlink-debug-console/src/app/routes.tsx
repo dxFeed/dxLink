@@ -3,6 +3,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import { Suspense, lazy } from 'react'
 import type { ReactElement } from 'react'
 
+import type { ErasedChannelPlugin } from '../features/channels/plugin'
 import { ConsolePage } from '../pages/console-page'
 import { ErrorBoundary } from '../shared/components/error-boundary'
 import type { ConsoleConfig } from '../shared/lib/console-config'
@@ -31,11 +32,15 @@ export interface RouteDef {
  * so the two can never drift apart.
  *
  * A function rather than a constant because the console page takes the resolved
- * configuration profile — the standalone app resolves it once at startup and hands it in
- * here, which is the same thing an embedding host does by passing props.
+ * configuration profile and the channel services on offer — the standalone app resolves
+ * both once at startup and hands them in here, which is the same thing an embedding host
+ * does by passing props.
  */
-export const createRoutes = (config: ConsoleConfig): readonly RouteDef[] => [
-  { label: 'Console', path: '/', element: <ConsolePage config={config} /> },
+export const createRoutes = (
+  config: ConsoleConfig,
+  channels: readonly ErasedChannelPlugin[]
+): readonly RouteDef[] => [
+  { label: 'Console', path: '/', element: <ConsolePage config={config} channels={channels} /> },
   {
     label: 'Protocol',
     path: '/protocol',

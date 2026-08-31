@@ -1,7 +1,3 @@
-import InsightsIcon from '@mui/icons-material/Insights'
-import ShowChartIcon from '@mui/icons-material/ShowChart'
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
-import ViewColumnIcon from '@mui/icons-material/ViewColumn'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -12,74 +8,58 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { createIndicatorEntry } from './types'
-import type {
-  ChannelConfig,
-  ChannelKind,
-  DomRequest,
-  DraftChannel,
-  FeedRequest,
-  IndiChartRequest,
-  RpcRequest,
-} from './types'
+import type { ErasedChannelPlugin } from './plugin'
+import type { DraftChannel } from './types'
 import { ErrorBoundary } from '../../shared/components/error-boundary'
 import { useConsoleConfig } from '../../shared/lib/console-config-context'
-import { DomChannel } from '../dom/dom-channel'
-import { DomChannelRequest } from '../dom/dom-channel-request'
-import { FeedChannel } from '../feed/feed-channel'
-import { FeedChannelRequest } from '../feed/feed-channel-request'
-import { IndiChartChannel } from '../indichart/indichart-channel'
-import { IndiChartChannelRequest } from '../indichart/indichart-channel-request'
-import { parseRequest } from '../rpc/descriptors'
-import { RpcChannel } from '../rpc/rpc-channel'
-import { canOpenRpcChannel, RpcChannelRequest } from '../rpc/rpc-channel-request'
 
-const ADD_BUTTONS: { kind: ChannelKind; label: string; icon: ReactNode }[] = [
-  { kind: 'feed', label: 'Feed', icon: <ShowChartIcon /> },
-  { kind: 'dom', label: 'DOM', icon: <ViewColumnIcon /> },
-  { kind: 'indichart', label: 'IndiChart', icon: <InsightsIcon /> },
-  { kind: 'rpc', label: 'RPC', icon: <SwapHorizIcon /> },
-]
+/**
+ * Letters whose *name* starts with a vowel sound, so an acronym beginning with one takes
+ * "an": an RPC, an FX, an SLA. Note U is absent — "a U-turn", because its name is "yoo".
+ */
+const VOWEL_SOUND_LETTERS = 'AEFHILMNORSX'
 
-const LABELS: Record<ChannelKind, string> = {
-  feed: 'Feed',
-  dom: 'DOM',
-  indichart: 'IndiChart',
-  rpc: 'RPC',
+/**
+ * "a" or "an" for a channel label.
+ *
+ * Pronunciation decides this, not spelling, and the two disagree for exactly the labels this
+ * console has: RPC is read "ar-pee-see" and takes "an", while DOM is read as a word and
+ * takes "a". So an all-caps label is judged by its first letter's name and anything else by
+ * its first letter's sound.
+ */
+const indefiniteArticle = (label: string): string => {
+  const first = (label[0] ?? '').toUpperCase()
+  const vowelSound =
+    label === label.toUpperCase() ? VOWEL_SOUND_LETTERS.includes(first) : 'AEIOU'.includes(first)
+
+  return vowelSound ? 'an' : 'a'
 }
 
-const DIALOG_TITLES: Record<ChannelKind, string> = {
-  feed: 'New Feed channel',
-  dom: 'New DOM channel',
-  indichart: 'New IndiChart channel',
-  rpc: 'New RPC channel',
-}
-
-/** "a Feed", "a Feed or DOM", "a Feed, DOM or RPC" — reads the same as it used to. */
-const formatKindList = (buttons: readonly { kind: ChannelKind }[]): string => {
-  const labels = buttons.map((button) => LABELS[button.kind])
+/**
+ * "a Feed channel", "an RPC channel", "a Feed, DOM or RPC channel".
+ *
+ * The article agrees with the first label, which is the only one it touches. Never called
+ * with an empty list — the caller has its own copy for a console offering nothing.
+ */
+const formatKindList = (plugins: readonly ErasedChannelPlugin[]): string => {
+  const labels = plugins.map((plugin) => plugin.label)
   const last = labels[labels.length - 1]
+  const list = labels.length === 1 ? last : `${labels.slice(0, -1).join(', ')} or ${last}`
 
-  return labels.length === 1
-    ? `a ${last} channel`
-    : `a ${labels.slice(0, -1).join(', ')} or ${last} channel`
+  return `${indefiniteArticle(labels[0] ?? '')} ${list} channel`
 }
 
-const renderChannel = (channel: DraftChannel) => {
-  const title = `${LABELS[channel.config.kind]} #${channel.id}`
-  switch (channel.config.kind) {
-    case 'feed':
-      return <FeedChannel title={title} config={channel.config} />
-    case 'dom':
-      return <DomChannel title={title} config={channel.config} />
-    case 'indichart':
-      return <IndiChartChannel title={title} config={channel.config} />
-    case 'rpc':
-      return <RpcChannel title={title} config={channel.config} />
-  }
+export interface ChannelsAreaProps {
+  /**
+   * The channel services this console offers, in the order their add-buttons appear.
+   *
+   * Required, and deliberately so: which services exist is a composition decision, not a
+   * default. A console that should not offer market data simply does not register those
+   * plugins — and then never imports their code either.
+   */
+  channels: readonly ErasedChannelPlugin[]
 }
 
 /**
@@ -88,41 +68,34 @@ const renderChannel = (channel: DraftChannel) => {
  * opens so the user can quickly open several channels; each opened channel
  * manages its own state.
  *
- * Which services are on offer comes from the console's configuration profile, so a
- * deployment can present only the ones it serves. That filters the buttons only:
- * {@link renderChannel} stays complete, so a profile that disagrees with what is already
- * open degrades instead of crashing.
+ * Knows nothing about any particular service. Add-buttons, dialog titles, request forms,
+ * validation and the channel bodies all come from the registered {@link ChannelPlugin}s, so
+ * adding or removing a service touches only the composition site.
+ *
+ * Two filters, doing different jobs: the registered plugins say which services exist in
+ * this build, and the profile's `channelKinds` says which of those this deployment offers.
+ * The second filters buttons only — an already-open channel keeps rendering, so a profile
+ * that disagrees with what is on screen degrades instead of crashing.
  */
-export const ChannelsArea = () => {
+export const ChannelsArea = ({ channels }: ChannelsAreaProps) => {
   const config = useConsoleConfig()
-  const addButtons = ADD_BUTTONS.filter((button) => config.channelKinds.includes(button.kind))
+  const offered = channels.filter((plugin) => config.channelKinds.includes(plugin.kind))
+  const byKind = useMemo(() => new Map(channels.map((plugin) => [plugin.kind, plugin])), [channels])
 
-  const [channels, setChannels] = useState<DraftChannel[]>([])
-  const [requestKind, setRequestKind] = useState<ChannelKind | null>(null)
+  const [openChannels, setOpenChannels] = useState<DraftChannel[]>([])
+  const [activePlugin, setActivePlugin] = useState<ErasedChannelPlugin | null>(null)
 
-  const [feedRequest, setFeedRequest] = useState<FeedRequest>({
-    view: 'subscriptions',
-    feed: '',
-    space: '',
-  })
-  const [domRequest, setDomRequest] = useState<DomRequest>({
-    symbol: 'AAPL',
-    // AGGREGATE is the price-level source that works without picking a venue.
-    source: 'AGGREGATE',
-    feed: '',
-    space: '',
-  })
-  const [indiRequest, setIndiRequest] = useState<IndiChartRequest>(() => ({
-    indicators: [createIndicatorEntry()],
-  }))
-  const [rpcRequest, setRpcRequest] = useState<RpcRequest>({
-    url: config.descriptorSetUrl,
-    registry: null,
-    source: null,
-    serviceName: '',
-    methodName: '',
-    json: '{}',
-  })
+  /**
+   * One request value per registered plugin, seeded once.
+   *
+   * Every request keeps its values between opens, so several similar channels are quick to
+   * create. IndiChart used to be reset on open, on the assumption that its editor was
+   * uncontrolled — it is not: `DxScriptEditor` takes a `script` prop and pushes it back
+   * into the editor, so the scripts are restored along with the state.
+   */
+  const [requests, setRequests] = useState<Record<string, unknown>>(() =>
+    Object.fromEntries(channels.map((plugin) => [plugin.kind, plugin.createRequest()]))
+  )
 
   const nextId = useRef(1)
   const [scrollToId, setScrollToId] = useState<string | null>(null)
@@ -137,89 +110,27 @@ export const ChannelsArea = () => {
     setScrollToId(null)
   }, [scrollToId])
 
-  /**
-   * Open the request dialog for a service.
-   *
-   * Every request keeps its values between opens, so several similar channels are
-   * quick to create. IndiChart used to be reset here, on the assumption that its editor
-   * was uncontrolled — it is not: `DxScriptEditor` takes a `script` prop and pushes it
-   * back into the editor, so the scripts are restored along with the state.
-   */
-  const openRequest = (kind: ChannelKind) => {
-    setRequestKind(kind)
-  }
-
-  /**
-   * Build the config for the channel the dialog is describing, or null when the request is
-   * not openable. Only the RPC request can fail here: its service, method and message are
-   * resolved out of a descriptor set, and a stale selection must not open a broken channel.
-   */
-  const buildConfig = (): ChannelConfig | null => {
-    switch (requestKind) {
-      case 'feed':
-        return {
-          kind: 'feed',
-          view: feedRequest.view,
-          feed: feedRequest.feed.trim(),
-          space: feedRequest.space.trim(),
-        }
-      case 'dom':
-        return {
-          kind: 'dom',
-          symbol: domRequest.symbol.trim(),
-          source: domRequest.source.trim(),
-          feed: domRequest.feed.trim(),
-          space: domRequest.space.trim(),
-        }
-      case 'indichart':
-        return {
-          kind: 'indichart',
-          indicators: indiRequest.indicators
-            .map((entry) => entry.code)
-            .filter((code) => code.trim() !== ''),
-        }
-      case 'rpc': {
-        const service = rpcRequest.registry?.getService(rpcRequest.serviceName)
-        const method = service?.method[rpcRequest.methodName]
-        if (service === undefined || method === undefined) {
-          return null
-        }
-        const request = parseRequest(method.input, rpcRequest.json)
-
-        return 'error' in request
-          ? null
-          : { kind: 'rpc', service, method, request: request.message }
-      }
-      case null:
-        return null
-    }
-  }
-
   const openChannel = () => {
-    const config = buildConfig()
-    if (config === null) {
+    if (activePlugin === null) {
+      return
+    }
+    const channelConfig = activePlugin.buildConfig(requests[activePlugin.kind])
+    if (channelConfig === null) {
       return
     }
     const id = String(nextId.current)
     nextId.current += 1
 
-    setChannels((current) => [...current, { id, config }])
-    setRequestKind(null)
+    setOpenChannels((current) => [
+      ...current,
+      { id, kind: activePlugin.kind, config: channelConfig },
+    ])
+    setActivePlugin(null)
     setScrollToId(id)
   }
 
-  const canOpen = (): boolean => {
-    switch (requestKind) {
-      case 'dom':
-        return domRequest.symbol.trim().length > 0
-      case 'indichart':
-        return indiRequest.indicators.some((entry) => entry.code.trim() !== '')
-      case 'rpc':
-        return canOpenRpcChannel(rpcRequest)
-      default:
-        return true
-    }
-  }
+  const canOpen =
+    activePlugin !== null && (activePlugin.canOpen?.(requests[activePlugin.kind]) ?? true)
 
   return (
     <Stack spacing={2}>
@@ -227,21 +138,21 @@ export const ChannelsArea = () => {
         <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
           Channels
         </Typography>
-        {addButtons.map((button) => (
+        {offered.map((plugin) => (
           <Button
-            key={button.kind}
+            key={plugin.kind}
             size="small"
             variant="outlined"
             color="inherit"
-            startIcon={button.icon}
-            onClick={() => openRequest(button.kind)}
+            startIcon={plugin.icon}
+            onClick={() => setActivePlugin(plugin)}
           >
-            {button.label}
+            {plugin.label}
           </Button>
         ))}
       </Stack>
 
-      {channels.length === 0 ? (
+      {openChannels.length === 0 ? (
         <Card variant="outlined">
           <CardContent
             sx={{
@@ -253,51 +164,52 @@ export const ChannelsArea = () => {
             }}
           >
             <Typography color="text.secondary">
-              {addButtons.length === 0
+              {offered.length === 0
                 ? 'This console is configured with no channel services.'
-                : `No channels open. Use the buttons above to open ${formatKindList(addButtons)}.`}
+                : `No channels open. Use the buttons above to open ${formatKindList(offered)}.`}
             </Typography>
           </CardContent>
         </Card>
       ) : (
-        channels.map((channel) => (
-          <Box key={channel.id} id={`channel-${channel.id}`} sx={{ scrollMarginTop: 80 }}>
-            {/* One failing channel must not take the others down with it. */}
-            <ErrorBoundary title={`${LABELS[channel.config.kind]} channel #${channel.id} failed`}>
-              {renderChannel(channel)}
-            </ErrorBoundary>
-          </Box>
-        ))
+        openChannels.map((channel) => {
+          const plugin = byKind.get(channel.kind)
+          if (plugin === undefined) {
+            return null
+          }
+
+          return (
+            <Box key={channel.id} id={`channel-${channel.id}`} sx={{ scrollMarginTop: 80 }}>
+              {/* One failing channel must not take the others down with it. */}
+              <ErrorBoundary title={`${plugin.label} channel #${channel.id} failed`}>
+                <plugin.Channel title={`${plugin.label} #${channel.id}`} config={channel.config} />
+              </ErrorBoundary>
+            </Box>
+          )
+        })
       )}
 
       <Dialog
-        open={requestKind !== null}
-        onClose={() => setRequestKind(null)}
+        open={activePlugin !== null}
+        onClose={() => setActivePlugin(null)}
         fullWidth
-        // The RPC form carries a service picker, a method picker and a JSON editor; the
-        // other three are a handful of fields.
-        maxWidth={requestKind === 'rpc' ? 'md' : 'sm'}
+        maxWidth={activePlugin?.dialogMaxWidth ?? 'sm'}
       >
-        <DialogTitle>{requestKind ? DIALOG_TITLES[requestKind] : ''}</DialogTitle>
+        <DialogTitle>{activePlugin?.dialogTitle ?? ''}</DialogTitle>
         <DialogContent dividers>
-          {requestKind === 'feed' && (
-            <FeedChannelRequest value={feedRequest} onChange={setFeedRequest} />
-          )}
-          {requestKind === 'dom' && (
-            <DomChannelRequest value={domRequest} onChange={setDomRequest} />
-          )}
-          {requestKind === 'indichart' && (
-            <IndiChartChannelRequest value={indiRequest} onChange={setIndiRequest} />
-          )}
-          {requestKind === 'rpc' && (
-            <RpcChannelRequest value={rpcRequest} onChange={setRpcRequest} />
+          {activePlugin !== null && (
+            <activePlugin.RequestForm
+              value={requests[activePlugin.kind]}
+              onChange={(next) =>
+                setRequests((current) => ({ ...current, [activePlugin.kind]: next }))
+              }
+            />
           )}
         </DialogContent>
         <DialogActions>
-          <Button color="inherit" onClick={() => setRequestKind(null)}>
+          <Button color="inherit" onClick={() => setActivePlugin(null)}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={openChannel} disabled={!canOpen()}>
+          <Button variant="contained" onClick={openChannel} disabled={!canOpen}>
             Open channel
           </Button>
         </DialogActions>

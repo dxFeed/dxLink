@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 
 import { App } from './app/App'
+import { createAppChannels } from './app/channels'
 import { resolveAppConsoleConfig } from './app/console-config'
 import { theme } from './app/theme'
 
@@ -18,6 +19,7 @@ if (container === null) {
 // Resolved once, before the first render: the profile is what the forms start from, so it
 // must not change under a mounted console.
 const config = resolveAppConsoleConfig()
+const channels = createAppChannels(config)
 
 createRoot(container).render(
   <StrictMode>
@@ -25,7 +27,7 @@ createRoot(container).render(
     <ThemeProvider theme={theme} defaultMode="system">
       <CssBaseline />
       <HashRouter>
-        <App config={config} />
+        <App config={config} channels={channels} />
       </HashRouter>
     </ThemeProvider>
   </StrictMode>

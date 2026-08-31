@@ -13,9 +13,9 @@ import { useEffect, useState } from 'react'
 import { createRequestTemplate, methodModel, parseRequest } from './descriptors'
 import { RpcViewModel } from './rpc-view-model'
 import type { RpcCallState, RpcMessageEntry } from './rpc-view-model'
+import type { RpcConfig } from './types'
 import { useVM } from '../../shared/view-model'
 import { ChannelWidget } from '../channels/channel-widget'
-import type { RpcConfig } from '../channels/types'
 import { useConnectionVM } from '../connection/connection-context'
 
 interface RpcChannelProps {

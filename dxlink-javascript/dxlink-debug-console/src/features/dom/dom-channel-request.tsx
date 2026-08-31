@@ -6,9 +6,9 @@ import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
+import type { DomRequest } from './types'
 import { DocLink } from '../../shared/components/doc-link'
 import { ORDER_SOURCES_DOC_URL } from '../../shared/lib/order-sources'
-import type { DomRequest } from '../channels/types'
 
 interface DomChannelRequestProps {
   value: DomRequest

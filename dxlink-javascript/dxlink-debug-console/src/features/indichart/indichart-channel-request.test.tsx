@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 
 import { IndiChartChannelRequest } from './indichart-channel-request'
+import type { IndiChartRequest } from './types'
 import { theme } from '../../app/theme'
-import type { IndiChartRequest } from '../channels/types'
 
 /**
  * Controlled harness mirroring how `channels-area` drives this form, so a removal is

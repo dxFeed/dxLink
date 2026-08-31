@@ -25,18 +25,15 @@ export default defineConfig({
     css: false,
     server: {
       deps: {
-        // These packages import their own modules without a file extension —
-        // DxScriptEditor its ace-builds modes/themes ('ace-builds/src-noconflict/
-        // mode-javascript'), dxcharts-lite its own './chart/chart'. Vite's bundler
-        // resolution handles that; Vitest's Node resolution does not. Inlining routes them
-        // through Vite so tests can mount the real editor and the real chart — and so
-        // anything importing them transitively, the channels area included, can be
-        // rendered at all.
-        inline: [
-          '@devexperts/dxcharts-lite',
-          '@dxscript/dxlink-dxcharts-lite',
-          '@dxscript/dxlink-dxscript-editor',
-        ],
+        // DxScriptEditor imports its ace-builds modes/themes without a file extension
+        // ('ace-builds/src-noconflict/mode-javascript'). Vite's bundler resolution handles
+        // that; Vitest's Node resolution does not. Inlining routes the package through
+        // Vite so tests can mount the real editor.
+        //
+        // dxcharts-lite needed the same treatment while the channels area imported the
+        // feed chart transitively. Now that the area only knows its registered plugins,
+        // nothing in a test reaches the chart, and the entry came back out.
+        inline: ['@dxscript/dxlink-dxscript-editor'],
       },
     },
   },

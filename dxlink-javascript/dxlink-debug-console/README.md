@@ -57,6 +57,11 @@ window.__DXLINK_CONFIG__ = {
 are talking to — and a locked field ignores its query parameter, so the pin holds. Only the
 injected config can lock: a query parameter is written by whoever opened the link.
 
+`channelKinds` restricts what a *deployment* offers out of the services this build has. Which
+services the build has at all is a separate, earlier decision, made in `src/app/channels.ts`
+by registering channel plugins — see ARCHITECTURE.md §8. Restricting `channelKinds` hides
+add-buttons; not registering a plugin means its code is never imported.
+
 Bad values fall back to the layer below with a warning rather than taking the console down,
 and unknown keys are ignored.
 

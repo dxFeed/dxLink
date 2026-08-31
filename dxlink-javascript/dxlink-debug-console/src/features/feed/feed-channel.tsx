@@ -10,9 +10,9 @@ import { ConfigurationSection } from './feed-configuration'
 import { EventsTable } from './feed-events-table'
 import { SubscriptionManager } from './feed-subscriptions'
 import { FeedViewModel } from './feed-view-model'
+import type { FeedConfig } from './types'
 import { useVM } from '../../shared/view-model'
 import { ChannelWidget } from '../channels/channel-widget'
-import type { FeedConfig } from '../channels/types'
 import { useConnectionVM } from '../connection/connection-context'
 
 interface FeedChannelProps {

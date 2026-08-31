@@ -15,11 +15,11 @@ import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 
 import { FeedCandlesViewModel } from './feed-candles-view-model'
+import type { FeedConfig } from './types'
 import { DocLink } from '../../shared/components/doc-link'
 import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../../shared/lib/order-sources'
 import { useVM } from '../../shared/view-model'
 import { ChannelWidget } from '../channels/channel-widget'
-import type { FeedConfig } from '../channels/types'
 import { useConnectionVM } from '../connection/connection-context'
 
 import '@dxscript/dxlink-dxcharts-lite/styles.css'

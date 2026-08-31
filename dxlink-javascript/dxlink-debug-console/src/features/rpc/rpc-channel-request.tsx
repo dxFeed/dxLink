@@ -33,7 +33,7 @@ import {
   parseRequest,
   readDescriptorSet,
 } from './descriptors'
-import type { RpcRequest } from '../channels/types'
+import type { RpcRequest } from './types'
 
 interface RpcChannelRequestProps {
   value: RpcRequest
