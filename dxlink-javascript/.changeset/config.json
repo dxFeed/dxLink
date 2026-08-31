@@ -7,5 +7,10 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["**/dxlink-debug-console/**"]
+  "ignore": [
+    "@dxfeed/dxlink-console-core",
+    "@dxfeed/dxlink-console-market-data",
+    "@dxfeed/dxlink-console-rpc",
+    "@dxfeed/dxlink-debug-console"
+  ]
 }
