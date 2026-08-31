@@ -1,6 +1,8 @@
 import type { DescMethod, DescService, FileRegistry, Message } from '@bufbuild/protobuf'
 
-export type ChannelKind = 'feed' | 'dom' | 'indichart' | 'rpc'
+// Re-exported so the channel slices keep importing the vocabulary from the channels
+// feature, while the console configuration profile can reach it from `shared`.
+export type { ChannelKind } from '../../shared/lib/channel-kinds'
 
 export type FeedView = 'subscriptions' | 'chart'
 

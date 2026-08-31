@@ -25,11 +25,18 @@ export default defineConfig({
     css: false,
     server: {
       deps: {
-        // DxScriptEditor imports its ace-builds modes/themes without a file extension
-        // ('ace-builds/src-noconflict/mode-javascript'). Vite's bundler resolution handles
-        // that; Vitest's Node resolution does not. Inlining routes the package through
-        // Vite so tests can mount the real editor.
-        inline: ['@dxscript/dxlink-dxscript-editor'],
+        // These packages import their own modules without a file extension —
+        // DxScriptEditor its ace-builds modes/themes ('ace-builds/src-noconflict/
+        // mode-javascript'), dxcharts-lite its own './chart/chart'. Vite's bundler
+        // resolution handles that; Vitest's Node resolution does not. Inlining routes them
+        // through Vite so tests can mount the real editor and the real chart — and so
+        // anything importing them transitively, the channels area included, can be
+        // rendered at all.
+        inline: [
+          '@devexperts/dxcharts-lite',
+          '@dxscript/dxlink-dxcharts-lite',
+          '@dxscript/dxlink-dxscript-editor',
+        ],
       },
     },
   },

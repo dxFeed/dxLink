@@ -9,6 +9,26 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Deployment configuration. A gateway serving this build can replace the block below
+      (Spring-style property placeholders, or any templating that runs at serve time) to
+      ship defaults without rebuilding the console: the WebSocket URL, the descriptor-set
+      URL, which channel services are on offer, and which of those values the user may not
+      change. Query parameters still override anything not listed in `locked`.
+
+      Absent or malformed values fall back to the built-in defaults, so the commented-out
+      form below is exactly what ships.
+
+      <script>
+        window.__DXLINK_CONFIG__ = {
+          wsUrl: 'wss://gateway.example.com',
+          descriptorSetUrl: 'https://gateway.example.com/proto/docs',
+          keepalive: { interval: 30, timeout: 60, acceptTimeout: 60 },
+          channelKinds: ['rpc'],
+          locked: ['wsUrl', 'descriptorSetUrl'],
+        }
+      </script>
+    -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

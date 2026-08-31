@@ -20,7 +20,8 @@ pnpm console          # or: pnpm --filter @dxfeed/dxlink-debug-console dev
 
 The dev server listens on <http://localhost:4280>. The connection form is pre-filled with
 the shared dev relay in development, and with a URL derived from `window.location` in
-production builds.
+production builds — see [Configuration](#configuration) for how a deployment or a link
+changes that.
 
 > **Note:** `@dxscript/dxlink-dxcharts-lite` and `@dxscript/dxlink-dxscript-editor` are
 > published only to dxFeed's internal registry, so `pnpm install` needs access to it.
@@ -28,6 +29,36 @@ production builds.
 >
 > The dev relay does **not** support the INDICHART service, so IndiChart channels are
 > rejected there. Point the connection form at an endpoint that enables it to use them.
+
+## Configuration
+
+Everything the forms start with comes from one profile — WebSocket URL, keepalive timings,
+descriptor-set URL, and which channel services are on offer. Four sources, later winning:
+
+| Source | For |
+| --- | --- |
+| built-in defaults | An unconfigured console: the URL derived from the page location, 30/60/60 keepalive, all four services |
+| the app | The one build-time choice — a development build points at the shared relay |
+| `window.__DXLINK_CONFIG__` | A gateway serving this build, substituting the block in `index.html` at serve time. The only source that can pin a field |
+| `location.search` | A link that carries a setup: `?ws=…`, `?descriptors=…`, `?channels=rpc,feed` |
+
+A gateway that wants a console fixed to itself injects, say:
+
+```js
+window.__DXLINK_CONFIG__ = {
+  wsUrl: 'wss://gateway.example.com',
+  descriptorSetUrl: 'https://gateway.example.com/proto/docs',
+  channelKinds: ['rpc'],
+  locked: ['wsUrl', 'descriptorSetUrl'],
+}
+```
+
+`locked` fields render read-only rather than hidden — you can still read the endpoint you
+are talking to — and a locked field ignores its query parameter, so the pin holds. Only the
+injected config can lock: a query parameter is written by whoever opened the link.
+
+Bad values fall back to the layer below with a warning rather than taking the console down,
+and unknown keys are ignored.
 
 ## Checks
 

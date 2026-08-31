@@ -4,11 +4,13 @@ import Button from '@mui/material/Button'
 import Container from '@mui/material/Container'
 import Toolbar from '@mui/material/Toolbar'
 import Typography from '@mui/material/Typography'
+import { useMemo } from 'react'
 import { Link as RouterLink, Route, Routes, useLocation } from 'react-router-dom'
 
-import { ROUTES } from './routes'
+import { createRoutes } from './routes'
 import { DxFeedLogo } from '../shared/components/dxfeed-logo'
 import { ThemeModeToggle } from '../shared/components/theme-mode-toggle'
+import type { ConsoleConfig } from '../shared/lib/console-config'
 
 /**
  * App shell: single-row "liquid glass" app bar with brand, inline nav and the
@@ -19,8 +21,9 @@ import { ThemeModeToggle } from '../shared/components/theme-mode-toggle'
  * theme switcher on screen. Left as-is, the row measured 587px against a 375px
  * viewport and pushed the switcher out of reach behind a horizontal scroll.
  */
-export const App = () => {
+export const App = ({ config }: { config: ConsoleConfig }) => {
   const { pathname } = useLocation()
+  const routes = useMemo(() => createRoutes(config), [config])
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
@@ -57,7 +60,7 @@ export const App = () => {
             component="nav"
             sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: { xs: 0, sm: 2 } }}
           >
-            {ROUTES.map((route) => {
+            {routes.map((route) => {
               const active = route.path === pathname
               return (
                 <Button
@@ -85,7 +88,7 @@ export const App = () => {
 
       <Container component="main" maxWidth="lg" sx={{ flexGrow: 1, py: 3 }}>
         <Routes>
-          {ROUTES.map((route) => (
+          {routes.map((route) => (
             <Route key={route.path} path={route.path} element={route.element} />
           ))}
         </Routes>

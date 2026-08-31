@@ -26,6 +26,7 @@ import type {
   RpcRequest,
 } from './types'
 import { ErrorBoundary } from '../../shared/components/error-boundary'
+import { useConsoleConfig } from '../../shared/lib/console-config-context'
 import { DomChannel } from '../dom/dom-channel'
 import { DomChannelRequest } from '../dom/dom-channel-request'
 import { FeedChannel } from '../feed/feed-channel'
@@ -57,6 +58,16 @@ const DIALOG_TITLES: Record<ChannelKind, string> = {
   rpc: 'New RPC channel',
 }
 
+/** "a Feed", "a Feed or DOM", "a Feed, DOM or RPC" — reads the same as it used to. */
+const formatKindList = (buttons: readonly { kind: ChannelKind }[]): string => {
+  const labels = buttons.map((button) => LABELS[button.kind])
+  const last = labels[labels.length - 1]
+
+  return labels.length === 1
+    ? `a ${last} channel`
+    : `a ${labels.slice(0, -1).join(', ')} or ${last} channel`
+}
+
 const renderChannel = (channel: DraftChannel) => {
   const title = `${LABELS[channel.config.kind]} #${channel.id}`
   switch (channel.config.kind) {
@@ -76,8 +87,16 @@ const renderChannel = (channel: DraftChannel) => {
  * per-service channel-request dialog. Request forms keep their values between
  * opens so the user can quickly open several channels; each opened channel
  * manages its own state.
+ *
+ * Which services are on offer comes from the console's configuration profile, so a
+ * deployment can present only the ones it serves. That filters the buttons only:
+ * {@link renderChannel} stays complete, so a profile that disagrees with what is already
+ * open degrades instead of crashing.
  */
 export const ChannelsArea = () => {
+  const config = useConsoleConfig()
+  const addButtons = ADD_BUTTONS.filter((button) => config.channelKinds.includes(button.kind))
+
   const [channels, setChannels] = useState<DraftChannel[]>([])
   const [requestKind, setRequestKind] = useState<ChannelKind | null>(null)
 
@@ -97,7 +116,7 @@ export const ChannelsArea = () => {
     indicators: [createIndicatorEntry()],
   }))
   const [rpcRequest, setRpcRequest] = useState<RpcRequest>({
-    url: '',
+    url: config.descriptorSetUrl,
     registry: null,
     source: null,
     serviceName: '',
@@ -208,7 +227,7 @@ export const ChannelsArea = () => {
         <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
           Channels
         </Typography>
-        {ADD_BUTTONS.map((button) => (
+        {addButtons.map((button) => (
           <Button
             key={button.kind}
             size="small"
@@ -234,7 +253,9 @@ export const ChannelsArea = () => {
             }}
           >
             <Typography color="text.secondary">
-              No channels open. Use the buttons above to open a Feed, DOM, IndiChart or RPC channel.
+              {addButtons.length === 0
+                ? 'This console is configured with no channel services.'
+                : `No channels open. Use the buttons above to open ${formatKindList(addButtons)}.`}
             </Typography>
           </CardContent>
         </Card>

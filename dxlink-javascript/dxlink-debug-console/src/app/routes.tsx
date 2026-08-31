@@ -5,6 +5,7 @@ import type { ReactElement } from 'react'
 
 import { ConsolePage } from '../pages/console-page'
 import { ErrorBoundary } from '../shared/components/error-boundary'
+import type { ConsoleConfig } from '../shared/lib/console-config'
 
 // The AsyncAPI viewer bundles its own parser and syntax highlighter and is far larger
 // than the rest of the app, so it is kept out of the initial chunk.
@@ -28,9 +29,13 @@ export interface RouteDef {
 /**
  * Single source of truth for navigation: drives both the tab bar and the router,
  * so the two can never drift apart.
+ *
+ * A function rather than a constant because the console page takes the resolved
+ * configuration profile — the standalone app resolves it once at startup and hands it in
+ * here, which is the same thing an embedding host does by passing props.
  */
-export const ROUTES: readonly RouteDef[] = [
-  { label: 'Console', path: '/', element: <ConsolePage /> },
+export const createRoutes = (config: ConsoleConfig): readonly RouteDef[] => [
+  { label: 'Console', path: '/', element: <ConsolePage config={config} /> },
   {
     label: 'Protocol',
     path: '/protocol',

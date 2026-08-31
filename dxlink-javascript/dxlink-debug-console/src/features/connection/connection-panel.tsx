@@ -12,7 +12,8 @@ import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 
 import { useConnectionVM } from './connection-context'
-import { getDefaultWsUrl } from '../../shared/lib/connection-url'
+import type { ConsoleConfig } from '../../shared/lib/console-config'
+import { useConsoleConfig } from '../../shared/lib/console-config-context'
 import { useVM } from '../../shared/view-model'
 import { ErrorCenter } from '../errors/error-center'
 
@@ -35,11 +36,16 @@ interface ConnectionForm {
   acceptKeepalive: string
 }
 
-const createDefaultForm = (): ConnectionForm => ({
-  url: getDefaultWsUrl(window.location, import.meta.env.PROD),
-  keepaliveInterval: '30',
-  keepaliveTimeout: '60',
-  acceptKeepalive: '60',
+/**
+ * The values the form starts with, taken from the console's configuration profile. The
+ * fields stay editable drafts from here on — the profile seeds them and is never written
+ * back to.
+ */
+const createDefaultForm = (config: ConsoleConfig): ConnectionForm => ({
+  url: config.wsUrl,
+  keepaliveInterval: String(config.keepalive.interval),
+  keepaliveTimeout: String(config.keepalive.timeout),
+  acceptKeepalive: String(config.keepalive.acceptTimeout),
 })
 
 const InfoLine = ({ label, value }: { label: string; value: string }) => (
@@ -54,20 +60,25 @@ const InfoLine = ({ label, value }: { label: string; value: string }) => (
 /**
  * Connection panel — the live connection view. Reads connection state / details /
  * errors from the page-scoped {@link ConnectionViewModel} and drives connect /
- * reconnect / disconnect. Form fields (URL + keepalive) are local draft state;
- * the URL defaults from `getDefaultWsUrl`.
+ * reconnect / disconnect. Form fields (URL + keepalive) are local draft state seeded from
+ * the console's configuration profile, which can also pin a field: a pinned field renders
+ * read-only rather than hidden, since which endpoint you are talking to is worth seeing
+ * even when the deployment fixed it.
  */
 export const ConnectionPanel = () => {
   const vm = useConnectionVM()
+  const config = useConsoleConfig()
   const connection = useVM(vm, (s) => s.connection)
   const details = useVM(vm, (s) => s.details)
   const errors = useVM(vm, (s) => s.errors)
 
-  const [form, setForm] = useState<ConnectionForm>(createDefaultForm)
+  const [form, setForm] = useState<ConnectionForm>(() => createDefaultForm(config))
 
   const connected = connection === DXLinkConnectionState.CONNECTED
   const connecting = connection === DXLinkConnectionState.CONNECTING
   const frozen = connected || connecting
+  const urlPinned = config.locked.includes('wsUrl')
+  const keepalivePinned = config.locked.includes('keepalive')
 
   const setField =
     (key: keyof ConnectionForm, digitsOnly = false) =>
@@ -115,7 +126,8 @@ export const ConnectionPanel = () => {
             label="WebSocket URL"
             value={form.url}
             onChange={setField('url')}
-            disabled={frozen}
+            disabled={frozen || urlPinned}
+            helperText={urlPinned ? 'Fixed by this deployment.' : undefined}
             size="small"
             fullWidth
           />
@@ -130,21 +142,21 @@ export const ConnectionPanel = () => {
               label="Keepalive interval, s"
               value={form.keepaliveInterval}
               onChange={setField('keepaliveInterval', true)}
-              disabled={frozen}
+              disabled={frozen || keepalivePinned}
               size="small"
             />
             <TextField
               label="Keepalive timeout, s"
               value={form.keepaliveTimeout}
               onChange={setField('keepaliveTimeout', true)}
-              disabled={frozen}
+              disabled={frozen || keepalivePinned}
               size="small"
             />
             <TextField
               label="Accept keepalive, s"
               value={form.acceptKeepalive}
               onChange={setField('acceptKeepalive', true)}
-              disabled={frozen}
+              disabled={frozen || keepalivePinned}
               size="small"
             />
             <TextField label="Server keepalive, s" value={serverKeepalive} size="small" disabled />

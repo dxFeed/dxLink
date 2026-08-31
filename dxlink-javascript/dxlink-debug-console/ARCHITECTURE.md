@@ -70,8 +70,10 @@ main.tsx
   `openFeed()` constructs one (via the channel registry), `closeChannel(id)` calls its `dispose()`.
 - **Error scoping:** connection-level errors aggregate on `ConnectionViewModel.errors[]`;
   **channel-level errors stay on their channel VM** (surfaced in the `ChannelWidget`), as today.
-- Connection params persisted to localStorage. **Tab-nav lifecycle (resolved): page-scoped** —
-  navigating `/`→`/protocol` unmounts the page and closes the socket (exact current behavior),
+- **Connection params are not persisted** — the theme is the only thing that survives a
+  reload. They come instead from the configuration profile (§7), which a host supplies and
+  the forms start from. **Tab-nav lifecycle (resolved): page-scoped** — navigating
+  `/`→`/protocol` unmounts the page and closes the socket (exact current behavior),
   reconnect on return. An overlay/persist variant is a possible future UX change, not in scope.
 
 ## 3. Reactive data flow (one VM — same shape for all)
@@ -172,9 +174,44 @@ selection, timezone). COLOR keeps the dxScript color-name ⇄ hex mapping.
 ### 6.2 UX improvements (over current console)
 
 - Theme follows the OS by default (`prefers-color-scheme`); in-app control to switch System / Light / Dark, persisted to localStorage (current app is light-only).
-- Persisted connection presets and last-used params; shareable URL state for tab + URL.
+- Shareable URL state for the connection and definitions endpoints (§7). Persisted connection presets and last-used params are still open.
 - Connection status as a clear badge; explicit reconnect control.
 - Live feed tables: virtualized, **pause/resume** + **clear**, copy-row-as-JSON, throttled.
 - Collapsible/reorderable channel panels.
 - Error center: timestamped, grouped by source (connection vs channel), dismissible.
 - Full keyboard accessibility and responsive layout (MUI a11y baseline).
+
+## 7. Configuration profile
+
+Everything a deployment can decide about a console before anyone opens it lives in one
+`ConsoleConfig` (`shared/lib/console-config.ts`): the WebSocket URL, the keepalive timings,
+the descriptor-set URL, which channel services are on offer, and which of those values the
+user may not change.
+
+**It seeds initial state; it does not own state.** Each value is read once, into the local
+draft state of the form that owns it, and is never written back — the user stays free to
+edit. The one exception is `locked`, which is how a host says a field is fixed rather than
+merely suggested; a locked field renders read-only rather than hidden, because in a debug
+console the endpoint you are talking to is worth seeing even when you cannot change it.
+
+Four sources, later winning:
+
+```
+built-in defaults  ←  app defaults  ←  window.__DXLINK_CONFIG__  ←  location.search
+   (derived from        (the dev          (what a gateway            (?ws= &
+    the location)        relay)            substituted into           descriptors= &
+                                           index.html)                channels=)
+```
+
+Two rules make locking mean something: **only the injected config can lock** (a query
+parameter is written by whoever opened the link, so letting it pin — or unpin — a field
+would make locking a lie), and **a locked field ignores its query parameter**.
+
+`app/console-config.ts` is the only place that reads globals, and the only place that reads
+`import.meta.env`. Everything below takes the resolved profile as data: `ConsolePage` accepts
+it as a prop and provides it through `ConsoleConfigProvider`, so an embedding host with its
+own answers passes them in and the page reaches for nothing.
+
+> Sections 1–6 above are the design written before the rebuild and have drifted from the
+> code in places — several files they name (`connection-form.tsx`, `channel-registry.ts`,
+> `candles/`, `e2e/`, `hooks/`) do not exist. This section describes what is there.
