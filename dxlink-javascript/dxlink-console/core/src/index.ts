@@ -7,8 +7,9 @@
  * decision, not an import to reach for.
  */
 
-// The page a host embeds, and the area it composes.
+// The page a host embeds, the theme it renders with, and the area it composes.
 export { ConsolePage } from './console-page'
+export { createConsoleTheme } from './theme'
 export type { ConsolePageProps } from './console-page'
 export { ChannelsArea } from './channels/channels-area'
 export type { ChannelsAreaProps } from './channels/channels-area'

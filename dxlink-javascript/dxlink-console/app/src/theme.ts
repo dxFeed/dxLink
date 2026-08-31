@@ -1,4 +1,4 @@
-import { createTheme } from '@mui/material/styles'
+import { createConsoleTheme } from '@dxfeed/dxlink-console-core'
 
 /**
  * Font stack: self-hosted Inter (variable) with system fallbacks. The font file
@@ -17,46 +17,29 @@ const FONT_FAMILY = [
 ].join(', ')
 
 /**
- * App theme. Stock MUI components throughout — the polished, "MUI-docs-grade"
- * look comes entirely from the theme (palette, typography, shape) plus a few
- * component style overrides (notably the translucent "liquid glass" app bar),
- * never from bespoke components.
+ * App theme: the console's own theme plus the layer that is this app's rather than the
+ * console's.
  *
- * Light + dark color schemes follow the OS by default (`defaultMode="system"`
- * on the provider); `cssVariables` with a class selector lets
- * `InitColorSchemeScript` apply the stored scheme before first paint.
- * Scheme-specific styles inside overrides use `theme.applyStyles('dark', …)`.
+ * The split is the point. `createConsoleTheme()` owns everything about the console —
+ * palette, shape, the density of the controls inside its panels — and is what an embedding
+ * host gets. What is added here is what only a page can own:
+ *
+ *  - **the font.** Core names none, so an embedded console inherits its host's type. This
+ *    app is the host of itself, so it names Inter.
+ *  - **the app bar**, which core has no equivalent of — the console is a page area, not a
+ *    chrome.
+ *  - **the global `CssBaseline` overrides**, which reach `html` and so exist only where a
+ *    global baseline does. `ConsolePage` uses `ScopedCssBaseline`, which is a different theme
+ *    slot and never sees these.
+ *
+ * Light + dark color schemes follow the OS by default (`defaultMode="system"` on the
+ * provider); the class-based `colorSchemeSelector` comes from the console theme, and lets
+ * `InitColorSchemeScript` apply the stored scheme before first paint. Scheme-specific styles
+ * inside overrides use `theme.applyStyles('dark', …)`.
  */
-export const theme = createTheme({
-  cssVariables: {
-    colorSchemeSelector: 'class',
-  },
-  colorSchemes: {
-    light: {
-      palette: {
-        primary: { main: '#3b6fed' },
-        background: { default: '#f5f6f8', paper: '#ffffff' },
-      },
-    },
-    dark: {
-      palette: {
-        primary: { main: '#7aa2ff' },
-        background: { default: '#0b0c0f', paper: '#15171c' },
-      },
-    },
-  },
-  shape: {
-    borderRadius: 10,
-  },
+export const theme = createConsoleTheme({
   typography: {
     fontFamily: FONT_FAMILY,
-    h1: { fontWeight: 700, letterSpacing: '-0.02em' },
-    h2: { fontWeight: 700, letterSpacing: '-0.02em' },
-    h3: { fontWeight: 700, letterSpacing: '-0.015em' },
-    h4: { fontWeight: 700, letterSpacing: '-0.01em' },
-    h5: { fontWeight: 600 },
-    h6: { fontWeight: 600 },
-    button: { fontWeight: 600, textTransform: 'none' },
   },
   components: {
     MuiCssBaseline: {
@@ -67,6 +50,11 @@ export const theme = createTheme({
         // follows the active color scheme. `html:root` outranks the package's
         // `:root` regardless of stylesheet order. (A chart created before a
         // mode switch keeps its palette until its next subscription re-create.)
+        //
+        // This has to be global — dxcharts reads the document root, not the console's
+        // subtree — which is why it stays with the app's global baseline rather than moving
+        // into the market-data package with the charts themselves. A host embedding
+        // market-data into a page with no global `CssBaseline` needs its own equivalent.
         'html:root': {
           '--dx-chart-bg': 'var(--mui-palette-background-paper)',
           '--dx-chart-grid': 'var(--mui-palette-divider)',
@@ -98,48 +86,6 @@ export const theme = createTheme({
             backgroundColor: 'rgba(13, 15, 19, 0.72)',
           }),
         }),
-      },
-    },
-    MuiCard: {
-      defaultProps: {
-        variant: 'outlined',
-      },
-      styleOverrides: {
-        root: ({ theme }) => ({
-          borderColor: theme.palette.divider,
-          backgroundImage: 'none',
-          boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 28px rgba(16, 24, 40, 0.05)',
-          ...theme.applyStyles('dark', {
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 28px rgba(0, 0, 0, 0.35)',
-          }),
-        }),
-      },
-    },
-    MuiButton: {
-      defaultProps: {
-        disableElevation: true,
-      },
-    },
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          fontWeight: 600,
-        },
-      },
-    },
-    // Compact dropdowns: Select menus open dense, matching the `size="small"`
-    // inputs they belong to. The app has no app-level menus (nav is buttons),
-    // so this effectively scopes to Select popovers.
-    MuiMenuItem: {
-      defaultProps: {
-        dense: true,
-      },
-      styleOverrides: {
-        root: {
-          fontSize: '0.8125rem',
-          minHeight: 30,
-        },
       },
     },
   },

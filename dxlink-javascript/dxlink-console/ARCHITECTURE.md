@@ -299,6 +299,58 @@ build, and the profile's `channelKinds` (§7) says which of those this deploymen
 second filters add-buttons only — an already-open channel keeps rendering, so a profile that
 disagrees with what is on screen degrades instead of crashing.
 
+## 9. Theming boundary
+
+The console is embeddable only if it styles itself and nothing else. Three things had to be
+true for that, and each is a place where MUI's defaults are built for an application that owns
+its page rather than a component dropped into someone else's.
+
+**The reset is scoped.** `ConsolePage` renders `ScopedCssBaseline`, always. MUI's reset comes
+in two forms: `CssBaseline` writes it to `html`/`body`, `ScopedCssBaseline` writes the same
+rules to a wrapping `div`. Only the second can be embedded — the first repaints the background,
+colour and font of whatever page the console lands in, which for a docs site means restyling
+the documentation around it. The standalone app keeps a global `CssBaseline` too, because an
+app legitimately owns its page; the scoped one inside it applies the same rules over the same
+palette, so it changes nothing there.
+
+Note the two are *different theme slots*. `MuiCssBaseline` overrides — the `--dx-chart-*`
+token mapping dxcharts-lite needs — are global by nature and invisible to
+`MuiScopedCssBaseline`, which is why they stay in `app/src/theme.ts`. A host embedding
+market-data into a page with no global baseline needs its own equivalent.
+
+**The theme is core's, and the font is not.** `createConsoleTheme(...overrides)` owns the
+palette, shape and control density; `app/src/theme.ts` layers on what only a page can own —
+Inter, the glass app bar, the global baseline overrides. `typography.fontFamily` is
+`'inherit'`, deliberately: an embedded console picks up the host's type. Omitting it would not
+achieve that, because `createTheme` fills in MUI's Roboto stack and the console would impose
+Roboto on a page that asked for nothing.
+
+The merge happens on the **options**, before `createTheme` runs. `createTheme(options, ...args)`
+merges its extra arguments into the theme it already computed, which strips anything derived: a
+`fontFamily` supplied that way lands on `typography.fontFamily` while `body1` and the headings
+keep the stack they were built from. That shipped briefly as a console rendering in Roboto
+inside a page rendering in Inter.
+
+**The host owns light/dark.** `ConsolePage` takes an optional `theme`. A host with a
+`ThemeProvider` already above the page — the app — passes nothing, so there is one theme in the
+tree. A host embedding into a page that is not MUI's passes one, and gets a self-contained
+console; that provider is given `colorSchemeNode={null}` and `storageManager={null}`.
+
+Both are necessary. Left to itself, MUI's provider resolves the mode by reading `localStorage`
+and then writes the resulting class onto `document.documentElement` — so an embedded console
+read a mode it never stored and flipped the host page dark through the host's own `.dark`
+rules, on a light OS. Nothing is lost by removing it: the theme selects color schemes by class,
+which MUI expands to the descendant selector `.dark &`, and `next-themes` with
+`attribute="class"` writes exactly `class="dark"` on `<html>`. The host's toggle drives the
+console through CSS with no code in between, which is why an embedded console renders no mode
+switch of its own — that control belongs to the app shell, and always did.
+
+The residue: `useColorScheme()` then reports the provider's default rather than what is on
+screen, so `useResolvedColorScheme()` (`market-data/src/indichart/color-scheme.ts`, for the
+dxScript editor's own light/dark prop) is wrong in an embed. Market-data is not on the docs
+site's path — it needs core and rpc — so this is a market-data problem, not a blocker.
+
 > Sections 1–3, 5 and 6 above are the design written before the rebuild and have drifted from
-> the code in wording and in small details. §4 describes the package layout as it now stands,
-> and §§7–8 were written against it.
+> the code in wording and in small details. §2's "nothing global but the theme" is one such
+> place — see §9, where the theme is no longer necessarily global. §4 describes the package
+> layout as it now stands, and §§7–9 were written against it.

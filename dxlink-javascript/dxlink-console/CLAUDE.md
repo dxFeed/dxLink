@@ -207,6 +207,33 @@ still exercises everything up to the wire.
   theme switcher must remain on screen. It previously measured 587px against a 375px
   viewport, pushing the switcher out of reach.
 
+### The embed contract (ARCHITECTURE.md §9)
+
+Running the app proves almost nothing about embedding: the app supplies a global
+`CssBaseline`, Inter and its own `ThemeProvider`, so a console that quietly depends on any of
+them still looks right there. Both bugs found while building this were invisible in the app and
+obvious the moment the console was rendered on a page that supplies none of it.
+
+So walk it on a **hostile host page** — a temporary second Vite entry beside `index.html`
+(any `*.html` in `app/` is served in dev), with its own serif font and background, no
+`CssBaseline`, no font import, no `InitColorSchemeScript`, and a button toggling `.dark` on
+`<html>`. Render `<ConsolePage theme={createConsoleTheme()} … />` into it. Then check, in the
+browser rather than by eye:
+
+- `document.documentElement.className` is **empty** — even with a stale `mui-mode` in
+  `localStorage` and the opposite OS preference. A class here means the console reached for a
+  mode and restyled the host page through the host's own `.dark` rules.
+- the host's own paragraph keeps its font, colour and background.
+- `getComputedStyle(document.querySelector('.MuiScopedCssBaseline-root')).fontFamily` is the
+  **host's** font, not Roboto. Roboto means the console is imposing MUI's default; the host's
+  font means `fontFamily: 'inherit'` survived the theme merge.
+- clicking the toggle flips the console's palette — `--mui-palette-primary-main` changes — with
+  no code between the host's class and the console.
+
+Delete the entry afterwards; it is a probe, not a fixture. Note that adding a dependency
+invalidates a running dev server's resolution, so restart it (or run once with `--force`) —
+otherwise the new import fails to resolve and every request 500s with a blank page.
+
 ---
 
 ## Traps

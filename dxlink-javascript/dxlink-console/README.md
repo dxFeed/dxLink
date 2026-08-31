@@ -5,9 +5,12 @@ DOM and INDICHART channels, and inspect what the protocol actually sends back. P
 a set of protobuf service definitions and it will call any RPC method in them too. Also
 renders the dxLink AsyncAPI specification.
 
-This is the modern rebuild of the console that shipped inside `@dxfeed/dxlink-docs`. It
-is an application, not a library: `private: true` and excluded from Changesets — nothing
-here is published to npm. It is run locally; there is no deployment.
+This is the modern rebuild of the console that shipped inside `@dxfeed/dxlink-docs`. Nothing
+here is published to npm — all four packages are `private: true` and excluded from Changesets,
+and the app is run locally with no deployment. The packages are nonetheless shaped to be
+consumed rather than only run: core styles itself and reads no globals, so a host can render
+the console inside a page it does not own (see [Embedding](#embedding)). Publishing is a
+separate, open decision.
 
 ## Running
 
@@ -70,6 +73,45 @@ profile core carries is just smaller than they suggest.
 
 Bad values fall back to the layer below with a warning rather than taking the console down,
 and unknown keys are ignored.
+
+## Embedding
+
+The console styles itself and nothing else, so it can be rendered inside a page it does not
+own — a docs site, say. A host that has no MUI `ThemeProvider` of its own passes a theme, and
+gets a self-contained console:
+
+```tsx
+import { ConsolePage, createConsoleTheme, builtinConsoleConfig } from '@dxfeed/dxlink-console-core'
+import { rpcChannelPlugin } from '@dxfeed/dxlink-console-rpc'
+
+<ConsolePage
+  theme={createConsoleTheme()}
+  config={{ ...builtinConsoleConfig(), wsUrl: 'wss://gateway.example.com' }}
+  channels={[rpcChannelPlugin({ descriptorSetUrl: '/proto/docs' })]}
+/>
+```
+
+Three things follow from that, and they are the whole of the theming contract:
+
+- **The MUI reset is scoped to the console's own subtree** (`ScopedCssBaseline`), so the host
+  page keeps its background, colour and font. A global `CssBaseline` would restyle the
+  documentation around the console.
+- **The font is inherited.** `createConsoleTheme()` sets `fontFamily: 'inherit'`, so the console
+  reads as part of the page rather than a widget pasted into it. Pass
+  `createConsoleTheme({ typography: { fontFamily: '…' } })` to override; overrides are
+  deep-merged over the console's options, so derived values follow.
+- **The host owns light/dark.** A console given a `theme` writes nothing to `<html>` and reads
+  nothing from `localStorage`. It follows whatever class the host sets, because the theme selects
+  color schemes by class and MUI's `'class'` selector is exactly what `next-themes`
+  (`attribute="class"`) writes. So an embedded console renders no theme switcher — that control
+  belongs to the host.
+
+A host that already has a `ThemeProvider` above the page leaves `theme` out, and its own theme
+applies; that is what the app does. See ARCHITECTURE.md §9 for why each of these is necessary
+rather than merely tidy.
+
+Note this is the theming half of embedding only. Publishing — reversing `private: true`, build
+steps, `exports` maps, peer deps — is a separate, open decision; see [Layout](#layout).
 
 ## Checks
 
