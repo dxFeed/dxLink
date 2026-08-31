@@ -30,8 +30,8 @@ Failing that, load a descriptor set from a file instead.
 The market-data relay answers an INDICHART channel request with
 `BAD_ACTION — Unsupported service: 'INDICHART'`. That is the server declining, not a
 console bug — the channel opens, is rejected, and closes, and the error lands on that
-channel's own card. `core/src/lib/connection-url.ts` defaults to the market-data URL, so
-IndiChart always needs the URL changed by hand.
+channel's own card. `app/src/connection-url.ts` starts a development build at the market-data
+relay, so IndiChart always needs the URL changed by hand.
 
 ## Running it
 
