@@ -8,4 +8,4 @@
 '@dxfeed/dxlink-api': minor
 ---
 
-Modernize build tooling and packaging. Packages are now bundled with tsup (replacing microbundle) and ship dual ESM/CJS builds exposed through a conditional `exports` map (`import`/`require` with matching type declarations). Public APIs are unchanged and the standard entry points (`main`, `module`, `types`, `exports`) resolve as before.
+Modernize build tooling and packaging. Packages are now bundled with tsup (replacing microbundle) and ship dual ESM/CJS builds exposed through a conditional `exports` map (`import`/`require` with matching type declarations). This packaging change carries no API change of its own, and the standard entry points (`main`, `module`, `types`, `exports`) resolve as before.
