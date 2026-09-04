@@ -175,7 +175,7 @@ what they test as `*.test.ts(x)`; each library package carries its own `vitest.c
 declares a `ChannelPlugin` and `app/src/channels.ts` aggregates them, so `ChannelsArea`
 renders channels without importing any of them. Adding a channel kind = a plugin + a line at
 the composition site. The one departure from the original sketch is the layer: the descriptor
-registers *UI* per service (add-button, request form, channel body) rather than teaching
+registers _UI_ per service (add-button, request form, channel body) rather than teaching
 `ConnectionViewModel` how to open channels, because each channel view model already opens its
 own channel off the client it is handed. §8 has the contract.
 
@@ -281,22 +281,22 @@ The descriptor §4 describes, in full. `ChannelsArea` knows nothing about FEED, 
 INDICHART or RPC; each service is a `ChannelPlugin` (`core/src/channels/plugin.ts`) carrying
 everything the area used to hardcode as a four-way switch:
 
-| | |
-| --- | --- |
-| `kind`, `label`, `icon` | the add-button, the channel title, the error-boundary name |
-| `dialogTitle`, `dialogMaxWidth` | the request dialog |
-| `createRequest()` | the value the request form starts from, seeded once per plugin |
-| `RequestForm` | the form itself, `{ value, onChange }` |
-| `canOpen?(request)` | whether "Open channel" is enabled |
-| `buildConfig(request)` | request → channel config, or `null` when it cannot be opened |
-| `Channel` | the opened channel, `{ title, config }` |
+|                                 |                                                                |
+| ------------------------------- | -------------------------------------------------------------- |
+| `kind`, `label`, `icon`         | the add-button, the channel title, the error-boundary name     |
+| `dialogTitle`, `dialogMaxWidth` | the request dialog                                             |
+| `createRequest()`               | the value the request form starts from, seeded once per plugin |
+| `RequestForm`                   | the form itself, `{ value, onChange }`                         |
+| `canOpen?(request)`             | whether "Open channel" is enabled                              |
+| `buildConfig(request)`          | request → channel config, or `null` when it cannot be opened   |
+| `Channel`                       | the opened channel, `{ title, config }`                        |
 
 Plugins reach the connection exactly as the channel components always have —
 `useConnectionVM()` for the view model, `useVM` to read its state. Those two are the whole
 host API; there is no plugin-specific context.
 
 `DraftChannel.config` is `unknown`. It was produced by the plugin named by `kind` and is only
-ever handed back to that same plugin, so no config type — and no config *dependency* — needs
+ever handed back to that same plugin, so no config type — and no config _dependency_ — needs
 to reach this feature. That is what keeps `@bufbuild/protobuf`, dxcharts and the dxScript
 editor out of core altogether. The types are checked inside each plugin, by
 `defineChannelPlugin`, which is also the single place the erasure happens.
@@ -325,7 +325,7 @@ the documentation around it. The standalone app keeps a global `CssBaseline` too
 app legitimately owns its page; the scoped one inside it applies the same rules over the same
 palette, so it changes nothing there.
 
-Note the two are *different theme slots*. `MuiCssBaseline` overrides — the `--dx-chart-*`
+Note the two are _different theme slots_. `MuiCssBaseline` overrides — the `--dx-chart-*`
 token mapping dxcharts-lite needs — are global by nature and invisible to
 `MuiScopedCssBaseline`, which is why they stay in `app/src/theme.ts`. A host embedding
 market-data into a page with no global baseline needs its own equivalent.

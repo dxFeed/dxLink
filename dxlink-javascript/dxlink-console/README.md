@@ -36,12 +36,12 @@ changes that.
 Everything the forms start with comes from one profile — WebSocket URL, keepalive timings,
 descriptor-set URL, and which channel services are on offer. Four sources, later winning:
 
-| Source | For |
-| --- | --- |
-| built-in defaults | 30/60/60 keepalive, no restriction on services, and **no URL** — deriving one means knowing how the console is deployed, which is the host's answer to give |
-| the app | The one build-time choice — a development build points at the shared relay |
-| `window.__DXLINK_CONFIG__` | A gateway serving this build, substituting the block in `index.html` at serve time. The only source that can pin a field |
-| `location.search` | A link that carries a setup: `?ws=…`, `?descriptors=…`, `?channels=rpc,feed` |
+| Source                     | For                                                                                                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| built-in defaults          | 30/60/60 keepalive, no restriction on services, and **no URL** — deriving one means knowing how the console is deployed, which is the host's answer to give |
+| the app                    | The one build-time choice — a development build points at the shared relay                                                                                  |
+| `window.__DXLINK_CONFIG__` | A gateway serving this build, substituting the block in `index.html` at serve time. The only source that can pin a field                                    |
+| `location.search`          | A link that carries a setup: `?ws=…`, `?descriptors=…`, `?channels=rpc,feed`                                                                                |
 
 A gateway that wants a console fixed to itself injects, say:
 
@@ -58,7 +58,7 @@ window.__DXLINK_CONFIG__ = {
 are talking to — and a locked field ignores its query parameter, so the pin holds. Only the
 injected config can lock: a query parameter is written by whoever opened the link.
 
-`channelKinds` restricts what a *deployment* offers out of the services this build has. Which
+`channelKinds` restricts what a _deployment_ offers out of the services this build has. Which
 services the build has at all is a separate, earlier decision, made in `app/src/channels.ts`
 by registering channel plugins — see ARCHITECTURE.md §8. Restricting `channelKinds` hides
 add-buttons; not registering a plugin means its code is never imported. Kind names are open
@@ -78,6 +78,7 @@ The console styles itself and nothing else, so it can be rendered inside a page 
 own — a docs site, say. A host that has no MUI `ThemeProvider` of its own passes a theme, and
 gets a self-contained console:
 
+<!-- prettier-ignore -->
 ```tsx
 import { ConsolePage, createConsoleTheme, builtinConsoleConfig } from '@dxfeed/dxlink-console-core'
 import { rpcChannelPlugin } from '@dxfeed/dxlink-console-rpc'
@@ -139,12 +140,12 @@ sub-path) · Vitest + Testing Library.
 
 Four packages, dependencies pointing downward — `app → {market-data, rpc} → core`:
 
-| Package | |
-| --- | --- |
-| `core/` — `@dxfeed/dxlink-console-core` | Connection, auth, the channel-plugin registry, the configuration profile. No market-data anything. |
+| Package                                               |                                                                                                                                                         |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/` — `@dxfeed/dxlink-console-core`               | Connection, auth, the channel-plugin registry, the configuration profile. No market-data anything.                                                      |
 | `market-data/` — `@dxfeed/dxlink-console-market-data` | FEED, DOM and INDICHART. Brings dxcharts-lite, the dxScript editor and the data grid. Subpaths `/feed`, `/dom`, `/indichart` expose them one at a time. |
-| `rpc/` — `@dxfeed/dxlink-console-rpc` | The RPC channel, over `@dxfeed/dxlink-protobuf-es`. |
-| `app/` — `@dxfeed/dxlink-debug-console` | This app. Composes the three, and is the first consumer of the same contract any host would use. |
+| `rpc/` — `@dxfeed/dxlink-console-rpc`                 | The RPC channel, over `@dxfeed/dxlink-protobuf-es`.                                                                                                     |
+| `app/` — `@dxfeed/dxlink-debug-console`               | This app. Composes the three, and is the first consumer of the same contract any host would use.                                                        |
 
 `core`, `market-data` and `rpc` are published, each with a tsup build to `build/` and dual
 ESM/CJS behind a conditional `exports` map. The app is `private: true` and stays in the
