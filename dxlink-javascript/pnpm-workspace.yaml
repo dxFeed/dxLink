@@ -6,13 +6,16 @@ packages:
   - dxlink-dom
   - dxlink-indichart
   - dxlink-rpc
-  - dxlink-debug-console
+  - dxlink-protobuf-es
+  # The console is an umbrella: core + the channel packages + the app that composes them.
+  - dxlink-console/*
 # esbuild and unrs-resolver are native modules that need their install scripts.
 # The other flagged packages (protobufjs, @scarf/scarf) don't, so skip them.
 onlyBuiltDependencies:
   - esbuild
   - unrs-resolver
 ignoredBuiltDependencies:
+  - '@bufbuild/buf'
   - '@scarf/scarf'
   - protobufjs
 
@@ -25,6 +28,10 @@ minimumReleaseAgeExclude:
   - '@dxfeed/*'
   - '@dxscript/*'
 allowBuilds:
+  # The `buf` CLI, used to regenerate the protobuf-es test fixture. Its install script is a
+  # fallback that npm-installs the platform binary when the optional dependency carrying it is
+  # missing; pnpm resolves that dependency normally, and the launcher finds the binary without it.
+  '@bufbuild/buf': false
   # Analytics/telemetry, pulled in by @asyncapi/react-component via @stoplight/spectral-*.
   # Its install script phones home and nothing needs it to run.
   '@scarf/scarf': false

@@ -32,7 +32,8 @@
     "@dxfeed/dxlink-feed": "workspace:*",
     "@dxfeed/dxlink-dom": "workspace:*",
     "@dxfeed/dxlink-indichart": "workspace:*",
-    "@dxfeed/dxlink-rpc": "workspace:*"
+    "@dxfeed/dxlink-rpc": "workspace:*",
+    "@dxfeed/dxlink-protobuf-es": "workspace:*"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.2",

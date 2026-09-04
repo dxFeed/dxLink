@@ -1,0 +1,56 @@
+// Test fixture for both binding paths: generated into `src/gen/` as protoc-gen-es code and as a
+// FileDescriptorSet. Deliberately not a realistic API — every interaction model, every field kind
+// whose protobuf-JSON form is worth pinning down, and a few awkward names all appear at once.
+// Run `pnpm run generate` after editing.
+
+syntax = "proto3";
+
+package test.gen.v1;
+
+enum Flavour {
+  FLAVOUR_UNSPECIFIED = 0;
+  FLAVOUR_PLAIN = 1;
+  FLAVOUR_SALTED = 2;
+}
+
+message Nested {
+  string label = 1;
+}
+
+message Ping {
+  string value = 1;
+  // Deliberately snake_case: protobuf-JSON carries the deduced `sentAtMillis` instead, and int64
+  // crosses the wire as a string.
+  int64 sent_at_millis = 2;
+  Flavour flavour = 3;
+  repeated Nested nested = 4;
+  map<string, string> extra = 5;
+}
+
+message Pong {
+  string value = 1;
+  Flavour flavour = 2;
+  repeated Nested nested = 3;
+  map<string, string> extra = 4;
+}
+
+// Every interaction model the dxLink wire can carry.
+service TestService {
+  rpc Unary(Ping) returns (Pong);
+  rpc ServerStream(Ping) returns (stream Pong);
+  rpc BidiStream(stream Ping) returns (stream Pong);
+}
+
+// A service the wire can carry only in part: `Collect` is client-streaming, which dxLink v1.0
+// cannot express, and binding it must either throw or be skipped.
+service MixedService {
+  rpc Echo(Ping) returns (Pong);
+  rpc Collect(stream Ping) returns (Pong);
+}
+
+// Method names that do not survive a naive lowercase-the-first-letter: the client is keyed by the
+// ECMAScript local name protoc-gen-es assigns, while the channel carries the proto name.
+service NamingService {
+  rpc RPCPing(Ping) returns (Pong);
+  rpc ping_pong(Ping) returns (Pong);
+}

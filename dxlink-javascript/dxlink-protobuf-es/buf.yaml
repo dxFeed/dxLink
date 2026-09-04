@@ -1,0 +1,7 @@
+# Only used to regenerate the test fixture in `src/gen/` from `proto/`.
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
