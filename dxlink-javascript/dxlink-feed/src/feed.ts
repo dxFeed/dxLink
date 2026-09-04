@@ -167,6 +167,7 @@ export interface DXLinkFeedRequester<Contract extends FeedContract = FeedContrac
    * Get active subscriptions in the feed channel.
    */
   getSubscriptions(): DXLinkFeedSubscription[]
+
   /**
    * Add subscriptions to the feed channel.
    * @param subscriptions - Subscriptions to be added.
@@ -382,8 +383,9 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
   }
 
   getSubscriptions(): DXLinkFeedSubscription[] {
-    return Object.values(this.subscriptions)
+    return [...this.subscriptions.values()]
   }
+
   addSubscriptions(subscriptions: SubscriptionByContract[Contract][]): void
   addSubscriptions(...subscriptions: SubscriptionByContract[Contract][]): void
   addSubscriptions(...args: unknown[]): void {
