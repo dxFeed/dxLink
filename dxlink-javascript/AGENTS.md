@@ -20,7 +20,7 @@ dxLink JavaScript API
 
 ## Packages
 
-- `@dxfeed/dxlink-api` re-exports public API from all dxlink JavaScript packages, except `dxlink-debug-console`.
+- `@dxfeed/dxlink-api` re-exports public API from all dxlink JavaScript protocol packages. The `dxlink-console/*` packages are not re-exported: they are UI libraries built on top of `@dxfeed/dxlink-api`.
 
 ## Development Commands
 
