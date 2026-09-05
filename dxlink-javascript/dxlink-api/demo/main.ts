@@ -9,7 +9,6 @@ import {
   DxLinkRpcService,
 } from '../src'
 
-
 const DEFAULT_URL = 'wss://demo.dxfeed.com/dxlink-ws'
 
 function startFeed(url: string): DXLinkWebSocketClient {
@@ -77,8 +76,7 @@ function startIndichart(url: string): DXLinkWebSocketClient {
   const indicators: DXLinkIndiChartIndicators = {
     indicator1: {
       lang: 'js',
-      content:
-          `function onTick() {
+      content: `function onTick() {
             const sma = ta.sma(close, input.double("length", 20));
             spline(sma, {title: "SMA"});
           }`,
@@ -108,21 +106,16 @@ function startIndichart(url: string): DXLinkWebSocketClient {
   return client
 }
 
-
 function startRpc(url: string): DXLinkWebSocketClient {
   console.log('Start RPC')
 
   const client = new DXLinkWebSocketClient()
-  client.setAuthToken("bro1:test")
+  client.setAuthToken('bro1:test')
   client.connect('wss://whsdev.prosp.devexperts.com/dxlink-dxtrade-unified-gateway')
 
-  interface GetAccountStatementSettingsRequest {
+  interface GetAccountStatementSettingsRequest {}
 
-  }
-
-  interface GetAccountStatementSettingsResponse {
-
-  }
+  interface GetAccountStatementSettingsResponse {}
 
   const rpc = new DxLinkRpcService(
     client,
@@ -157,7 +150,7 @@ function createUi(): void {
     defaultUrl: string
     start: (url: string) => DXLinkWebSocketClient
   }
-  
+
   const DEMOS = {
     feed: {
       label: 'Feed',
@@ -180,9 +173,9 @@ function createUi(): void {
       start: startRpc,
     } satisfies DemoDefinition,
   } as const
-  
+
   const DEMO_KEYS = Object.keys(DEMOS) as (keyof typeof DEMOS)[]
-  
+
   let activeClient: DXLinkWebSocketClient | undefined
 
   const root = document.getElementById('root')
