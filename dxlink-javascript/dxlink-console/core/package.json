@@ -60,10 +60,10 @@
   "license": "MPL-2.0",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/dxfeed/dxlink.git"
+    "url": "git+https://github.com/dxFeed/dxLink.git"
   },
   "bugs": {
-    "url": "https://github.com/dxfeed/dxlink/issues"
+    "url": "https://github.com/dxFeed/dxLink/issues"
   },
   "homepage": "https://dxfeed.com/",
   "keywords": [
