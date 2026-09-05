@@ -45,6 +45,10 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
+        with:
+          # The workspace is not at the repo root, and `defaults.run.working-directory`
+          # does not apply to actions — so the packageManager field has to be pointed at.
+          package_json_file: dxlink-javascript/package.json
 
       - name: Set up Node
         uses: actions/setup-node@v4
