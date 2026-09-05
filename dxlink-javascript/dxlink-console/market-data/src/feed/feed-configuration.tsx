@@ -23,6 +23,7 @@ import type { ReactNode } from 'react'
 
 import { EVENT_TYPES } from './event-types'
 import type { FeedViewModel } from './feed-view-model'
+import { BROWSABLE_FREE_TEXT } from '../lib/browsable-free-text'
 
 interface EventFieldRow {
   type: string
@@ -69,7 +70,7 @@ const EventFieldsEditor = ({
           {/* Offers the known event types (as dxlink-docs did) without preventing
               a type that is not on the list. */}
           <Autocomplete
-            freeSolo
+            {...BROWSABLE_FREE_TEXT}
             options={EVENT_TYPES}
             value={row.type}
             onInputChange={(_event, next) => update(index, { type: next })}

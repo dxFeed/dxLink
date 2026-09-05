@@ -16,6 +16,7 @@ import { EVENT_TYPES, EVENT_TYPES_DOC_URL } from './event-types'
 import { feedSubKey } from './feed-view-model'
 import type { FeedSubKind, FeedSubscriptionInput, FeedViewModel } from './feed-view-model'
 import { DocLink } from '../components/doc-link'
+import { BROWSABLE_FREE_TEXT } from '../lib/browsable-free-text'
 import {
   CANDLE_SYMBOLS_DOC_URL,
   EPOCH_MILLIS_DOC_URL,
@@ -93,9 +94,11 @@ export const SubscriptionManager = ({ vm }: { vm: FeedViewModel }) => {
             gridTemplateColumns: { xs: '1fr', md: `repeat(${2 + extraCols}, 1fr) auto` },
           }}
         >
-          {/* freeSolo: the list is a convenience, the server accepts any type it knows. */}
+          {/* Pick from the list, or type a type that is not on it — the list is a convenience
+              and the server accepts any type it knows. The four props after `freeSolo` are
+              what make both halves work; see the note above BROWSABLE_FREE_TEXT. */}
           <Autocomplete
-            freeSolo
+            {...BROWSABLE_FREE_TEXT}
             options={EVENT_TYPES}
             value={type}
             onInputChange={(_event, next) => setType(next)}
@@ -130,7 +133,7 @@ export const SubscriptionManager = ({ vm }: { vm: FeedViewModel }) => {
           />
           {showSource && (
             <Autocomplete
-              freeSolo
+              {...BROWSABLE_FREE_TEXT}
               options={FEED_ORDER_SOURCES}
               value={source}
               onInputChange={(_event, next) => setSource(next)}

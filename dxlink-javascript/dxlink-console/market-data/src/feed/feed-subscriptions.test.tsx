@@ -45,6 +45,33 @@ describe('SubscriptionManager', () => {
     expect(options).not.toContain('DailyCandle')
   })
 
+  it('opens the event-type list from the field itself, not only by typing a prefix', () => {
+    render(<SubscriptionManager vm={createVM()} />)
+
+    const input = screen.getByLabelText('Event type')
+    // The popup indicator only exists because `forcePopupIcon` is set: MUI hides it for a
+    // `freeSolo` field by default, which leaves the list reachable only by guessing a prefix.
+    fireEvent.click(screen.getByTitle('Open'))
+
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(17)
+    fireEvent.keyDown(input, { key: 'Escape' })
+  })
+
+  it('selects the current event type on click, so typing replaces it', () => {
+    render(<SubscriptionManager vm={createVM()} />)
+
+    const input = screen.getByLabelText('Event type') as HTMLInputElement
+    setValue(input, 'Quote')
+    // `selectOnFocus` is what makes the text replaceable, and MUI applies it on click rather
+    // than on focus. Without it the next keystroke appends: typing `Trade` over `Quote` left
+    // `QuoteTrade`, which matches no event type and subscribes to nothing the server knows.
+    fireEvent.click(input)
+
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe('Quote'.length)
+    fireEvent.keyDown(input, { key: 'Escape' })
+  })
+
   it('accepts an event type that is not on the list', () => {
     const vm = createVM()
     render(<SubscriptionManager vm={vm} />)
