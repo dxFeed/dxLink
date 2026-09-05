@@ -61,10 +61,11 @@ describe('ChannelWidget', () => {
     const onClearErrors = vi.fn()
     renderWidget({ errors, onClearErrors })
 
-    const trigger = screen.getByRole('button', { name: /Channel/ })
-    expect(screen.getByText('2')).toBeInTheDocument()
+    // The count is the label, not a floating badge — see ErrorCenter.
+    const trigger = screen.getByRole('button', { name: '2 errors' })
 
     fireEvent.click(trigger)
+    expect(screen.getByText('Channel errors')).toBeInTheDocument()
     expect(screen.getByText('INVALID_ARGUMENT')).toBeInTheDocument()
     expect(screen.getByText('Unknown symbol')).toBeInTheDocument()
     expect(screen.getByText('BAD_ACTION')).toBeInTheDocument()
@@ -76,7 +77,7 @@ describe('ChannelWidget', () => {
   it('hides the error trigger while the channel is healthy', () => {
     renderWidget({ errors: [] })
 
-    expect(screen.queryByRole('button', { name: /Channel/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /error/ })).not.toBeInTheDocument()
   })
 
   it('drops the body and the actions once closed, keeping a closed record', () => {
@@ -88,6 +89,6 @@ describe('ChannelWidget', () => {
     expect(onClose).toHaveBeenCalledOnce()
     expect(screen.getByText('closed')).toBeInTheDocument()
     expect(screen.queryByText('channel body')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Channel/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /error/ })).not.toBeInTheDocument()
   })
 })

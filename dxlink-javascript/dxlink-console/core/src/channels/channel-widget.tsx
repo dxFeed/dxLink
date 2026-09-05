@@ -138,7 +138,7 @@ export const ChannelWidget = ({
           ) : (
             <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
               {errors !== undefined && (
-                <ErrorCenter errors={errors} onClear={onClearErrors} label="Channel" size="small" />
+                <ErrorCenter errors={errors} onClear={onClearErrors} scope="Channel" />
               )}
               {status}
               <Tooltip title={expanded ? 'Collapse' : 'Expand'}>

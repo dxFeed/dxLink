@@ -181,7 +181,12 @@ export const ConnectionPanel = () => {
             )}
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <ErrorCenter errors={errors} onClear={vm.clearErrors} />
+            <ErrorCenter
+              errors={errors}
+              onClear={vm.clearErrors}
+              scope="Connection"
+              size="medium"
+            />
             <Button variant="contained" onClick={handlePrimary} disabled={connecting}>
               {PRIMARY_LABEL[connection]}
             </Button>
