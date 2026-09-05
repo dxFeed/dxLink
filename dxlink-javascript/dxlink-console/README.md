@@ -110,7 +110,7 @@ applies; that is what the app does. See ARCHITECTURE.md §9 for why each of thes
 rather than merely tidy.
 
 Install what you need. A docs site wanting the connection, auth and the RPC channel takes
-`core` and `rpc` and never pulls the market-data dependency tree:
+`core` and `rpc` and never pulls the market-data or dxScript dependency trees:
 
 ```sh
 pnpm add @dxfeed/dxlink-console-core @dxfeed/dxlink-console-rpc
@@ -138,25 +138,27 @@ sub-path) · Vitest + Testing Library.
 
 ## Layout
 
-Four packages, dependencies pointing downward — `app → {market-data, rpc} → core`:
+Five packages, dependencies pointing downward — `app → {market-data, dxscript, rpc} → core`:
 
-| Package                                               |                                                                                                                                                         |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/` — `@dxfeed/dxlink-console-core`               | Connection, auth, the channel-plugin registry, the configuration profile. No market-data anything.                                                      |
-| `market-data/` — `@dxfeed/dxlink-console-market-data` | FEED, DOM and INDICHART. Brings dxcharts-lite, the dxScript editor and the data grid. Subpaths `/feed`, `/dom`, `/indichart` expose them one at a time. |
-| `rpc/` — `@dxfeed/dxlink-console-rpc`                 | The RPC channel, over `@dxfeed/dxlink-protobuf-es`.                                                                                                     |
-| `app/` — `@dxfeed/dxlink-debug-console`               | This app. Composes the three, and is the first consumer of the same contract any host would use.                                                        |
+| Package                                               |                                                                                                                                                |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/` — `@dxfeed/dxlink-console-core`               | Connection, auth, the channel-plugin registry, the configuration profile. No market-data anything.                                             |
+| `market-data/` — `@dxfeed/dxlink-console-market-data` | FEED and DOM. Brings dxcharts-lite and the data grid. Subpaths `/feed` and `/dom` expose them one at a time.                                   |
+| `dxscript/` — `@dxfeed/dxlink-console-dxscript`       | INDICHART. The dxScript editor and the dxScript-aware chart, both peer dependencies, so registering this plugin is what opts a host into them. |
+| `rpc/` — `@dxfeed/dxlink-console-rpc`                 | The RPC channel, over `@dxfeed/dxlink-protobuf-es`.                                                                                            |
+| `app/` — `@dxfeed/dxlink-debug-console`               | This app. Composes the four, and is the first consumer of the same contract any host would use.                                                |
 
-`core`, `market-data` and `rpc` are published, each with a tsup build to `build/` and dual
+`core`, `market-data`, `dxscript` and `rpc` are published, each with a tsup build to `build/` and dual
 ESM/CJS behind a conditional `exports` map. The app is `private: true` and stays in the
 Changesets `ignore` list. Because the app consumes the libraries' `build/` output rather than
 their source, **`turbo run build` has to run before the dev server**, and a library edit needs
 a rebuild to show up.
 
-The point of the boundary: **core and rpc install no `@dxscript`, no dxcharts and no data
-grid.** An RPC-only console depends on those two and never sees the market-data dependency
-tree — the difference between hiding a button and not shipping a dependency. See
-ARCHITECTURE.md §4 for the file-level layout and §8 for the plugin contract.
+The point of the boundary: **only `dxscript` installs `@dxscript`, and only `market-data`
+installs dxcharts-lite and the data grid.** An RPC-only console depends on `core` and `rpc`
+and sees neither tree; a FEED-and-DOM console never resolves the dxScript editor, which is the
+heaviest thing here. That is the difference between hiding a button and not shipping a
+dependency. See ARCHITECTURE.md §4 for the file-level layout and §8 for the plugin contract.
 
 The app follows MVVM with **no global store**. Each ViewModel owns its dxlink-api object
 as a private field and exposes UI state through its own Zustand store; views bind with

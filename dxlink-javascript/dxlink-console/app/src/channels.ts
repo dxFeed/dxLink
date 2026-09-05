@@ -1,7 +1,7 @@
 import type { ErasedChannelPlugin } from '@dxfeed/dxlink-console-core'
+import { indiChartChannelPlugin } from '@dxfeed/dxlink-console-dxscript'
 import { domChannelPlugin } from '@dxfeed/dxlink-console-market-data/dom'
 import { feedChannelPlugin } from '@dxfeed/dxlink-console-market-data/feed'
-import { indiChartChannelPlugin } from '@dxfeed/dxlink-console-market-data/indichart'
 import { rpcChannelPlugin } from '@dxfeed/dxlink-console-rpc'
 
 import type { DescriptorSettings } from './console-config'

@@ -2,8 +2,6 @@ import { DXLinkChannelState } from '@dxfeed/dxlink-api'
 import { useVM } from '@dxfeed/dxlink-console-core'
 import { ChannelWidget } from '@dxfeed/dxlink-console-core'
 import { useConnectionVM } from '@dxfeed/dxlink-console-core'
-import { IndiChart } from '@dxscript/dxlink-dxcharts-lite'
-import type { IndiChartHandle } from '@dxscript/dxlink-dxcharts-lite'
 import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
@@ -12,29 +10,21 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import Stack from '@mui/material/Stack'
-import { styled } from '@mui/material/styles'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 
+import { CandleChart } from './candle-chart'
+import type { CandleChartHandle } from './candle-chart'
 import { FeedCandlesViewModel } from './feed-candles-view-model'
 import type { FeedConfig } from './types'
 import { DocLink } from '../components/doc-link'
 import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../lib/order-sources'
 
-import '@dxscript/dxlink-dxcharts-lite/styles.css'
-
 interface FeedChartChannelProps {
   title: string
   config: FeedConfig
 }
-
-// The chart's container needs an intrinsic height; `styled` applies it via the
-// component's `className` prop (which the chart spreads onto its container div).
-const ChartSurface = styled(IndiChart)({
-  height: 360,
-  width: '100%',
-})
 
 const StatusChip = ({ state }: { state: DXLinkChannelState }) => {
   if (state === DXLinkChannelState.OPENED) {
@@ -46,7 +36,7 @@ const StatusChip = ({ state }: { state: DXLinkChannelState }) => {
   return <Chip size="small" color="warning" variant="outlined" label="opening" />
 }
 
-/** Live Feed candle-chart view — wraps {@link FeedCandlesViewModel} + the dxcharts IndiChart. */
+/** Live Feed candle-chart view — wraps {@link FeedCandlesViewModel} + {@link CandleChart}. */
 export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
   const connectionVM = useConnectionVM()
   const [vm] = useState(() => {
@@ -60,8 +50,7 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
     })
   })
 
-  const chartRef = useRef<IndiChartHandle>(null)
-  const [resetKey, setResetKey] = useState(0)
+  const chartRef = useRef<CandleChartHandle>(null)
   const [symbol, setSymbol] = useState('AAPL{=d}')
   const [fromTime, setFromTime] = useState('0')
   const [chartError, setChartError] = useState<string | null>(null)
@@ -69,12 +58,12 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
   useEffect(() => {
     vm.start()
     vm.setChartListener((candles, dataType) => {
-      // pushData runs synchronously inside the WebSocket frame dispatch, which does not
-      // guard its listeners. An escaping throw would abort processing of that frame for
-      // every other channel, and React's error boundary cannot see it — this is not a
-      // render error. Contain it here and report it as a chart error.
+      // This runs synchronously inside the WebSocket frame dispatch, which does not guard
+      // its listeners. An escaping throw would abort processing of that frame for every
+      // other channel, and React's error boundary cannot see it — this is not a render
+      // error. Contain it here and report it as a chart error.
       try {
-        chartRef.current?.pushData(candles, [], dataType)
+        chartRef.current?.push(candles, dataType)
       } catch (error) {
         setChartError(error instanceof Error ? error.message : String(error))
       }
@@ -95,7 +84,6 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
   const subscribe = () => {
     setChartError(null)
     chartRef.current?.reset()
-    setResetKey((k) => k + 1)
     vm.setSubscription(symbol.trim(), Number(fromTime) || 0)
   }
 
@@ -179,12 +167,7 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
             </Typography>
           </Stack>
           <Box sx={{ position: 'relative' }}>
-            <ChartSurface
-              ref={chartRef}
-              resetKey={resetKey}
-              showLabels={true}
-              onIndicatorError={setChartError}
-            />
+            <CandleChart ref={chartRef} />
             {candleCount === 0 && (
               <Stack
                 spacing={1}

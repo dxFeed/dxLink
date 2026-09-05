@@ -27,14 +27,14 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 
+import { DocLink } from './doc-link'
+import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from './doc-urls'
 import { IndiChartViewModel } from './indichart-view-model'
 import type { IndicatorOutputKind, IndicatorOutputMeta } from './indichart-view-model'
 import { ParameterField, initialParameterValue } from './parameter-field'
 import type { ParameterValue } from './parameter-field'
 import { describeScriptError } from './script-error'
 import type { IndiChartConfig } from './types'
-import { DocLink } from '../components/doc-link'
-import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../lib/order-sources'
 
 import '@dxscript/dxlink-dxcharts-lite/styles.css'
 

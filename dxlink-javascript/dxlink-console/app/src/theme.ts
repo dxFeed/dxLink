@@ -44,17 +44,19 @@ export const theme = createConsoleTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
-        // dxcharts-lite reads its required `--dx-chart-*` tokens from the
-        // document root at chart creation; the package ships light-only
-        // defaults. Map them onto MUI's palette CSS variables so the chart
-        // follows the active color scheme. `html:root` outranks the package's
-        // `:root` regardless of stylesheet order. (A chart created before a
-        // mode switch keeps its palette until its next subscription re-create.)
+        // The `@dxscript` build of dxcharts-lite reads its required `--dx-chart-*`
+        // tokens from the document root at chart creation, and ships light-only
+        // defaults. Map them onto MUI's palette CSS variables so the IndiChart
+        // chart follows the active color scheme. `html:root` outranks the
+        // package's `:root` regardless of stylesheet order. (A chart created
+        // before a mode switch keeps its palette until its next re-create.)
         //
-        // This has to be global — dxcharts reads the document root, not the console's
+        // This has to be global — that chart reads the document root, not the console's
         // subtree — which is why it stays with the app's global baseline rather than moving
-        // into the market-data package with the charts themselves. A host embedding
-        // market-data into a page with no global `CssBaseline` needs its own equivalent.
+        // into `@dxfeed/dxlink-console-dxscript` with the channel itself. A host embedding
+        // that package into a page with no global `CssBaseline` needs its own equivalent.
+        // The FEED candle chart needs none of this: it is vanilla dxcharts-lite, which takes
+        // its colours as config, mapped from the theme in `market-data`'s `candle-chart.tsx`.
         'html:root': {
           '--dx-chart-bg': 'var(--mui-palette-background-paper)',
           '--dx-chart-grid': 'var(--mui-palette-divider)',

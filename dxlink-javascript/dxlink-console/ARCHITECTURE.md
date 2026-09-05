@@ -102,8 +102,8 @@ The live dxlink objects stay as private VM fields; only UI state goes in the sto
 
 ## 4. Package layout
 
-The console is an **umbrella of four packages**. Three are libraries a host composes; the
-fourth is the app that composes them for us and is the first consumer of the same contract
+The console is an **umbrella of five packages**. Four are libraries a host composes; the
+fifth is the app that composes them for us and is the first consumer of the same contract
 any other host would use.
 
 ```
@@ -124,17 +124,19 @@ dxlink-javascript/dxlink-console/
     components/                  # error-boundary
     lib/                         # console-config(+context) · channel-errors · timestamped-error
 
-  market-data/ @dxfeed/dxlink-console-market-data   dxcharts-lite · dxScript editor · x-data-grid
-    src/index.ts                 # all three plugins; subpaths below expose them one at a time
+  market-data/ @dxfeed/dxlink-console-market-data   dxcharts-lite · x-data-grid
+    src/index.ts                 # both plugins; subpaths below expose them one at a time
     feed/       plugin.tsx · types.ts · feed-view-model · feed-candles-view-model · feed-channel
-                · feed-channel-request · feed-chart-channel · feed-configuration
+                · feed-channel-request · feed-chart-channel · candle-chart · feed-configuration
                 · feed-subscriptions · feed-events-table · candles · sorted-list · event-types
     dom/        plugin.tsx · types.ts · dom-view-model · dom-channel · dom-channel-request
-    indichart/  plugin.tsx · types.ts · indichart-view-model · indichart-channel
-                · indichart-channel-request · parameter-field · session-parameter-field
-                · script-error · colors · color-scheme · session
-    lib/        order-sources.ts  # the one piece of market-data vocabulary core must not hold
-    components/ doc-link.tsx     # only ever used in market-data helper text
+    lib/        order-sources.ts · color-scheme.ts
+    components/ doc-link.tsx     # see below: a plugin package carries its own UI helpers
+
+  dxscript/    @dxfeed/dxlink-console-dxscript    @dxscript editor · @dxscript dxcharts-lite
+    src/       index.ts · plugin.tsx · types.ts · indichart-view-model · indichart-channel
+               · indichart-channel-request · parameter-field · session-parameter-field
+               · script-error · colors · session · doc-urls · color-scheme · doc-link
 
   rpc/         @dxfeed/dxlink-console-rpc          @bufbuild/protobuf · dxlink-protobuf-es
     src/       index.ts · plugin.tsx · types.ts · rpc-view-model · rpc-channel
@@ -149,7 +151,7 @@ dxlink-javascript/dxlink-console/
                · components/{dxfeed-logo,theme-mode-toggle}
 ```
 
-The three libraries are published; the app is not. Each library follows the same packaging as
+The four libraries are published; the app is not. Each library follows the same packaging as
 the rest of the workspace: a tsup build to `build/`, dual ESM/CJS behind a conditional
 `exports` map, and `files: ["/build", "/package.json"]`. React, MUI and emotion are
 **peer** dependencies, because each has to be one instance shared with the host — a second
@@ -161,13 +163,14 @@ The cost of that is paid in development: the app now consumes `build/`, not `src
 That is deliberate — the alternative, a `publishConfig` override keeping `main` on the source
 in-repo, was considered and dropped in favour of manifests that say exactly what they publish.
 
-`market-data` is the one deviation: it omits `sideEffects` rather than declaring `false`,
-because its chart channels import dxcharts-lite's stylesheet and a bundler told the package is
-side-effect-free may drop that import. Its subpath exports (`/feed`, `/dom`, `/indichart`)
-already give the granularity `sideEffects` would have bought, so nothing is lost.
+`dxscript` is the one deviation: it declares `sideEffects: ["*.css"]` rather than `false`,
+because `indichart-channel.tsx` imports the `@dxscript` chart's stylesheet and a bundler told
+the package is side-effect-free may drop that import. It is the only package here that
+imports CSS at all — vanilla dxcharts-lite takes its colours as config rather than from a
+stylesheet, which is what lets `market-data` declare `false` outright.
 
 Dependency direction (acyclic, and enforced by the package boundary rather than by
-convention): `app → {market-data, rpc} → core`. Nothing points back up. Unit tests sit beside
+convention): `app → {market-data, dxscript, rpc} → core`. Nothing points back up. Unit tests sit beside
 what they test as `*.test.ts(x)`; each library package carries its own `vitest.config.ts` and
 `src/test/setup.ts`.
 
@@ -183,15 +186,25 @@ own channel off the client it is handed. §8 has the contract.
 `localStorage`; it holds no hostname, and it names no channel service. Everything about how a
 console is deployed — which endpoint, which services, what a link may override, what a gateway
 pinned — arrives as props. What that cost: `connection-url.ts` and the two source parsers live
-in app, `doc-link.tsx` lives with the only code that uses it, and `ConsolePage` takes both
-`config` and `channels` as **required** props rather than guessing either. §7 has the profile.
+in app, and `ConsolePage` takes both `config` and `channels` as **required** props rather than
+guessing either. §7 has the profile.
 
-What the split buys, concretely: **core and rpc install no `@dxscript`, no dxcharts and no
-data grid.** A host that wants an RPC-only console depends on those two packages and never
-sees the market-data dependency tree — the difference between filtering a button and not
-shipping a dependency. Within market-data, the `/feed`, `/dom` and `/indichart` subpaths keep
-the same granularity for the bundle: registering only FEED should not pull the dxScript editor
-that only INDICHART uses.
+**A channel package is self-contained**, which is the same rule read from the other side. Its
+only dependency here is core's published surface — the plugin contract, `ChannelWidget`, the
+connection hooks — and it reaches for nothing else, including nothing in a sibling channel
+package. The visible cost is that `doc-link.tsx`, `color-scheme.ts` and two documentation URLs
+exist in more than one package. That is the intended trade: the alternative is either a
+dependency between channel packages, which would make registering one plugin install another's
+tree, or core accumulating helpers that exist only to serve channels — and core is what every
+host installs. A few dozen duplicated lines are cheaper than either.
+
+What the split buys, concretely: **only `dxscript` installs `@dxscript`, and only
+`market-data` installs dxcharts-lite and the data grid.** A host that wants an RPC-only
+console depends on `core` and `rpc` and sees neither tree — the difference between filtering
+a button and not shipping a dependency. The dxScript editor is the sharpest case: it is the
+heaviest thing the console can pull, nothing but INDICHART uses it, and after the split a
+FEED-and-DOM console never resolves it. Within market-data, the `/feed` and `/dom` subpaths
+keep the same granularity for the bundle.
 
 ## 5. Schema-driven indicator parameter form
 
@@ -325,10 +338,13 @@ the documentation around it. The standalone app keeps a global `CssBaseline` too
 app legitimately owns its page; the scoped one inside it applies the same rules over the same
 palette, so it changes nothing there.
 
-Note the two are _different theme slots_. `MuiCssBaseline` overrides — the `--dx-chart-*`
-token mapping dxcharts-lite needs — are global by nature and invisible to
-`MuiScopedCssBaseline`, which is why they stay in `app/src/theme.ts`. A host embedding
-market-data into a page with no global baseline needs its own equivalent.
+Note the two are _different theme slots_. `MuiCssBaseline` overrides are global by nature and
+invisible to `MuiScopedCssBaseline`, which is why they stay in `app/src/theme.ts`. The
+`--dx-chart-*` token mapping is the one that matters here: the `@dxscript` chart reads those
+custom properties off the document root, so a host embedding `dxscript` into a page with no
+global baseline needs its own equivalent. `market-data` no longer has that problem — its
+candle chart is vanilla dxcharts-lite, which takes colours as config, so `candle-chart.tsx`
+maps the MUI palette itself and needs nothing global.
 
 **The theme is core's, and the font is not.** `createConsoleTheme(...overrides)` owns the
 palette, shape and control density; `app/src/theme.ts` layers on what only a page can own —
@@ -358,9 +374,10 @@ console through CSS with no code in between, which is why an embedded console re
 switch of its own — that control belongs to the app shell, and always did.
 
 The residue: `useColorScheme()` then reports the provider's default rather than what is on
-screen, so `useResolvedColorScheme()` (`market-data/src/indichart/color-scheme.ts`, for the
-dxScript editor's own light/dark prop) is wrong in an embed. Market-data is not on the docs
-site's path — it needs core and rpc — so this is a market-data problem, not a blocker.
+screen, so `useResolvedColorScheme()` is wrong in an embed. Two channel packages carry a copy
+and read it — the dxScript editor's own light/dark prop, and the candle chart's colour config
+— and neither is on the docs site's path, so this stays a channel-package problem rather than
+a blocker.
 
 > Sections 1–3, 5 and 6 above are the design written before the rebuild and have drifted from
 > the code in wording and in small details. §2's "nothing global but the theme" is one such

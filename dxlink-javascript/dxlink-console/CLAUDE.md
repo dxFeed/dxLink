@@ -45,7 +45,8 @@ pnpm -C dxlink-javascript turbo run build --filter './dxlink-console/*'
 pnpm --filter @dxfeed/dxlink-debug-console dev
 ```
 
-Serves <http://localhost:4280>. While working inside `core`, `market-data` or `rpc`, run that
+Serves <http://localhost:4280>. While working inside `core`, `market-data`, `dxscript` or
+`rpc`, run that
 package's `tsup … --watch` alongside the dev server, or rebuild by hand after each edit — there
 is no longer HMR across the package boundary.
 
@@ -55,15 +56,15 @@ restart, or its import fails to resolve and every request 500s with a blank page
 
 ## Checks
 
-The console is four packages now, so run the checks across all of them at once rather than
+The console is five packages now, so run the checks across all of them at once rather than
 naming one:
 
 ```bash
 pnpm turbo run build lint test typecheck --filter './dxlink-console/*'
 ```
 
-Or one package at a time — `@dxfeed/dxlink-console-core`, `-market-data`, `-rpc`, and the app
-`@dxfeed/dxlink-debug-console` (which has the only `build` and no tests of its own).
+Or one package at a time — `@dxfeed/dxlink-console-core`, `-market-data`, `-dxscript`, `-rpc`,
+and the app `@dxfeed/dxlink-debug-console`.
 
 Test runs print sourcemap warnings pointing into `@dxscript/dxlink-dxscript-editor`. Its
 published sourcemaps reference sources it does not ship; the warnings are noise.
@@ -127,7 +128,7 @@ function onTick() {
 That compiles to 6 inputs · 1 output and should render:
 
 - **COLOR** — `lineColor` shows a **red** swatch and `#FF0000`. Black means the
-  dxScript palette lookup in `market-data/src/indichart/colors.ts` failed.
+  dxScript palette lookup in `dxscript/src/colors.ts` failed.
 - **SESSION** — a field with a trigger button, opening Interval/Raw modes, start and
   end pickers, weekday toggles, a read-only indicator timezone and a result preview. A
   plain text box means the rich field regressed.
@@ -252,7 +253,9 @@ otherwise the new import fails to resolve and every request 500s with a blank pa
 - **`useTheme().palette.mode` is not the mode on screen.** The theme is built with
   `cssVariables` + `colorSchemes`, so the palette is emitted once as CSS custom properties
   and `palette.mode` stays at its default. Use `useResolvedColorScheme()` from
-  `market-data/src/indichart/color-scheme.ts`, which resolves `'system'` through `systemMode`.
+  the channel package's own `color-scheme.ts` (`dxscript/src/`, `market-data/src/lib/`), which
+  resolves `'system'` through `systemMode`. Each channel package carries its own copy on
+  purpose — see ARCHITECTURE.md §4 on self-contained plugin packages.
 - **The dxScript editor is controlled, via `script`** — not `value`, and it is not
   uncontrolled. It is passed `entry.code || undefined`: `''` would mount it empty and
   suppress the bundled sample.
