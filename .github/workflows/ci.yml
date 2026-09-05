@@ -1,0 +1,66 @@
+name: CI
+
+# Format, lint, test and build every pull request and every push to main.
+#
+# @dxfeed/dxlink-console-dxscript and the debug-console app are excluded: both pull @dxscript/*
+# from the internal Nexus, which GitHub-hosted runners cannot reach, so neither can be installed
+# here. They are checked only by running the workspace from inside the network.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: dxlink-javascript
+
+env:
+  PNPM_FILTER: >-
+    --filter=!@dxfeed/dxlink-console-dxscript
+    --filter=!@dxfeed/dxlink-debug-console
+
+jobs:
+  check:
+    name: Format, lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # The workspace is not at the repo root, and `defaults.run.working-directory`
+          # does not apply to actions — so the packageManager field has to be pointed at.
+          package_json_file: dxlink-javascript/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: dxlink-javascript/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile $PNPM_FILTER
+
+      - name: Format
+        run: pnpm run format:check
+
+      # Split so a red check names the gate that failed. turbo caches between them,
+      # and `test` depends on `build`, so the ordering costs nothing.
+      - name: Build
+        run: pnpm turbo run build $PNPM_FILTER
+
+      - name: Lint
+        run: pnpm turbo run lint $PNPM_FILTER
+
+      - name: Test
+        run: pnpm turbo run test $PNPM_FILTER
