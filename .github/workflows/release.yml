@@ -27,6 +27,11 @@ defaults:
     working-directory: dxlink-javascript
 
 env:
+  # `changeset version` rewrites every package.json, which makes pnpm consider node_modules stale;
+  # every later pnpm command would then "repair" it with a full, unfiltered install and reach for
+  # the @dxscript packages this job deliberately skipped. Turn that auto-install off.
+  pnpm_config_verify_deps_before_run: 'false'
+
   # Both pull @dxscript/* from the internal Nexus, which GitHub-hosted runners cannot reach.
   # dxscript is still versioned by changesets; it just has to be published from inside the network.
   PNPM_FILTER: >-
