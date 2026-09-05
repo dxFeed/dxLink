@@ -87,8 +87,10 @@ against a live server afterwards. They are the checks worth repeating.
   `FeedConfig.eventFields` order — for `Quote` that is `eventSymbol, eventType, eventTime,
 sequence, timeNanoPart, bid*, ask*`. Alphabetical order means the negotiated order was
   dropped.
-- **All 18 event types.** The event-type combobox must list 18, including
-  `DailyCandle`, `TradeETH`, `Configuration`, `Message`.
+- **All 17 event types.** The event-type combobox must list 17, including `TradeETH`,
+  `Configuration`, `Message`, and **not** `DailyCandle` — the dxFeed API deprecates that one
+  in favour of `Candle`, so it is deliberately off the list. The field is free text, so a
+  server that still serves it can still be asked for it.
 
 ### On the dxScript URL
 

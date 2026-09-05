@@ -31,17 +31,18 @@ const setValue = (input: HTMLElement, value: string) => {
 }
 
 describe('SubscriptionManager', () => {
-  it('offers the event types the old console had, including the four that were dropped', () => {
+  it('offers the event types the old console had, less the deprecated one', () => {
     render(<SubscriptionManager vm={createVM()} />)
 
     const options = optionsOf(screen.getByLabelText('Event type'))
 
-    expect(options).toHaveLength(18)
-    // These four existed in dxlink-docs but were missing from the rebuild.
-    expect(options).toContain('DailyCandle')
+    expect(options).toHaveLength(17)
+    // These existed in dxlink-docs but were missing from the rebuild.
     expect(options).toContain('TradeETH')
     expect(options).toContain('Configuration')
     expect(options).toContain('Message')
+    // Deprecated in the dxFeed API in favour of `Candle`, so not offered.
+    expect(options).not.toContain('DailyCandle')
   })
 
   it('accepts an event type that is not on the list', () => {

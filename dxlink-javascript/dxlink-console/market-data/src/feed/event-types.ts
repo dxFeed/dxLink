@@ -5,12 +5,16 @@
  * its order. This is a convenience list for the UI, not a protocol constraint — the
  * server accepts any event type it knows, so the forms let users type their own.
  *
+ * Deprecated event types are left off. `DailyCandle` is the one this list carried: the
+ * dxFeed API deprecates it in favour of `Candle`, whose daily aggregation now carries the
+ * properties `DailyCandle` existed for. A server that still serves it can still be asked for
+ * it — the field is free text — but offering it here would recommend it.
+ *
  * @see https://kb.dxfeed.com/en/data-model/dxfeed-api-market-events.html#event-types
  */
 const EVENT_TYPE_LIST = [
   'Quote',
   'Candle',
-  'DailyCandle',
   'Trade',
   'TradeETH',
   'Summary',
