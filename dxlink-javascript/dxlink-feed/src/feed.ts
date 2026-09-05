@@ -88,12 +88,13 @@ export interface FeedConfig {
  */
 export type DXLinkFeedConfigChangeListener = (config: FeedConfig) => void
 
-type AnySubscription = Subscription | TimeSeriesSubscription | IndexedEventSubscription
+export type DXLinkFeedSubscription =
+  Subscription | TimeSeriesSubscription | IndexedEventSubscription
 
 /**
  * Get a unique key for the subscription.
  */
-const getSubscriptionKey = (subscription: AnySubscription) =>
+const getSubscriptionKey = (subscription: DXLinkFeedSubscription) =>
   `${subscription.type}${'source' in subscription ? `#${subscription.source}` : ''}:${
     subscription.symbol
   }`
@@ -117,8 +118,8 @@ export type DXLinkFeedEventListener = (event: FeedEventData[]) => void
  * Chunk of the subscriptions to be sent to the channel.
  */
 interface FeedSubscriptionChunk {
-  add?: AnySubscription[]
-  remove?: AnySubscription[]
+  add?: DXLinkFeedSubscription[]
+  remove?: DXLinkFeedSubscription[]
   reset?: boolean
 }
 
@@ -161,6 +162,11 @@ export interface DXLinkFeedRequester<Contract extends FeedContract = FeedContrac
    * Remove a listener for the feed channel config changes.
    */
   removeConfigChangeListener(listener: DXLinkFeedConfigChangeListener): void
+
+  /**
+   * Get active subscriptions in the feed channel.
+   */
+  getSubscriptions(): DXLinkFeedSubscription[]
 
   /**
    * Add subscriptions to the feed channel.
@@ -273,11 +279,11 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
   /**
    * Pending add subscriptions to be sent to the channel.
    */
-  private readonly pendingAdd = new Map<string, AnySubscription>()
+  private readonly pendingAdd = new Map<string, DXLinkFeedSubscription>()
   /**
    * Pending remove subscriptions to be sent to the channel.
    */
-  private readonly pendingRemove = new Map<string, AnySubscription>()
+  private readonly pendingRemove = new Map<string, DXLinkFeedSubscription>()
   /**
    * Pending reset flag to be sent to the channel.
    */
@@ -287,7 +293,7 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
    * List of active subscriptions.
    * Used to avoid sending the same subscription twice and re-subscribe on the channel re-open.
    */
-  private readonly subscriptions = new Map<string, AnySubscription>()
+  private readonly subscriptions = new Map<string, DXLinkFeedSubscription>()
 
   /**
    * List of event types which schema was sent to the channel.
@@ -374,6 +380,10 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
     if (this.channel.getState() === DXLinkChannelState.OPENED) {
       this.sendAcceptConfig(this.touchedEvents)
     }
+  }
+
+  getSubscriptions(): DXLinkFeedSubscription[] {
+    return [...this.subscriptions.values()]
   }
 
   addSubscriptions(subscriptions: SubscriptionByContract[Contract][]): void

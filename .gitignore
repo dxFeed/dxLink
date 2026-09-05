@@ -1,0 +1,8 @@
+# Dependencies
+node_modules/
+
+# pnpm workspace state (machine-specific cache)
+.pnpm-workspace-state-v1.json
+
+# OS
+.DS_Store

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "debug-console",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "dxlink-javascript", "--filter", "@dxfeed/dxlink-debug-console", "dev"],
+      "port": 4280
+    }
+  ]
+}

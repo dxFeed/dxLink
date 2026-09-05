@@ -9,8 +9,7 @@ import {
   type DXLinkErrorListener,
 } from '@dxfeed/dxlink-core'
 import { ReplaySubject, Subject } from 'rxjs'
-import { test } from 'uvu'
-import * as assert from 'uvu/assert'
+import { expect, test } from 'vitest'
 
 import { DxLinkRpcService } from './'
 
@@ -138,9 +137,9 @@ test('opens channel with service and method on subscribe', () => {
 
   const sub = rpc.streamStream('GetData', input$).subscribe()
 
-  assert.ok(mock.lastChannel, 'channel should be created')
-  assert.is(mock.lastChannel!.service, 'myService')
-  assert.is(mock.lastChannel!.parameters['methodName'], 'GetData')
+  expect(mock.lastChannel, 'channel should be created').toBeTruthy()
+  expect(mock.lastChannel!.service).toBe('myService')
+  expect(mock.lastChannel!.parameters['methodName']).toBe('GetData')
 
   sub.unsubscribe()
 })
@@ -156,11 +155,11 @@ test('sends input values as CHANNEL_DATA when channel is opened', () => {
   input$.next({ query: 'AAPL' })
   input$.next({ query: 'GOOGL' })
 
-  assert.is(mock.lastChannel!.sentMessages.length, 2)
-  assert.is(mock.lastChannel!.sentMessages[0]!.type, 'CHANNEL_DATA')
-  assert.equal(mock.lastChannel!.sentMessages[0]!['payload'], { query: 'AAPL' })
-  assert.is(mock.lastChannel!.sentMessages[1]!.type, 'CHANNEL_DATA')
-  assert.equal(mock.lastChannel!.sentMessages[1]!['payload'], { query: 'GOOGL' })
+  expect(mock.lastChannel!.sentMessages.length).toBe(2)
+  expect(mock.lastChannel!.sentMessages[0]!.type).toBe('CHANNEL_DATA')
+  expect(mock.lastChannel!.sentMessages[0]!['payload']).toEqual({ query: 'AAPL' })
+  expect(mock.lastChannel!.sentMessages[1]!.type).toBe('CHANNEL_DATA')
+  expect(mock.lastChannel!.sentMessages[1]!['payload']).toEqual({ query: 'GOOGL' })
 
   sub.unsubscribe()
 })
@@ -179,9 +178,9 @@ test('emits CHANNEL_DATA payload on output observable', () => {
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { price: 150 } })
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { price: 151 } })
 
-  assert.is(received.length, 2)
-  assert.equal(received[0], { price: 150 })
-  assert.equal(received[1], { price: 151 })
+  expect(received.length).toBe(2)
+  expect(received[0]).toEqual({ price: 150 })
+  expect(received[1]).toEqual({ price: 151 })
 
   sub.unsubscribe()
 })
@@ -200,8 +199,8 @@ test('ignores non-CHANNEL_DATA messages', () => {
   mock.lastChannel!.simulateMessage({ type: 'SOME_OTHER_TYPE', data: 'hello' })
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 1 } })
 
-  assert.is(received.length, 1)
-  assert.equal(received[0], { value: 1 })
+  expect(received.length).toBe(1)
+  expect(received[0]).toEqual({ value: 1 })
 
   sub.unsubscribe()
 })
@@ -214,9 +213,9 @@ test('closes channel on unsubscribe', () => {
   const sub = rpc.streamStream('Method', input$).subscribe()
   mock.lastChannel!.simulateOpen()
 
-  assert.is(mock.lastChannel!.closed, false)
+  expect(mock.lastChannel!.closed).toBe(false)
   sub.unsubscribe()
-  assert.is(mock.lastChannel!.closed, true)
+  expect(mock.lastChannel!.closed).toBe(true)
 })
 
 test('completes output when channel is closed by server', () => {
@@ -233,7 +232,7 @@ test('completes output when channel is closed by server', () => {
   mock.lastChannel!.simulateOpen()
   mock.lastChannel!.simulateClose()
 
-  assert.is(completed, true)
+  expect(completed).toBe(true)
 
   sub.unsubscribe()
 })
@@ -252,9 +251,9 @@ test('errors output when channel receives error', () => {
   mock.lastChannel!.simulateOpen()
   mock.lastChannel!.simulateError({ type: 'UNAUTHORIZED', message: 'Not authorized' })
 
-  assert.ok(receivedError)
-  assert.is(receivedError!.type, 'UNAUTHORIZED')
-  assert.is(receivedError!.message, 'Not authorized')
+  expect(receivedError).toBeTruthy()
+  expect(receivedError!.type).toBe('UNAUTHORIZED')
+  expect(receivedError!.message).toBe('Not authorized')
 
   sub.unsubscribe()
 })
@@ -273,8 +272,8 @@ test('errors output when input$ errors', () => {
   mock.lastChannel!.simulateOpen()
   input$.error(new Error('input failed'))
 
-  assert.ok(receivedError)
-  assert.instance(receivedError, Error)
+  expect(receivedError).toBeTruthy()
+  expect(receivedError).toBeInstanceOf(Error)
 
   sub.unsubscribe()
 })
@@ -293,8 +292,8 @@ test('input$ completing does not close the channel', () => {
   mock.lastChannel!.simulateOpen()
   input$.complete()
 
-  assert.is(mock.lastChannel!.closed, false)
-  assert.is(completed, false)
+  expect(mock.lastChannel!.closed).toBe(false)
+  expect(completed).toBe(false)
 
   sub.unsubscribe()
 })
@@ -308,15 +307,15 @@ test('resubscribes to input$ on channel reconnect', () => {
   mock.lastChannel!.simulateOpen()
 
   input$.next('msg1')
-  assert.is(mock.lastChannel!.sentMessages.length, 1)
+  expect(mock.lastChannel!.sentMessages.length).toBe(1)
 
   // Simulate reconnect
   mock.lastChannel!.simulateRequested()
   mock.lastChannel!.simulateOpen()
 
   input$.next('msg2')
-  assert.is(mock.lastChannel!.sentMessages.length, 2)
-  assert.equal(mock.lastChannel!.sentMessages[1]!['payload'], 'msg2')
+  expect(mock.lastChannel!.sentMessages.length).toBe(2)
+  expect(mock.lastChannel!.sentMessages[1]!['payload']).toEqual('msg2')
 
   sub.unsubscribe()
 })
@@ -331,13 +330,13 @@ test('does not subscribe to input until channel is OPENED', () => {
   // Channel is REQUESTED, not yet OPENED — input is not subscribed yet.
   // Subject values emitted now are lost (caller should use ReplaySubject for buffering).
   input$.next('early-1')
-  assert.is(mock.lastChannel!.sentMessages.length, 0)
+  expect(mock.lastChannel!.sentMessages.length).toBe(0)
 
   // Once OPENED, input is subscribed; subsequent values are sent.
   mock.lastChannel!.simulateOpen()
   input$.next('after-open')
-  assert.is(mock.lastChannel!.sentMessages.length, 1)
-  assert.equal(mock.lastChannel!.sentMessages[0]!['payload'], 'after-open')
+  expect(mock.lastChannel!.sentMessages.length).toBe(1)
+  expect(mock.lastChannel!.sentMessages[0]!['payload']).toEqual('after-open')
 
   sub.unsubscribe()
 })
@@ -352,13 +351,13 @@ test('ReplaySubject input drains buffered values once channel is OPENED', () => 
   // Values emitted before OPENED — ReplaySubject buffers them
   input$.next('early-1')
   input$.next('early-2')
-  assert.is(mock.lastChannel!.sentMessages.length, 0)
+  expect(mock.lastChannel!.sentMessages.length).toBe(0)
 
   // Once OPENED, ReplaySubject replays its buffer
   mock.lastChannel!.simulateOpen()
-  assert.is(mock.lastChannel!.sentMessages.length, 2)
-  assert.equal(mock.lastChannel!.sentMessages[0]!['payload'], 'early-1')
-  assert.equal(mock.lastChannel!.sentMessages[1]!['payload'], 'early-2')
+  expect(mock.lastChannel!.sentMessages.length).toBe(2)
+  expect(mock.lastChannel!.sentMessages[0]!['payload']).toEqual('early-1')
+  expect(mock.lastChannel!.sentMessages[1]!['payload']).toEqual('early-2')
 
   sub.unsubscribe()
 })
@@ -372,20 +371,20 @@ test('ReplaySubject input is replayed after reconnect', () => {
   mock.lastChannel!.simulateOpen()
 
   input$.next('before')
-  assert.is(mock.lastChannel!.sentMessages.length, 1)
+  expect(mock.lastChannel!.sentMessages.length).toBe(1)
 
   // Simulate connection drop — channel goes back to REQUESTED, input is unsubscribed
   mock.lastChannel!.simulateRequested()
 
   // New value during REQUESTED — buffered by ReplaySubject
   input$.next('during-requested')
-  assert.is(mock.lastChannel!.sentMessages.length, 1)
+  expect(mock.lastChannel!.sentMessages.length).toBe(1)
 
   // Reconnect succeeds — input is re-subscribed, ReplaySubject replays both values
   mock.lastChannel!.simulateOpen()
-  assert.is(mock.lastChannel!.sentMessages.length, 3)
-  assert.equal(mock.lastChannel!.sentMessages[1]!['payload'], 'before')
-  assert.equal(mock.lastChannel!.sentMessages[2]!['payload'], 'during-requested')
+  expect(mock.lastChannel!.sentMessages.length).toBe(3)
+  expect(mock.lastChannel!.sentMessages[1]!['payload']).toEqual('before')
+  expect(mock.lastChannel!.sentMessages[2]!['payload']).toEqual('during-requested')
 
   sub.unsubscribe()
 })
@@ -406,16 +405,16 @@ test('requestResponse sends one request and emits response', () => {
   })
   mock.lastChannel!.simulateOpen()
 
-  assert.is(mock.lastChannel!.sentMessages.length, 1)
-  assert.equal(mock.lastChannel!.sentMessages[0]!['payload'], { query: 'AAPL' })
+  expect(mock.lastChannel!.sentMessages.length).toBe(1)
+  expect(mock.lastChannel!.sentMessages[0]!['payload']).toEqual({ query: 'AAPL' })
 
   // Server sends one response then closes the channel
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { price: 150 } })
   mock.lastChannel!.simulateClose()
 
-  assert.is(received.length, 1)
-  assert.equal(received[0], { price: 150 })
-  assert.is(completed, true)
+  expect(received.length).toBe(1)
+  expect(received[0]).toEqual({ price: 150 })
+  expect(completed).toBe(true)
 
   sub.unsubscribe()
 })
@@ -432,14 +431,14 @@ test('requestStream sends one request and emits multiple responses', () => {
   })
   mock.lastChannel!.simulateOpen()
 
-  assert.is(mock.lastChannel!.sentMessages.length, 1)
-  assert.equal(mock.lastChannel!.sentMessages[0]!['payload'], { query: 'AAPL' })
+  expect(mock.lastChannel!.sentMessages.length).toBe(1)
+  expect(mock.lastChannel!.sentMessages[0]!['payload']).toEqual({ query: 'AAPL' })
 
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { price: 150 } })
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { price: 151 } })
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { price: 152 } })
 
-  assert.is(received.length, 3)
+  expect(received.length).toBe(3)
 
   sub.unsubscribe()
 })
@@ -458,9 +457,7 @@ test('requestStream completes when server closes channel', () => {
   mock.lastChannel!.simulateMessage({ type: 'CHANNEL_DATA', payload: { value: 1 } })
   mock.lastChannel!.simulateClose()
 
-  assert.is(completed, true)
+  expect(completed).toBe(true)
 
   sub.unsubscribe()
 })
-
-test.run()

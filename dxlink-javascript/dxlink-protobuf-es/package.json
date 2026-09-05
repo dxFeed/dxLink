@@ -1,0 +1,75 @@
+{
+  "name": "@dxfeed/dxlink-protobuf-es",
+  "version": "0.9.0",
+  "private": false,
+  "sideEffects": false,
+  "description": "Binds protobuf-es service descriptors to the dxLink RPC transport, producing typed rxjs clients",
+  "source": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./build/index.d.mts",
+        "default": "./build/index.mjs"
+      },
+      "require": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      }
+    }
+  },
+  "main": "build/index.js",
+  "module": "build/index.mjs",
+  "types": "build/index.d.ts",
+  "scripts": {
+    "prepublishOnly": "pnpm run build && pnpm run test",
+    "generate": "buf generate && buf build --as-file-descriptor-set -o src/gen/test_service.binpb",
+    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean --out-dir build",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@dxfeed/dxlink-core": "workspace:*",
+    "@dxfeed/dxlink-rpc": "workspace:*"
+  },
+  "peerDependencies": {
+    "@bufbuild/protobuf": "^2.12.0",
+    "rxjs": ">=7.0.0"
+  },
+  "devDependencies": {
+    "@bufbuild/protobuf": "^2.12.0",
+    "rxjs": "^7.5.2"
+  },
+  "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
+  "maintainers": [
+    {
+      "name": "Fyzu",
+      "url": "https://github.com/fyzu"
+    }
+  ],
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/dxfeed/dxlink.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dxfeed/dxlink/issues"
+  },
+  "homepage": "https://dxfeed.com/",
+  "keywords": [
+    "api",
+    "rpc",
+    "client",
+    "protobuf",
+    "protobuf-es",
+    "rxjs",
+    "observable",
+    "dxfeed",
+    "dxlink"
+  ],
+  "files": [
+    "/build",
+    "/package.json"
+  ]
+}

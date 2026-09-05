@@ -6,25 +6,26 @@
   "description": "dxLink core",
   "source": "src/index.ts",
   "exports": {
-    "types": "./build/index.d.ts",
-    "require": "./build/index.js",
-    "default": "./build/index.module.js"
+    ".": {
+      "import": {
+        "types": "./build/index.d.mts",
+        "default": "./build/index.mjs"
+      },
+      "require": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      }
+    }
   },
   "main": "build/index.js",
-  "module": "build/index.module.js",
+  "module": "build/index.mjs",
   "types": "build/index.d.ts",
-  "browserslist": [
-    "last 1 year"
-  ],
-  "minify": {
-    "mangle": false
-  },
   "scripts": {
-    "prepublishOnly": "npm run build && npm run test",
-    "build": "microbundle -f esm,cjs",
+    "prepublishOnly": "pnpm run build && pnpm run test",
+    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean --out-dir build",
     "lint": "eslint src",
-    "test": "tsx src/index.test.ts",
-    "test:watch": "tsx watch src/index.test.ts"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {},
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",

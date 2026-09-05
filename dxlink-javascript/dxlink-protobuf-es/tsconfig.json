@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // `ES2022.Error` for `new Error(message, { cause })`, used to keep the original
+    // protobuf-es failure attached when a message cannot be encoded or decoded.
+    "lib": ["ES2020", "ES2022.Error", "DOM", "DOM.Iterable"]
+  }
+}

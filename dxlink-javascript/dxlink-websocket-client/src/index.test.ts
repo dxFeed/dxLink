@@ -1,6 +1,5 @@
 import { DXLinkConnectionState, type DXLinkError } from '@dxfeed/dxlink-core'
-import { test } from 'uvu'
-import * as assert from 'uvu/assert'
+import { expect, test } from 'vitest'
 
 import { DXLINK_WS_PROTOCOL_VERSION, DXLinkWebSocketClient } from './client'
 
@@ -44,45 +43,47 @@ const waitForConnectionState = (
     client.addConnectionStateChangeListener(listener)
   })
 
-test(`Live market-data endpoint success-path`, async () => {
-  const client = new DXLinkWebSocketClient({
-    actionTimeout: ACTION_TIMEOUT_SEC,
-    logLevel: 0,
-    maxReconnectAttempts: 0,
-  })
-  const errors: DXLinkError[] = []
-  const connectionStates: DXLinkConnectionState[] = []
+test(
+  `Live market-data endpoint success-path`,
+  async () => {
+    const client = new DXLinkWebSocketClient({
+      actionTimeout: ACTION_TIMEOUT_SEC,
+      logLevel: 0,
+      maxReconnectAttempts: 0,
+    })
+    const errors: DXLinkError[] = []
+    const connectionStates: DXLinkConnectionState[] = []
 
-  const onError = (error: DXLinkError) => {
-    errors.push(error)
-  }
-  const onConnectionState = (state: DXLinkConnectionState) => {
-    connectionStates.push(state)
-  }
+    const onError = (error: DXLinkError) => {
+      errors.push(error)
+    }
+    const onConnectionState = (state: DXLinkConnectionState) => {
+      connectionStates.push(state)
+    }
 
-  client.addErrorListener(onError)
-  client.addConnectionStateChangeListener(onConnectionState)
+    client.addErrorListener(onError)
+    client.addConnectionStateChangeListener(onConnectionState)
 
-  try {
-    client.connect(DEMO_URL)
+    try {
+      client.connect(DEMO_URL)
 
-    assert.is(client.getConnectionState(), DXLinkConnectionState.CONNECTING)
+      expect(client.getConnectionState()).toBe(DXLinkConnectionState.CONNECTING)
 
-    await waitForConnectionState(client, DXLinkConnectionState.CONNECTED, CONNECT_TIMEOUT_MS)
+      await waitForConnectionState(client, DXLinkConnectionState.CONNECTED, CONNECT_TIMEOUT_MS)
 
-    const details = client.getConnectionDetails()
-    assert.is(details.protocolVersion, DXLINK_WS_PROTOCOL_VERSION)
-    assert.ok(details.serverVersion !== undefined && details.serverVersion.length > 0)
-    assert.is(errors.length, 0)
-    assert.ok(connectionStates.includes(DXLinkConnectionState.CONNECTING))
-    assert.ok(connectionStates.includes(DXLinkConnectionState.CONNECTED))
-  } finally {
-    client.disconnect()
-    client.removeErrorListener(onError)
-    client.removeConnectionStateChangeListener(onConnectionState)
+      const details = client.getConnectionDetails()
+      expect(details.protocolVersion).toBe(DXLINK_WS_PROTOCOL_VERSION)
+      expect(details.serverVersion !== undefined && details.serverVersion.length > 0).toBe(true)
+      expect(errors.length).toBe(0)
+      expect(connectionStates.includes(DXLinkConnectionState.CONNECTING)).toBe(true)
+      expect(connectionStates.includes(DXLinkConnectionState.CONNECTED)).toBe(true)
+    } finally {
+      client.disconnect()
+      client.removeErrorListener(onError)
+      client.removeConnectionStateChangeListener(onConnectionState)
 
-    assert.is(client.getConnectionState(), DXLinkConnectionState.NOT_CONNECTED)
-  }
-})
-
-test.run()
+      expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
+    }
+  },
+  CONNECT_TIMEOUT_MS + 10_000
+)

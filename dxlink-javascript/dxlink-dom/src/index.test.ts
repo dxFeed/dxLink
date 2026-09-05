@@ -1,9 +1,5 @@
-import { test } from 'uvu'
-import * as assert from 'uvu/assert'
+import { expect, test } from 'vitest'
 
 test(`test`, () => {
-  assert.is('test', 'test')
-  ;`👍` //?
+  expect('test').toBe('test')
 })
-
-test.run()

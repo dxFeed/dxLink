@@ -1,6 +1,13 @@
 {
-  "$schema": "https://turbo.build/schema.json",
-  "pipeline": {
+  "$schema": "https://v2-9-16.turborepo.dev/schema.json",
+  "globalDependencies": [
+    "tsconfig.json",
+    "eslint.config.mjs",
+    ".prettierrc",
+    ".prettierignore",
+    "dxlink-console/tsconfig.base.json"
+  ],
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["build/**"]
@@ -8,12 +15,39 @@
     "test": {
       "dependsOn": ["build"],
       "outputs": [],
-      "inputs": ["src/**/*.tsx", "src/**/*.ts", "test/**/*.ts", "test/**/*.tsx"]
+      "inputs": [
+        "src/**/*.tsx",
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "test/**/*.tsx",
+        "tsconfig.json",
+        "vite.config.ts",
+        "vitest.config.ts"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"],
       "outputs": [],
-      "inputs": ["src/**/*.tsx", "src/**/*.ts", "test/**/*.ts", "test/**/*.tsx"]
+      "inputs": [
+        "src/**/*.tsx",
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "test/**/*.tsx",
+        "tsconfig.json",
+        "eslint.config.mjs"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": [
+        "src/**/*.tsx",
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "test/**/*.tsx",
+        "tsconfig.json",
+        "vite.config.ts"
+      ]
     },
     "publish": {
       "dependsOn": ["build", "test", "lint"],

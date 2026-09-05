@@ -16,5 +16,6 @@ export {
   type DXLinkFeedEventListener,
   type SubscriptionByContract,
   type DXLinkFeedRequester,
+  type DXLinkFeedSubscription,
   DXLinkFeed,
 } from './feed'

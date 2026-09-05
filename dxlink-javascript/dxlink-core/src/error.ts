@@ -2,12 +2,7 @@
  * Error type that can be used to handle errors or send them to the remote endpoint.
  */
 export type DXLinkErrorType =
-  | 'UNKNOWN'
-  | 'UNSUPPORTED_PROTOCOL'
-  | 'TIMEOUT'
-  | 'UNAUTHORIZED'
-  | 'INVALID_MESSAGE'
-  | 'BAD_ACTION'
+  'UNKNOWN' | 'UNSUPPORTED_PROTOCOL' | 'TIMEOUT' | 'UNAUTHORIZED' | 'INVALID_MESSAGE' | 'BAD_ACTION'
 
 /**
  * Unified error that can be used to handle errors or send them to the remote endpoint.

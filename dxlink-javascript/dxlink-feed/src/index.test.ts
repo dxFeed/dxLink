@@ -1,5 +1,4 @@
-import { test } from 'uvu'
-import * as assert from 'uvu/assert'
+import { expect, test } from 'vitest'
 
 import { DXLinkWebSocketClient } from '../../dxlink-websocket-client/src'
 
@@ -32,37 +31,39 @@ const waitForFirstEvents = (
     feed.addEventListener(listener)
   })
 
-test(`Live feed service returns Quote for AAPL`, async () => {
-  const client = new DXLinkWebSocketClient({
-    actionTimeout: ACTION_TIMEOUT_SEC,
-    logLevel: 0,
-    maxReconnectAttempts: 0,
-  })
+test(
+  `Live feed service returns Quote for AAPL`,
+  async () => {
+    const client = new DXLinkWebSocketClient({
+      actionTimeout: ACTION_TIMEOUT_SEC,
+      logLevel: 0,
+      maxReconnectAttempts: 0,
+    })
 
-  const feed = new DXLinkFeed(client, FeedContract.TICKER)
-  feed.configure({
-    acceptDataFormat: FeedDataFormat.COMPACT,
-    acceptEventFields: {
-      Quote: ['eventSymbol', 'askPrice', 'bidPrice'],
-    },
-  })
-  feed.addSubscriptions({ type: 'Quote', symbol: 'AAPL' })
+    const feed = new DXLinkFeed(client, FeedContract.TICKER)
+    feed.configure({
+      acceptDataFormat: FeedDataFormat.COMPACT,
+      acceptEventFields: {
+        Quote: ['eventSymbol', 'askPrice', 'bidPrice'],
+      },
+    })
+    feed.addSubscriptions({ type: 'Quote', symbol: 'AAPL' })
 
-  try {
-    client.connect(DEMO_URL)
+    try {
+      client.connect(DEMO_URL)
 
-    const events = await waitForFirstEvents(feed, EVENT_TIMEOUT_MS)
+      const events = await waitForFirstEvents(feed, EVENT_TIMEOUT_MS)
 
-    assert.is(events.length, 1)
-    const event = events[0]
-    assert.is(event.eventType, 'Quote')
-    assert.is(event.eventSymbol, 'AAPL')
-    assert.ok(typeof event.askPrice === 'number')
-    assert.ok(typeof event.bidPrice === 'number')
-  } finally {
-    feed.close()
-    client.disconnect()
-  }
-})
-
-test.run()
+      expect(events.length).toBe(1)
+      const event = events[0]
+      expect(event.eventType).toBe('Quote')
+      expect(event.eventSymbol).toBe('AAPL')
+      expect(typeof event.askPrice === 'number').toBe(true)
+      expect(typeof event.bidPrice === 'number').toBe(true)
+    } finally {
+      feed.close()
+      client.disconnect()
+    }
+  },
+  EVENT_TIMEOUT_MS + 10_000
+)

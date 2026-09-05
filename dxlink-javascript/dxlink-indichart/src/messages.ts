@@ -123,8 +123,7 @@ export interface DXLinkIndiChartIndicatorDisabled {
 }
 
 export type DXLinkIndiChartIndicatorState =
-  | DXLinkIndiChartIndicatorEnabled
-  | DXLinkIndiChartIndicatorDisabled
+  DXLinkIndiChartIndicatorEnabled | DXLinkIndiChartIndicatorDisabled
 
 export interface DXLinkIndiChartIndicatorsStates {
   readonly [key: string]: DXLinkIndiChartIndicatorState
@@ -205,14 +204,7 @@ export type DXLinkIndiChartSplineStyle =
  * handle any future style the server may introduce.
  */
 export type DXLinkIndiChartShapeStyle =
-  | 'TAG'
-  | 'ARROW_UP'
-  | 'ARROW_DOWN'
-  | 'XCROSS'
-  | 'CROSS'
-  | 'BEACON'
-  | 'CIRCLE'
-  | (string & {})
+  'TAG' | 'ARROW_UP' | 'ARROW_DOWN' | 'XCROSS' | 'CROSS' | 'BEACON' | 'CIRCLE' | (string & {})
 
 /**
  * Anchor location of a {@link DXLinkIndiChartShapePoint} on the chart.
@@ -222,12 +214,7 @@ export type DXLinkIndiChartShapeStyle =
  * handle any future location the server may introduce.
  */
 export type DXLinkIndiChartShapeLocation =
-  | 'ABOVE_BAR'
-  | 'BELOW_BAR'
-  | 'TOP'
-  | 'BOTTOM'
-  | 'ABSOLUTE'
-  | (string & {})
+  'ABOVE_BAR' | 'BELOW_BAR' | 'TOP' | 'BOTTOM' | 'ABSOLUTE' | (string & {})
 
 export interface DXLinkIndiChartSplinePoint {
   readonly value: JSONNumber

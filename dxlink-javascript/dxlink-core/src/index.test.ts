@@ -1,13 +1,9 @@
-import { test } from 'uvu'
-import * as assert from 'uvu/assert'
+import { expect, test } from 'vitest'
 
 import { Logger } from './'
 
 test(`test`, () => {
   const logger = new Logger(`test`, 0)
 
-  assert.instance(logger, Logger)
-  ;`👍` //?
+  expect(logger).toBeInstanceOf(Logger)
 })
-
-test.run()

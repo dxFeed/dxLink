@@ -50,12 +50,7 @@ export interface ChannelClosedMessage {
 }
 
 export type ErrorType =
-  | 'UNKNOWN'
-  | 'UNSUPPORTED_PROTOCOL'
-  | 'TIMEOUT'
-  | 'UNAUTHORIZED'
-  | 'INVALID_MESSAGE'
-  | 'BAD_ACTION'
+  'UNKNOWN' | 'UNSUPPORTED_PROTOCOL' | 'TIMEOUT' | 'UNAUTHORIZED' | 'INVALID_MESSAGE' | 'BAD_ACTION'
 
 export interface ErrorMessage {
   type: 'ERROR'
@@ -78,11 +73,7 @@ export interface ChannelPayloadMessage {
 }
 
 export type ConnectionMessage =
-  | SetupMessage
-  | KeepaliveMessage
-  | AuthMessage
-  | AuthStateMessage
-  | ErrorMessage
+  SetupMessage | KeepaliveMessage | AuthMessage | AuthStateMessage | ErrorMessage
 
 export type DXLinkWebSocketMessage =
   | SetupMessage

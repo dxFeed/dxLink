@@ -6,32 +6,38 @@
   "description": "dxLink API provides access to market data from dxFeed services",
   "source": "src/index.ts",
   "exports": {
-    "types": "./build/index.d.ts",
-    "require": "./build/index.js",
-    "default": "./build/index.module.js"
+    ".": {
+      "import": {
+        "types": "./build/index.d.mts",
+        "default": "./build/index.mjs"
+      },
+      "require": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      }
+    }
   },
   "main": "build/index.js",
-  "module": "build/index.module.js",
+  "module": "build/index.mjs",
   "types": "build/index.d.ts",
-  "browserslist": [
-    "last 1 year"
-  ],
-  "minify": {
-    "mangle": false
-  },
   "scripts": {
     "start": "vite ./demo",
-    "prepublishOnly": "npm run build",
-    "build": "microbundle -f esm,cjs",
+    "prepublishOnly": "pnpm run build",
+    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean --out-dir build",
     "lint": "eslint src"
   },
   "dependencies": {
-    "@dxfeed/dxlink-core": "0.9.0",
-    "@dxfeed/dxlink-websocket-client": "0.9.0",
-    "@dxfeed/dxlink-feed": "0.9.0",
-    "@dxfeed/dxlink-dom": "0.9.0",
-    "@dxfeed/dxlink-indichart": "0.9.0",
-    "@dxfeed/dxlink-rpc": "0.9.0"
+    "@dxfeed/dxlink-core": "workspace:*",
+    "@dxfeed/dxlink-websocket-client": "workspace:*",
+    "@dxfeed/dxlink-feed": "workspace:*",
+    "@dxfeed/dxlink-dom": "workspace:*",
+    "@dxfeed/dxlink-indichart": "workspace:*",
+    "@dxfeed/dxlink-rpc": "workspace:*",
+    "@dxfeed/dxlink-protobuf-es": "workspace:*"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.16"
   },
   "author": "Dmitry Petrov <dmitry.petrov@devexperts.com>",
   "maintainers": [

@@ -1,7 +1,7 @@
 import type { DXLinkChannelMessage } from '@dxfeed/dxlink-core'
 
 export enum DepthOfMarketDataFormat {
-  'FULL' = 'FULL',
+  FULL = 'FULL',
 }
 
 export interface DepthOfMarketParameters {
@@ -38,9 +38,7 @@ export interface DepthOfMarketSnapshotMessage {
 }
 
 export type DepthOfMarketMessage =
-  | DepthOfMarketSetupMessage
-  | DepthOfMarketConfigMessage
-  | DepthOfMarketSnapshotMessage
+  DepthOfMarketSetupMessage | DepthOfMarketConfigMessage | DepthOfMarketSnapshotMessage
 
 export const isDepthOfMarketMessage = (
   message: DXLinkChannelMessage

@@ -1,0 +1,40 @@
+packages:
+  - dxlink-api
+  - dxlink-core
+  - dxlink-websocket-client
+  - dxlink-feed
+  - dxlink-dom
+  - dxlink-indichart
+  - dxlink-rpc
+  - dxlink-protobuf-es
+  # The console is an umbrella: core + the channel packages + the app that composes them.
+  - dxlink-console/*
+# esbuild and unrs-resolver are native modules that need their install scripts.
+# The other flagged packages (protobufjs, @scarf/scarf) don't, so skip them.
+onlyBuiltDependencies:
+  - esbuild
+  - unrs-resolver
+ignoredBuiltDependencies:
+  - '@bufbuild/buf'
+  - '@scarf/scarf'
+  - protobufjs
+
+# Supply-chain cooldown: don't install npm releases younger than this many minutes
+# (1440 = 1 day), giving a compromised publish time to be detected and yanked
+# before it can land here. Internal/private-registry scopes are exempt (trusted
+# sources that may also omit publish-time metadata).
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - '@dxfeed/*'
+  - '@dxscript/*'
+allowBuilds:
+  # The `buf` CLI, used to regenerate the protobuf-es test fixture. Its install script is a
+  # fallback that npm-installs the platform binary when the optional dependency carrying it is
+  # missing; pnpm resolves that dependency normally, and the launcher finds the binary without it.
+  '@bufbuild/buf': false
+  # Analytics/telemetry, pulled in by @asyncapi/react-component via @stoplight/spectral-*.
+  # Its install script phones home and nothing needs it to run.
+  '@scarf/scarf': false
+  esbuild: true
+  protobufjs: false
+  unrs-resolver: true
