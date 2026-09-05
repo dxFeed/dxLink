@@ -1,0 +1,119 @@
+name: Release
+
+# npm auth is Trusted Publishing: no NPM_TOKEN, npm verifies this workflow's OIDC claim instead.
+# Hence `id-token: write`, and publishing through the npm CLI — pnpm 11.8 cannot do the exchange.
+#
+# A trusted publisher can only be attached to a package that already exists, so a package whose
+# first version has never been published must go out by hand once before this can release it.
+# `main` must also accept pushes from github-actions[bot].
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Version and verify, but do not push, publish or tag'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+defaults:
+  run:
+    working-directory: dxlink-javascript
+
+env:
+  # Both pull @dxscript/* from the internal Nexus, which GitHub-hosted runners cannot reach.
+  # dxscript is still versioned by changesets; it just has to be published from inside the network.
+  PNPM_FILTER: >-
+    --filter=!@dxfeed/dxlink-console-dxscript
+    --filter=!@dxfeed/dxlink-debug-console
+
+jobs:
+  release:
+    name: Version and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: dxlink-javascript/pnpm-lock.yaml
+
+      - name: Ensure npm supports Trusted Publishing
+        run: |
+          npm install -g 'npm@^11.5.1'
+          npm --version
+
+      - name: Fail if there is nothing to release
+        run: |
+          if [ -z "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            echo "::error::No pending changesets in .changeset — nothing to release."
+            exit 1
+          fi
+
+      - name: Install
+        run: pnpm install --frozen-lockfile $PNPM_FILTER
+
+      - name: Apply changesets
+        run: pnpm changeset version
+
+      - name: Read released version
+        id: version
+        # One `fixed` group in .changeset/config.json, so any package reports the release version.
+        run: echo "version=$(node -p "require('./dxlink-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build, test and lint
+        run: pnpm turbo run build test lint $PNPM_FILTER
+
+      - name: Commit and push version bump
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'chore(release): v${{ steps.version.outputs.version }}'
+          git push origin HEAD:${{ github.ref_name }}
+
+      - name: Publish to npm
+        # `pnpm -r exec` walks the workspace in topological order.
+        env:
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: pnpm -r $PNPM_FILTER exec bash "$GITHUB_WORKSPACE/.github/scripts/publish-package.sh"
+
+      - name: Tag the release
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git tag 'v${{ steps.version.outputs.version }}'
+          git push origin 'v${{ steps.version.outputs.version }}'
+
+      - name: Collect release notes
+        id: notes
+        run: |
+          pnpm ls -r --depth -1 --json $PNPM_FILTER \
+            | node "$GITHUB_WORKSPACE/.github/scripts/release-notes.mjs" '${{ steps.version.outputs.version }}' \
+            > "$RUNNER_TEMP/release-notes.md"
+          cat "$RUNNER_TEMP/release-notes.md"
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create 'v${{ steps.version.outputs.version }}' \
+            --title 'v${{ steps.version.outputs.version }}' \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --repo '${{ github.repository }}'
