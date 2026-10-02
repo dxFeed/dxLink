@@ -173,9 +173,9 @@ told apart by the first non-whitespace byte.
   disabled. A silently dropped typo is the failure this form exists to prevent.
 - **Send another request** appears only for `STREAM_STREAM`, and is disabled once the call
   completes or fails — there is no channel left to send on.
-- **Sent must show 1 for a unary call**, not 2. The card's message log is reset by
-  `RpcViewModel.start()` for exactly this reason: StrictMode mounts, unmounts and remounts
-  the view, and the store outlives that cycle.
+- **Sent must show 1 for a unary call**, not 2. StrictMode mounts, unmounts and remounts the
+  view; the call's session must survive that rather than make the call a second time. Two
+  means the session was reopened — see ARCHITECTURE.md §2.
 
 **A descriptor set can arrive without `json_name`, and dxLink's own does.** Only the bundled
 `google/protobuf/*` files in `/proto/docs` carry it; the API's own fields are missing it (474
@@ -270,6 +270,14 @@ otherwise the new import fails to resolve and every request 500s with a blank pa
   See `indichart-channel-request.test.tsx`.
 - **`@dxfeed/ui-kit` is unpublished.** It is gone from npmjs, nexus and jFrog. Nothing here
   depends on it any more — do not reintroduce it.
+- **A model writes atoms; it never reads them in its session's Effect with `get`** unless a
+  change to that atom should close the session and open a new one — that is what `get` means
+  inside an atom. Read current values with `registry.get` (as the feed session does for its
+  pending subscriptions), and list every atom the session writes in `session({ state })`, or a
+  value written while no view observes it is dropped with the unobserved node.
+- **Never write an atom from a finalizer.** A finalizer also runs while the page's registry is
+  being disposed, and a write then throws. Commands find the live dxLink object through
+  `session.current()`, which the session clears itself.
 - **Do not relax the pnpm supply-chain policy** to make an install succeed, and do not add
   ambient `declare module` blocks for `@dxscript/*` — those packages ship their own types,
   and a stub would hide a real mismatch.

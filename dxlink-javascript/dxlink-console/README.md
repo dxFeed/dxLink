@@ -113,11 +113,13 @@ Install what you need. A docs site wanting the connection, auth and the RPC chan
 `core` and `rpc` and never pulls the market-data or dxScript dependency trees:
 
 ```sh
-pnpm add @dxfeed/dxlink-console-core @dxfeed/dxlink-console-rpc
+pnpm add @dxfeed/dxlink-console-core @dxfeed/dxlink-console-rpc effect @effect/atom-react
 ```
 
-React, MUI and emotion are peer dependencies — the host provides them, so there is one React,
-one theme context and one emotion cache. In Next.js, add the packages to `transpilePackages`
+React, MUI, emotion, `effect` and `@effect/atom-react` are peer dependencies — the host
+provides them, so there is one React, one theme context, one emotion cache and one atom
+registry context. The console renders its own registry, so a host needs no Effect setup of its
+own. In Next.js, add the packages to `transpilePackages`
 only if you consume them from source; the published builds need no transpilation. The console
 is client-only, so render it from a `'use client'` component of your own.
 
@@ -132,9 +134,10 @@ pnpm --filter @dxfeed/dxlink-debug-console build     # → build/
 
 ## Stack
 
-React 19 · Vite · TypeScript (strict) · MUI v9 + MUI X DataGrid · Zustand (per-ViewModel
-vanilla stores) · React Router v7 (`HashRouter`, so the app stays relocatable under any
-sub-path) · Vitest + Testing Library.
+React 19 · Vite · TypeScript (strict) · MUI v9 + MUI X DataGrid · Effect 4 (atoms for state via
+`@effect/atom-react`, scoped Effects for dxLink resources, Schema for configuration) · React
+Router v7 (`HashRouter`, so the app stays relocatable under any sub-path) · Vitest + Testing
+Library.
 
 ## Layout
 
@@ -160,10 +163,11 @@ and sees neither tree; a FEED-and-DOM console never resolves the dxScript editor
 heaviest thing here. That is the difference between hiding a button and not shipping a
 dependency. See ARCHITECTURE.md §4 for the file-level layout and §8 for the plugin contract.
 
-The app follows MVVM with **no global store**. Each ViewModel owns its dxlink-api object
-as a private field and exposes UI state through its own Zustand store; views bind with
-`useVM(vm, selector)` and call commands. Connection-level errors aggregate on the
-connection ViewModel, channel-level errors stay on the channel that produced them.
+The app follows MVVM with **no global store**. Each dxlink-api object is wrapped in a model —
+atoms for its state, commands, and a session: a scoped Effect that holds the object open and
+releases it, with every listener it registered, when the session ends. Views bind with
+`useAtomValue` and call commands through `useAtomSet`. Connection-level errors aggregate on the
+connection model, channel-level errors stay on the channel that produced them.
 
 This package replaced the console that shipped inside `@dxfeed/dxlink-docs`, which has
 been deleted. Parity was signed off against live servers, and nothing is outstanding.
