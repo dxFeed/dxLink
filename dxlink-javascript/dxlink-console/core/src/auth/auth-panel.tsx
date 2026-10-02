@@ -1,4 +1,5 @@
 import { DXLinkAuthState } from '@dxfeed/dxlink-api'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -9,17 +10,17 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 
-import { useConnectionVM } from '../connection/connection-context'
-import { useVM } from '../view-model'
+import { useConnection } from '../connection/connection-context'
 
 /**
  * Authorization panel — the live auth view. Shown when the server reports
- * UNAUTHORIZED (or while AUTHORIZING). Submits the token to the connection VM;
+ * UNAUTHORIZED (or while AUTHORIZING). Submits the token to the connection model;
  * on success the page swaps this panel for the channels area.
  */
 export const AuthPanel = () => {
-  const vm = useConnectionVM()
-  const auth = useVM(vm, (s) => s.auth)
+  const model = useConnection()
+  const auth = useAtomValue(model.auth)
+  const setAuthToken = useAtomSet(model.setAuthToken)
   const [token, setToken] = useState('')
 
   const authorizing = auth === DXLinkAuthState.AUTHORIZING
@@ -28,7 +29,7 @@ export const AuthPanel = () => {
     event.preventDefault()
     const trimmed = token.trim()
     if (trimmed !== '') {
-      vm.setAuthToken(trimmed)
+      setAuthToken(trimmed)
     }
   }
 

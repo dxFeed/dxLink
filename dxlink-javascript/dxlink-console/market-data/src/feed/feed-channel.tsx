@@ -1,18 +1,22 @@
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
-import { useVM } from '@dxfeed/dxlink-console-core'
-import { ChannelWidget } from '@dxfeed/dxlink-console-core'
-import { useConnectionVM } from '@dxfeed/dxlink-console-core'
+import {
+  ChannelWidget,
+  useChannelCard,
+  useConnectionClient,
+  useSession,
+} from '@dxfeed/dxlink-console-core'
+import { useAtomValue } from '@effect/atom-react'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import Stack from '@mui/material/Stack'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { FeedChartChannel } from './feed-chart-channel'
 import { ConfigurationSection } from './feed-configuration'
 import { EventsTable } from './feed-events-table'
+import { makeFeedModel } from './feed-model'
 import { SubscriptionManager } from './feed-subscriptions'
-import { FeedViewModel } from './feed-view-model'
 import type { FeedConfig } from './types'
 
 interface FeedChannelProps {
@@ -30,48 +34,35 @@ const FeedStatusChip = ({ state }: { state: DXLinkChannelState }) => {
   return <Chip size="small" color="warning" variant="outlined" label="opening" />
 }
 
-/** Live Feed subscriptions view — wraps a real {@link FeedViewModel}. */
+/** Live Feed subscriptions view — wraps a {@link FeedModel}. */
 const FeedSubscriptionsChannel = ({ title, config }: FeedChannelProps) => {
-  const connectionVM = useConnectionVM()
-  // Pure construction (StrictMode double-invokes this) — the feed channel is
-  // opened in start()/closed in stop() via the effect below, not here.
-  const [vm] = useState(() => {
-    const client = connectionVM.getClient()
-    if (client === null) {
-      throw new Error('Feed channel opened without an active connection')
-    }
-    return new FeedViewModel(client, {
+  const client = useConnectionClient()
+  // Pure construction (StrictMode double-invokes this): the feed channel opens with the
+  // session below, not here.
+  const [model] = useState(() =>
+    makeFeedModel(client, {
       feed: config.feed || undefined,
       space: config.space || undefined,
     })
-  })
-  useEffect(() => {
-    vm.start()
-    return () => vm.stop()
-  }, [vm])
-  const channelState = useVM(vm, (s) => s.channelState)
-  const channelId = useVM(vm, (s) => s.channelId)
-  const channelParameters = useVM(vm, (s) => s.channelParameters)
-  const errors = useVM(vm, (s) => s.errors)
+  )
+  useSession(model.session)
+  const channelState = useAtomValue(model.channel.state)
+  const card = useChannelCard(model.channel)
 
   return (
     <ChannelWidget
       icon={<ShowChartIcon />}
       title={title}
       subtitle="Feed · subscriptions"
-      onClose={vm.close}
       status={<FeedStatusChip state={channelState} />}
-      channelId={channelId}
-      parameters={channelParameters}
-      errors={errors}
-      onClearErrors={vm.clearErrors}
+      {...card}
     >
       <Stack spacing={2}>
-        <ConfigurationSection vm={vm} />
+        <ConfigurationSection model={model} />
         <Divider />
-        <SubscriptionManager vm={vm} />
+        <SubscriptionManager model={model} />
         <Divider />
-        <EventsTable vm={vm} />
+        <EventsTable model={model} />
       </Stack>
     </ChannelWidget>
   )

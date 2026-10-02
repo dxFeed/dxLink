@@ -22,10 +22,12 @@ import Stack from '@mui/material/Stack'
 import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
+import { Effect } from 'effect'
 import { useMemo, useRef, useState } from 'react'
 
 import {
   createRequestTemplate,
+  type DescriptorSetError,
   fetchDescriptorSet,
   isMethodSupported,
   listServices,
@@ -224,18 +226,19 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
   const selectService = (next: DescService | undefined) =>
     selectMethod(next?.methods.find(isMethodSupported), { serviceName: next?.typeName ?? '' })
 
-  const load = async (source: string, loader: () => Promise<void>) => {
+  const load = (source: string, registry: Effect.Effect<FileRegistry, DescriptorSetError>) => {
     setLoading(true)
     setLoadError(null)
-    try {
-      await loader()
-    } catch (error) {
-      setLoadError(
-        `Could not load definitions from ${source}: ${error instanceof Error ? error.message : String(error)}`
+    void Effect.runPromise(
+      registry.pipe(
+        Effect.match({
+          onSuccess: (loaded) => applyRegistry(loaded, source),
+          onFailure: (error) =>
+            setLoadError(`Could not load definitions from ${source}: ${error.message}`),
+        }),
+        Effect.ensuring(Effect.sync(() => setLoading(false)))
       )
-    } finally {
-      setLoading(false)
-    }
+    )
   }
 
   // Loading a new set invalidates the current selection — preselect its first service and
@@ -254,15 +257,9 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
     })
   }
 
-  const loadUrl = () =>
-    load(value.url, async () => {
-      applyRegistry(await fetchDescriptorSet(value.url), value.url)
-    })
+  const loadUrl = () => load(value.url, fetchDescriptorSet(value.url))
 
-  const loadFile = (file: File) =>
-    load(file.name, async () => {
-      applyRegistry(await readDescriptorSet(file), file.name)
-    })
+  const loadFile = (file: File) => load(file.name, readDescriptorSet(file))
 
   return (
     <Stack spacing={2.5} sx={{ pt: 1 }}>
@@ -284,7 +281,7 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
           />
           <Button
             variant="outlined"
-            onClick={() => void loadUrl()}
+            onClick={loadUrl}
             disabled={loading || value.url.trim() === ''}
             sx={{ mt: 0.25 }}
           >
@@ -309,7 +306,7 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
               const file = e.target.files?.[0]
               // Clear the input so picking the same file again still fires a change.
               e.target.value = ''
-              if (file !== undefined) void loadFile(file)
+              if (file !== undefined) loadFile(file)
             }}
           />
         </Box>

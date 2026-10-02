@@ -14,6 +14,7 @@ import {
 } from '@bufbuild/protobuf'
 import { protoCamelCase } from '@bufbuild/protobuf/reflect'
 import { type FileDescriptorSet, FileDescriptorSetSchema } from '@bufbuild/protobuf/wkt'
+import { Effect, Schema } from 'effect'
 
 /**
  * Reading protobuf service definitions at runtime.
@@ -112,6 +113,28 @@ export const parseDescriptorSet = (bytes: Uint8Array): FileRegistry =>
   deduceMissingJsonNames(createFileRegistry(decodeDescriptorSet(bytes)))
 
 /**
+ * A descriptor set could not be loaded: the endpoint was unreachable or refused, or what came
+ * back is not a descriptor set. `message` says which, in terms of what the user can do about it.
+ */
+export class DescriptorSetError extends Schema.TaggedError<DescriptorSetError>()(
+  'DescriptorSetError',
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+  }
+) {}
+
+const describe = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause)
+
+/** {@link parseDescriptorSet}, failing with a {@link DescriptorSetError} on bytes it cannot read. */
+const decode = (bytes: Uint8Array): Effect.Effect<FileRegistry, DescriptorSetError> =>
+  Effect.try({
+    try: () => parseDescriptorSet(bytes),
+    catch: (cause) => new DescriptorSetError({ message: describe(cause), cause }),
+  })
+
+/**
  * Media types that ask a schema endpoint for the binary representation.
  *
  * dxLink's `/proto/docs` negotiates on `Accept` and serves protobuf-JSON to everything else —
@@ -121,33 +144,54 @@ export const parseDescriptorSet = (bytes: Uint8Array): FileRegistry =>
  */
 const BINARY_ACCEPT = 'application/protobuf, application/x-protobuf, application/octet-stream'
 
-/** Fetch a `FileDescriptorSet` from an endpoint and build a registry from it. */
-export const fetchDescriptorSet = async (url: string): Promise<FileRegistry> => {
-  let response: Response
-  try {
-    response = await fetch(url, { headers: { Accept: BINARY_ACCEPT } })
-  } catch (error) {
+/**
+ * Fetch a `FileDescriptorSet` from an endpoint and build a registry from it.
+ *
+ * Interrupting it aborts the request.
+ */
+export const fetchDescriptorSet = Effect.fnUntraced(function* (
+  url: string
+): Effect.fn.Return<FileRegistry, DescriptorSetError> {
+  const response = yield* Effect.tryPromise({
+    try: (signal) => fetch(url, { headers: { Accept: BINARY_ACCEPT }, signal }),
     // Browsers report every blocked cross-origin request as an opaque network error. Naming
     // the likely cause saves the next person a session in the network tab — and note that
     // asking for a media type makes the request preflighted, so an endpoint on another origin
     // has to allow the `Accept` header as well as the origin itself.
-    throw new Error(
-      'the endpoint must be reachable, and one on another origin must allow cross-origin ' +
-        'requests including the Accept header',
-      { cause: error }
-    )
-  }
+    catch: (cause) =>
+      new DescriptorSetError({
+        message:
+          'the endpoint must be reachable, and one on another origin must allow cross-origin ' +
+          'requests including the Accept header',
+        cause,
+      }),
+  })
 
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`)
+    return yield* new DescriptorSetError({
+      message: `${response.status} ${response.statusText}`,
+    })
   }
 
-  return parseDescriptorSet(new Uint8Array(await response.arrayBuffer()))
-}
+  const body = yield* Effect.tryPromise({
+    try: () => response.arrayBuffer(),
+    catch: (cause) => new DescriptorSetError({ message: describe(cause), cause }),
+  })
+
+  return yield* decode(new Uint8Array(body))
+})
 
 /** Build a registry from a descriptor set the user picked from disk. */
-export const readDescriptorSet = async (file: File): Promise<FileRegistry> =>
-  parseDescriptorSet(new Uint8Array(await file.arrayBuffer()))
+export const readDescriptorSet = Effect.fnUntraced(function* (
+  file: File
+): Effect.fn.Return<FileRegistry, DescriptorSetError> {
+  const body = yield* Effect.tryPromise({
+    try: () => file.arrayBuffer(),
+    catch: (cause) => new DescriptorSetError({ message: describe(cause), cause }),
+  })
+
+  return yield* decode(new Uint8Array(body))
+})
 
 /** Every service in a registry, ordered by fully qualified name. */
 export const listServices = (registry: FileRegistry): DescService[] => {

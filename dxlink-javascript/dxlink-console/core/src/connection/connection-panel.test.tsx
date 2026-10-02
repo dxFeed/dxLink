@@ -1,9 +1,10 @@
+import { RegistryProvider } from '@effect/atom-react'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { ConnectionProvider } from './connection-context'
+import { makeConnectionModel } from './connection-model'
 import { ConnectionPanel } from './connection-panel'
-import { ConnectionViewModel } from './connection-view-model'
 import { builtinConsoleConfig } from '../lib/console-config'
 import type { ConsoleConfig, ConsoleConfigLock } from '../lib/console-config'
 import { ConsoleConfigProvider } from '../lib/console-config-context'
@@ -15,13 +16,15 @@ const config = (overrides: Partial<ConsoleConfig> = {}): ConsoleConfig => ({
 
 const renderPanel = (value: ConsoleConfig) =>
   render(
-    <ConsoleConfigProvider value={value}>
-      {/* The panel reads connection state from the page's ViewModel; a fresh one is
-          NOT_CONNECTED and opens no socket. */}
-      <ConnectionProvider value={new ConnectionViewModel()}>
-        <ConnectionPanel />
-      </ConnectionProvider>
-    </ConsoleConfigProvider>
+    <RegistryProvider>
+      <ConsoleConfigProvider value={value}>
+        {/* The panel reads connection state from the page's model; a fresh one is
+            NOT_CONNECTED and opens no socket. */}
+        <ConnectionProvider value={makeConnectionModel()}>
+          <ConnectionPanel />
+        </ConnectionProvider>
+      </ConsoleConfigProvider>
+    </RegistryProvider>
   )
 
 const urlField = () => screen.getByLabelText(/WebSocket URL/)

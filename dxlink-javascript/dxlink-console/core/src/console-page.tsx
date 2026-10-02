@@ -1,18 +1,20 @@
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
+import { RegistryProvider, useAtomValue } from '@effect/atom-react'
 import ScopedCssBaseline from '@mui/material/ScopedCssBaseline'
 import Stack from '@mui/material/Stack'
 import { ThemeProvider } from '@mui/material/styles'
 import type { Theme } from '@mui/material/styles'
+import { useState } from 'react'
 
 import { AuthPanel } from './auth/auth-panel'
 import { ChannelsArea } from './channels/channels-area'
 import type { ErasedChannelPlugin } from './channels/plugin'
 import { ConnectionProvider } from './connection/connection-context'
+import { makeConnectionModel } from './connection/connection-model'
 import { ConnectionPanel } from './connection/connection-panel'
-import { ConnectionViewModel } from './connection/connection-view-model'
 import type { ConsoleConfig } from './lib/console-config'
 import { ConsoleConfigProvider } from './lib/console-config-context'
-import { useOwnedViewModel, useVM } from './view-model'
+import { useSession } from './lib/model'
 
 export interface ConsolePageProps {
   /**
@@ -48,8 +50,20 @@ export interface ConsolePageProps {
 }
 
 /**
- * Console page. Owns the page-scoped {@link ConnectionViewModel} (disposed on
- * unmount → closes the socket) and provides it to the subtree. Tri-state gating:
+ * How long, in milliseconds, the page's atom registry keeps an atom nothing observes before
+ * releasing it — and with it, any session the atom holds.
+ *
+ * React StrictMode unmounts and remounts every component once in development; a session must
+ * survive that rather than close a channel and open a second one. The remount happens before
+ * the registry's next task, so this is margin rather than mechanism — it covers a subtree that
+ * remounts a little later than that, at the cost of a card's channel closing this much after
+ * the card goes.
+ */
+const IDLE_TTL = 400
+
+/**
+ * Console page. Owns the page-scoped {@link ConnectionModel} (its client is closed when the page
+ * unmounts) and provides it to the subtree. Tri-state gating:
  *  - not connected → connection panel only,
  *  - connected + auth UNAUTHORIZED/AUTHORIZING → auth panel,
  *  - authorized (now or earlier this session) → channels area.
@@ -98,29 +112,46 @@ const HOST_OWNS_COLOR_SCHEME = { colorSchemeNode: null } satisfies {
   colorSchemeNode: Element | null
 }
 
-export const ConsolePage = ({ config, channels, theme }: ConsolePageProps) => {
-  const vm = useOwnedViewModel(() => new ConnectionViewModel())
-  const connection = useVM(vm, (s) => s.connection)
-  const auth = useVM(vm, (s) => s.auth)
-  const sessionId = useVM(vm, (s) => s.sessionId)
-  const everAuthorized = useVM(vm, (s) => s.everAuthorized)
+/**
+ * The page's content, inside its own registry: a model created here belongs to that registry,
+ * so this is the first component that can own one.
+ */
+const ConsoleContent = ({ channels }: { channels: readonly ErasedChannelPlugin[] }) => {
+  // Creating a model is pure — atoms only describe state — so StrictMode's double-invoked
+  // initializer discards one unused copy and opens nothing.
+  const [model] = useState(makeConnectionModel)
+  useSession(model.session)
+  const connection = useAtomValue(model.connection)
+  const auth = useAtomValue(model.auth)
+  const sessionId = useAtomValue(model.sessionId)
+  const everAuthorized = useAtomValue(model.everAuthorized)
 
   const connected = connection === DXLinkConnectionState.CONNECTED
   const needsAuth =
     connected && (auth === DXLinkAuthState.UNAUTHORIZED || auth === DXLinkAuthState.AUTHORIZING)
 
+  return (
+    <ConnectionProvider value={model}>
+      <Stack spacing={3}>
+        <ConnectionPanel />
+        {needsAuth && !everAuthorized && <AuthPanel />}
+        {everAuthorized && <ChannelsArea key={sessionId} channels={channels} />}
+      </Stack>
+    </ConnectionProvider>
+  )
+}
+
+export const ConsolePage = ({ config, channels, theme }: ConsolePageProps) => {
+  // The page owns its registry, as it owns its styles: every atom the console reads lives and
+  // dies with this page, and a host's own registry, if it has one, is neither read nor written.
   const page = (
-    <ScopedCssBaseline>
-      <ConsoleConfigProvider value={config}>
-        <ConnectionProvider value={vm}>
-          <Stack spacing={3}>
-            <ConnectionPanel />
-            {needsAuth && !everAuthorized && <AuthPanel />}
-            {everAuthorized && <ChannelsArea key={sessionId} channels={channels} />}
-          </Stack>
-        </ConnectionProvider>
-      </ConsoleConfigProvider>
-    </ScopedCssBaseline>
+    <RegistryProvider defaultIdleTTL={IDLE_TTL}>
+      <ScopedCssBaseline>
+        <ConsoleConfigProvider value={config}>
+          <ConsoleContent channels={channels} />
+        </ConsoleConfigProvider>
+      </ScopedCssBaseline>
+    </RegistryProvider>
   )
 
   return theme === undefined ? (
