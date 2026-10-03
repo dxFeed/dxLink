@@ -26,7 +26,7 @@ Every dxlink-api entity is wrapped in a **model** — a plain object of atoms, m
   through `useAtomSet`;
 - **one session** holds the dxLink object open: an atom whose value is computed by a **scoped
   Effect**. Everything that Effect acquires — the dxLink object itself
-  (`Effect.acquireRelease`), its listeners (`on` / `listen`), the fibers that drain them
+  (`Effect.acquireRelease`), its listeners (`on` / `onBatch`), the fibers that drain them
   (`Effect.forkScoped`) — belongs to the atom's `Scope`, and is released with it.
 
 The session replaces the ViewModel's hand-written `start()` / `stop()` pair. Nothing has to be
@@ -86,6 +86,9 @@ main.tsx
   (`useSession` does), and is released when nothing has for the registry's idle TTL, or when an
   atom its Effect read changes — `channel.closed` for a channel, the connect request for the
   connection — which closes it and opens the next.
+- **Sessions open on commit.** `useSession` subscribes from an effect, not while rendering, so a
+  render React discards — an interrupted concurrent render, a later hook that throws — puts
+  nothing on the wire. A model's atoms show their initial values for that first render.
 - **StrictMode-safe by construction.** Creating a model is pure — `useState(() => make…Model())`
   may run twice, and the discarded copy never opened anything. React 19's mount → unmount →
   remount happens before the registry releases an unobserved atom, so the remount finds the
@@ -118,8 +121,8 @@ main.tsx
                        ▼
         ┌──────────────────────── feed session (scoped Effect) ───────────┐
         │  • on(feed, 'ConfigChange', …)  → registry.set(config, …)       │
-        │  • listen(feed, 'Event') → Stream.groupedWithin(…, 100 millis)  │
-        │      → Stream.runForEach(Atom.update(events, …)) · forkScoped   │
+        │  • onBatch(feed, 'Event', …) → Atom.update(events, …)          │
+        │      once per 100 ms window, and only while events arrive       │
         │  • trackChannel → channel state, id, parameters, errors         │
         └───────▲─────────────────────────────────────────────┬───────────┘
                 │ useAtomValue(model.events)                   │ useAtomSet(model.addSubscription)
@@ -134,14 +137,20 @@ Two ways in from a listener, for two kinds of data:
 
 - **`on(target, name, f)`** — call `f` for each notification, for the scope's lifetime. For what
   changes rarely (channel state, configuration) and should land at once.
-- **`listen(target, name)`** — the same notifications as a `Stream`, for data that wants stream
-  operators. High-frequency data (feed events, DOM snapshots, RPC responses) is coalesced with
-  `Stream.groupedWithin(…, FLUSH_INTERVAL)` and written once per window (~10fps).
+- **`onBatch(target, name, f, { latest? })`** — the same notifications gathered into windows,
+  for high-frequency data (feed events, DOM snapshots, RPC responses through `coalesce`, which it
+  is built on). The first notification after a quiet spell opens a window; everything arriving
+  within `FLUSH_INTERVAL` (100 ms) of it is written once, together (~10fps at most). The loop
+  waits on its queue, so **an idle channel runs no timer**; `latest: true` backs the queue with a
+  one-slot sliding queue, so a DOM window holds the snapshot that opened it and the newest one,
+  never the ones in between.
 
 Both register **in the session's own fiber**, never in a forked one. A Stream built with
 `Stream.callback` only registers once a forked consumer first pulls it — a scheduler tick later —
 and a channel can be answered within that tick: an OPENED state missed there is never sent again.
-`listen` therefore registers immediately and buffers into a queue the forked consumer drains.
+`onBatch` therefore registers immediately and buffers into the queue its forked loop drains.
+(`Stream.groupedWithin` was the first choice here and was dropped: its schedule keeps firing
+every window while nothing arrives.)
 
 Neither lets a callback throw into the dxLink dispatch, which does not guard its listeners — a
 throw there would abort the frame for every other channel. Chart data is the exception to "state
@@ -149,9 +158,10 @@ goes to atoms": a chart consumes batches in order through a ref, so the candle a
 models hand them to a callback the view supplies, and the view reports a chart that throws as a
 chart error on that card.
 
-The RPC model takes its responses from an rxjs `Observable` rather than a listener, and turns its
-notifications into data — next, error and complete — so a failure travels through the same
-coalescing window, after every response that preceded it, instead of overtaking them.
+The RPC model takes its responses from an rxjs `Observable` rather than a listener, and feeds it
+to the same `coalesce` with its notifications as data — next, error and complete — so a failure
+travels through the same window, after every response that preceded it, instead of overtaking
+them.
 
 ## 4. Package layout
 
@@ -174,7 +184,8 @@ dxlink-javascript/dxlink-console/
     connection/                  # connection-model · connection-context · connection-panel
     auth/ · errors/
     components/                  # error-boundary
-    lib/                         # model (session, on, listen, command) · channel · console-config(+context)
+    lib/                         # model (session, on, onBatch, coalesce, command) · channel
+                                 # · console-config(+context)
                                  # · timestamped-error
 
   market-data/ @dxfeed/dxlink-console-market-data   dxcharts-lite · x-data-grid
@@ -362,7 +373,7 @@ everything the area used to hardcode as a four-way switch:
 Plugins reach the connection through `useConnection()` — or `useConnectionClient()` for the
 live client a channel model opens its channel on — and build their models from what
 `@dxfeed/dxlink-console-core` exports for it: `channelSession` (or `session`, for a channel the
-plugin does not hold an object for), `on`, `listen`, `command`, and `makeChannelAtoms` /
+plugin does not hold an object for), `on`, `onBatch` / `coalesce`, `command`, and `makeChannelAtoms` /
 `useChannelCard` for the card. That is the whole host API; there is no plugin-specific context.
 
 `DraftChannel.config` is `unknown`. It was produced by the plugin named by `kind` and is only

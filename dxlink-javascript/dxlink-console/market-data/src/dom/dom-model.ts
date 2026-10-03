@@ -5,16 +5,9 @@ import type {
   DepthOfMarketOrder,
   DXLinkClient,
 } from '@dxfeed/dxlink-api'
-import {
-  FLUSH_INTERVAL,
-  channelSession,
-  command,
-  listen,
-  makeChannelAtoms,
-  on,
-} from '@dxfeed/dxlink-console-core'
+import { channelSession, command, makeChannelAtoms, on, onBatch } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
-import { Effect, Stream } from 'effect'
+import { Effect } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 
 export interface DomSnapshot {
@@ -33,8 +26,8 @@ export interface DomModel {
 }
 
 /**
- * The model for one DOM channel. Snapshots are full replacements, so a flush keeps only the
- * latest one that arrived within {@link FLUSH_INTERVAL}.
+ * The model for one DOM channel. Snapshots are full replacements, so a flush window keeps only
+ * the latest one.
  */
 export const makeDomModel = (
   client: DXLinkClient,
@@ -64,17 +57,18 @@ export const makeDomModel = (
         registry.set(config, dom.getConfig())
         yield* on(dom, 'ConfigChange', (next) => registry.set(config, next))
 
-        const snapshots = yield* listen(dom, 'Snapshot')
-        yield* snapshots.pipe(
-          Stream.groupedWithin(Number.POSITIVE_INFINITY, FLUSH_INTERVAL),
-          Stream.runForEach((batch) => {
+        yield* onBatch(
+          dom,
+          'Snapshot',
+          (batch) => {
             const latest = batch[batch.length - 1]
             if (latest === undefined) return Effect.void
             const [time, bids, asks] = latest
 
             return Atom.set(snapshot, { time, bids, asks })
-          }),
-          Effect.forkScoped
+          },
+          // Each snapshot replaces the last, so a window holds only the newest.
+          { latest: true }
         )
       }),
   })

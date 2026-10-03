@@ -27,8 +27,9 @@ Breaking for code that builds a channel plugin on core's host API:
   `ChannelWidget` header from them.
 - A channel model is built from `channelSession` — which holds a dxLink channel object open
   until the channel is closed, follows its protocol channel and keeps the card's atoms alive —
-  or the plain `session` beneath it, with `on`, `listen` and `command`, exported from core
-  together with `FLUSH_INTERVAL`.
+  or the plain `session` beneath it, with `on`, `onBatch` / `coalesce` (high-frequency data,
+  written once per `FLUSH_INTERVAL` window and only while it arrives) and `command`, all
+  exported from core.
 - `ChannelWidget` no longer keeps its own closed state: it shows the `closed` prop
   (`useChannelCard` passes the model's), and offers the close button only when given
   `onClose`.

@@ -22,8 +22,8 @@ import Stack from '@mui/material/Stack'
 import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { Effect } from 'effect'
-import { useMemo, useRef, useState } from 'react'
+import { Cause, Effect, Fiber } from 'effect'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   createRequestTemplate,
@@ -226,17 +226,39 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
   const selectService = (next: DescService | undefined) =>
     selectMethod(next?.methods.find(isMethodSupported), { serviceName: next?.typeName ?? '' })
 
+  // A load belongs to this form. Closing the dialog abandons the one in flight — aborting its
+  // request — rather than letting it write into a form that is gone.
+  const inFlight = useRef<Fiber.Fiber<void> | null>(null)
+  useEffect(
+    () => () => {
+      if (inFlight.current !== null) Effect.runFork(Fiber.interrupt(inFlight.current))
+    },
+    []
+  )
+
   const load = (source: string, registry: Effect.Effect<FileRegistry, DescriptorSetError>) => {
     setLoading(true)
     setLoadError(null)
-    void Effect.runPromise(
+    inFlight.current = Effect.runFork(
       registry.pipe(
-        Effect.match({
-          onSuccess: (loaded) => applyRegistry(loaded, source),
-          onFailure: (error) =>
-            setLoadError(`Could not load definitions from ${source}: ${error.message}`),
-        }),
-        Effect.ensuring(Effect.sync(() => setLoading(false)))
+        Effect.flatMap((loaded) => Effect.sync(() => applyRegistry(loaded, source))),
+        // Every way a load can end is reported here, a defect included — not left to surface
+        // as an unhandled rejection. An abandoned load has no form left to report to.
+        Effect.catchCause((cause) =>
+          Effect.sync(() => {
+            if (Cause.hasInterruptsOnly(cause)) return
+            const error = Cause.squash(cause)
+            setLoadError(
+              `Could not load definitions from ${source}: ${error instanceof Error ? error.message : String(error)}`
+            )
+          })
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            inFlight.current = null
+            setLoading(false)
+          })
+        )
       )
     )
   }

@@ -1,9 +1,10 @@
-import { useAtomValue } from '@effect/atom-react'
-import { Cause, Effect, Queue, Stream } from 'effect'
+import { RegistryContext } from '@effect/atom-react'
+import { Cause, Effect, Queue } from 'effect'
 import type { Scope } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import type { AtomRegistry } from 'effect/reactivity/AtomRegistry'
+import { useContext, useEffect, useState } from 'react'
 
 /**
  * The primitives a console model is built from.
@@ -73,34 +74,63 @@ export const on = <T extends object, N extends ListenerName<T>>(
 }
 
 /**
- * What `target` pushes through its `name` listener, as a Stream of the listener's arguments.
+ * How long a model gathers high-frequency data before writing it to its atoms (~10fps).
  *
- * For data that wants stream operators — coalescing above all. The listener is registered
- * immediately (see {@link on}) and buffers into a queue, so the stream can be consumed by a
- * forked fiber without losing what arrives before that fiber first runs.
+ * Feed events, DOM snapshots and RPC responses can arrive far faster than anyone can read them;
+ * rendering each would only burn the frame budget.
  */
-export const listen = <T extends object, N extends ListenerName<T>>(
-  target: T,
-  name: N
-): Effect.Effect<Stream.Stream<ListenerArgs<T, N>>, never, Scope.Scope> =>
-  Effect.gen(function* () {
-    const queue = yield* Queue.unbounded<ListenerArgs<T, N>>()
-    const enqueue = (...args: unknown[]) => {
-      Queue.offerUnsafe(queue, args as ListenerArgs<T, N>)
-    }
-    yield* on(target, name, enqueue as (...args: ListenerArgs<T, N>) => void)
+export const FLUSH_INTERVAL = '100 millis'
 
-    return Stream.fromQueue(queue)
+/**
+ * Hand what `subscribe` delivers to `f` in windows, for as long as the calling scope lives.
+ *
+ * The first value after a quiet spell opens a window, and everything that arrives within
+ * {@link FLUSH_INTERVAL} of it goes to `f` together, in order. Nothing is scheduled while
+ * nothing arrives, so an idle channel costs no timer. `latest: true` keeps only the newest value
+ * of a window — for full replacements, such as a DOM snapshot, where holding the rest would only
+ * be to throw them away.
+ *
+ * `subscribe` runs in the calling fiber and its values are buffered, so the forked loop loses
+ * nothing that arrives before it first runs (see {@link on} for why that matters).
+ */
+export const coalesce = <A, R = never>(
+  subscribe: (emit: (value: A) => void) => Effect.Effect<void, never, Scope.Scope>,
+  f: (batch: ReadonlyArray<A>) => Effect.Effect<void, never, R>,
+  options: { readonly latest?: boolean } = {}
+): Effect.Effect<void, never, Scope.Scope | R> =>
+  Effect.gen(function* () {
+    const queue = yield* options.latest ? Queue.sliding<A>(1) : Queue.unbounded<A>()
+    yield* subscribe((value) => {
+      Queue.offerUnsafe(queue, value)
+    })
+
+    yield* Effect.gen(function* () {
+      // Waits, with no timer, for the value that opens the next window.
+      const opening = yield* Queue.takeAll(queue)
+      yield* Effect.sleep(FLUSH_INTERVAL)
+      const rest = yield* Queue.clear(queue)
+      yield* f([...opening, ...rest])
+    }).pipe(Effect.forever, Effect.forkScoped)
   })
 
 /**
- * How often a model flushes high-frequency data into its atoms (~10fps).
- *
- * Feed events, DOM snapshots and RPC responses can arrive far faster than anyone can read them;
- * rendering each would only burn the frame budget. A flush gathers whatever arrived since the
- * last one.
+ * {@link coalesce} over a dxLink listener: `f` receives each window's notifications, as the
+ * listener's argument lists.
  */
-export const FLUSH_INTERVAL = '100 millis'
+export const onBatch = <T extends object, N extends ListenerName<T>, R = never>(
+  target: T,
+  name: N,
+  f: (batch: ReadonlyArray<ListenerArgs<T, N>>) => Effect.Effect<void, never, R>,
+  options?: { readonly latest?: boolean }
+): Effect.Effect<void, never, Scope.Scope | R> =>
+  coalesce<ListenerArgs<T, N>, R>(
+    (emit) =>
+      on(target, name, ((...args: unknown[]) => emit(args as ListenerArgs<T, N>)) as (
+        ...args: ListenerArgs<T, N>
+      ) => void),
+    f,
+    options
+  )
 
 /** A dxLink object held open by a model, and released with it. */
 export interface Session<A, E = never> {
@@ -167,16 +197,29 @@ export const session = <A, E = never>(options: {
 /**
  * Hold a session open for as long as the calling component is mounted.
  *
- * A session that fails — a dxLink constructor that throws, say — is rethrown here, during
- * render, so the nearest error boundary contains it to the one card that failed.
+ * The session opens when the component commits, not while it renders: a render React discards —
+ * an interrupted concurrent render, a sibling hook that throws — must not put a channel on the
+ * wire that nothing then holds. The model's atoms render their initial values until it does.
  *
- * Call it before reading the model's state: opening the session writes that state, and reading
- * it first would only render the initial values once more.
+ * A session that fails — a dxLink constructor that throws, say — is rethrown on the next render,
+ * so the nearest error boundary contains it to the one card that failed.
  */
 export const useSession = <A, E>(session: Session<A, E>): void => {
-  const result = useAtomValue(session.atom)
-  if (AsyncResult.isFailure(result)) {
-    throw Cause.squash(result.cause)
+  const registry = useContext(RegistryContext)
+  const [failure, setFailure] = useState<Cause.Cause<E> | null>(null)
+
+  useEffect(
+    () =>
+      registry.subscribe(
+        session.atom,
+        (result) => setFailure(AsyncResult.isFailure(result) ? result.cause : null),
+        { immediate: true }
+      ),
+    [registry, session]
+  )
+
+  if (failure !== null) {
+    throw Cause.squash(failure)
   }
 }
 

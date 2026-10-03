@@ -20,6 +20,11 @@ import type { TimestampedError } from './timestamped-error'
  * service that drifts.
  */
 export interface ChannelAtoms {
+  /**
+   * The protocol channel's state, for a service's status chip. Like {@link ChannelAtoms.id}, it
+   * is written by {@link trackChannel}; a model that follows no protocol channel — RPC, whose
+   * transport opens and hides it — leaves both at their initial values.
+   */
   readonly state: Atom.Writable<DXLinkChannelState>
   /** Protocol channel id, for correlating with a protocol log. Null until opened. */
   readonly id: Atom.Writable<number | null>

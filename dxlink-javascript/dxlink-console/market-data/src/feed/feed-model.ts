@@ -8,16 +8,9 @@ import type {
   Subscription,
   TimeSeriesSubscription,
 } from '@dxfeed/dxlink-api'
-import {
-  FLUSH_INTERVAL,
-  channelSession,
-  command,
-  listen,
-  makeChannelAtoms,
-  on,
-} from '@dxfeed/dxlink-console-core'
+import { channelSession, command, makeChannelAtoms, on, onBatch } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
-import { Effect, Stream } from 'effect'
+import { Effect } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 
 export type FeedSubKind = 'regular' | 'indexed' | 'timeSeries'
@@ -113,7 +106,7 @@ export interface FeedModel {
 /**
  * The model for one Feed channel. The channel always uses the default AUTO contract.
  *
- * Events are coalesced over {@link FLUSH_INTERVAL} and upserted one row per symbol.
+ * Events are coalesced into flush windows (see `onBatch`) and upserted one row per symbol.
  */
 export const makeFeedModel = (
   client: DXLinkClient,
@@ -140,18 +133,13 @@ export const makeFeedModel = (
       Effect.gen(function* () {
         yield* on(feed, 'ConfigChange', (next) => registry.set(config, next))
 
-        const received = yield* listen(feed, 'Event')
-        yield* received.pipe(
-          Stream.groupedWithin(Number.POSITIVE_INFINITY, FLUSH_INTERVAL),
-          Stream.runForEach((batches) =>
-            Atom.update(events, (current) =>
-              upsertFeedEvents(
-                current,
-                batches.flatMap(([batch]) => batch)
-              )
+        yield* onBatch(feed, 'Event', (batch) =>
+          Atom.update(events, (current) =>
+            upsertFeedEvents(
+              current,
+              batch.flatMap(([received]) => received)
             )
-          ),
-          Effect.forkScoped
+          )
         )
 
         // Subscriptions added while no channel was open still belong on the wire.

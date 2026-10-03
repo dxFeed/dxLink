@@ -35,7 +35,7 @@ export type {
 
 // What a channel model is built from: a session holding its dxLink object, listeners scoped to
 // that session, commands, and the atoms every channel card shows.
-export { FLUSH_INTERVAL, command, listen, on, session, useSession } from './lib/model'
+export { FLUSH_INTERVAL, coalesce, command, on, onBatch, session, useSession } from './lib/model'
 export type { ListenerArgs, ListenerName, Session } from './lib/model'
 export {
   channelSession,

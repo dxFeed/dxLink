@@ -1,13 +1,14 @@
 import { RegistryProvider, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { Effect, Stream } from 'effect'
+import { Effect, Exit, Scope } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { command, FLUSH_INTERVAL, listen, on, session, useSession } from './model'
+import { coalesce, command, on, onBatch, session, useSession } from './model'
+import { ErrorBoundary } from '../components/error-boundary'
 
 /** The listener shape every dxLink object has, with one listener kind. */
 class FakeTicker {
@@ -42,13 +43,8 @@ const makeTickerModel = (ticker: FakeTicker) => {
           () => Effect.sync(() => log.push('close'))
         )
         yield* on(held, 'Tick', (value) => registry.set(latest, value))
-        const ticks = yield* listen(held, 'Tick')
-        yield* ticks.pipe(
-          Stream.groupedWithin(Number.POSITIVE_INFINITY, FLUSH_INTERVAL),
-          Stream.runForEach((group) =>
-            Atom.update(batches, (current) => [...current, group.map(([value]) => value)])
-          ),
-          Effect.forkScoped
+        yield* onBatch(held, 'Tick', (group) =>
+          Atom.update(batches, (current) => [...current, group.map(([value]) => value)])
         )
 
         return held
@@ -207,6 +203,99 @@ describe('session', () => {
     } finally {
       console.error = consoleError
     }
+  })
+})
+
+describe('coalesce', () => {
+  /** A source the test pushes into, coalesced into `windows`. */
+  const coalesced = (options?: { latest?: boolean }) => {
+    let push: (value: number) => void = () => undefined
+    const windows: number[][] = []
+    const scope = Effect.runSync(Scope.make())
+    Effect.runSync(
+      coalesce<number>(
+        (emit) =>
+          Effect.sync(() => {
+            push = emit
+          }),
+        (batch) => Effect.sync(() => windows.push([...batch])),
+        options
+      ).pipe(Scope.provide(scope))
+    )
+
+    return {
+      push: (value: number) => push(value),
+      windows,
+      close: () => Effect.runSync(Scope.close(scope, Exit.void)),
+    }
+  }
+
+  it('flushes a window once, a flush interval after the value that opened it', async () => {
+    const source = coalesced()
+
+    source.push(1)
+    source.push(2)
+    expect(source.windows).toEqual([])
+    await waitFor(() => expect(source.windows).toEqual([[1, 2]]))
+
+    // Quiet now: nothing is flushed until the next value opens another window.
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    expect(source.windows).toEqual([[1, 2]])
+
+    source.push(3)
+    await waitFor(() => expect(source.windows).toEqual([[1, 2], [3]]))
+    source.close()
+  })
+
+  it('keeps only the newest value of a window when asked to', async () => {
+    const source = coalesced({ latest: true })
+
+    for (let value = 1; value <= 5; value += 1) source.push(value)
+
+    await waitFor(() => expect(source.windows).toHaveLength(1))
+    const [window] = source.windows
+    expect(window?.[window.length - 1]).toBe(5)
+    // The value that opened the window, and the newest: never everything in between.
+    expect(window?.length).toBeLessThanOrEqual(2)
+    source.close()
+  })
+
+  it('stops with its scope, dropping a window still open', async () => {
+    const source = coalesced()
+
+    source.push(1)
+    source.close()
+
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    expect(source.windows).toEqual([])
+  })
+})
+
+describe('useSession', () => {
+  it('opens nothing for a render React discards', () => {
+    const ticker = new FakeTicker()
+    const model = makeTickerModel(ticker)
+    const Failing = () => {
+      useSession(model.session)
+      throw new Error('a later hook failed')
+    }
+    const consoleError = console.error
+    console.error = () => undefined
+
+    try {
+      render(
+        <RegistryProvider>
+          <ErrorBoundary>
+            <Failing />
+          </ErrorBoundary>
+        </RegistryProvider>
+      )
+    } finally {
+      console.error = consoleError
+    }
+
+    expect(model.log).toEqual([])
+    expect(ticker.listeners.size).toBe(0)
   })
 })
 

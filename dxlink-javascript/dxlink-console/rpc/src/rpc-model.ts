@@ -2,7 +2,7 @@ import type { DescMethod, DescService, JsonValue, Message } from '@bufbuild/prot
 import type { DXLinkClient, DXLinkError } from '@dxfeed/dxlink-api'
 import { DXLinkLogLevel } from '@dxfeed/dxlink-api'
 import {
-  FLUSH_INTERVAL,
+  coalesce,
   command,
   makeChannelAtoms,
   prependError,
@@ -10,7 +10,7 @@ import {
 } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
 import { createDXLinkDynamicService } from '@dxfeed/dxlink-protobuf-es'
-import { Cause, Effect, Queue, Stream } from 'effect'
+import { Effect } from 'effect'
 import type { Scope } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
@@ -75,40 +75,26 @@ type Notification =
   | { readonly _tag: 'Complete' }
 
 /**
- * Subscribe to the call's responses for as long as the calling scope lives, as a Stream of
- * {@link Notification}s.
+ * Subscribe to the call's responses for as long as the calling scope lives, handing each
+ * notification to `emit` — subscribing is what makes the call, and unsubscribing cancels it.
  *
- * Subscribing is what makes the call, so it happens right here rather than when a consumer
- * first pulls. The stream never fails: an error is one more notification, delivered after every
- * response that came before it — a coalescing window must not drop those on the way out.
- * Ending the scope unsubscribes, which cancels the RPC.
+ * An error is one more notification rather than a failure, so it reaches the model in order,
+ * after every response that came before it, instead of overtaking them in a flush window.
  */
-const notifications = (
-  responses: Observable<Message>
-): Effect.Effect<Stream.Stream<Notification>, never, Scope.Scope> =>
-  Effect.gen(function* () {
-    const queue = yield* Queue.unbounded<Notification, Cause.Done>()
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        responses.subscribe({
-          next: (message) => {
-            Queue.offerUnsafe(queue, { _tag: 'Next', message })
-          },
-          error: (error: unknown) => {
-            Queue.offerUnsafe(queue, { _tag: 'Error', error })
-            Queue.endUnsafe(queue)
-          },
-          complete: () => {
-            Queue.offerUnsafe(queue, { _tag: 'Complete' })
-            Queue.endUnsafe(queue)
-          },
-        })
-      ),
-      (subscription) => Effect.sync(() => subscription.unsubscribe())
-    )
-
-    return Stream.fromQueue(queue)
-  })
+const subscribe = (
+  responses: Observable<Message>,
+  emit: (notification: Notification) => void
+): Effect.Effect<void, never, Scope.Scope> =>
+  Effect.acquireRelease(
+    Effect.sync(() =>
+      responses.subscribe({
+        next: (message) => emit({ _tag: 'Next', message }),
+        error: (error: unknown) => emit({ _tag: 'Error', error }),
+        complete: () => emit({ _tag: 'Complete' }),
+      })
+    ),
+    (subscription) => Effect.sync(() => subscription.unsubscribe())
+  )
 
 /**
  * What reads and writes atoms: the registry inside the session, a command's write context
@@ -236,16 +222,14 @@ export const makeRpcModel = (
           return null
         }
 
-        const received = yield* notifications(call.responses)
         const input = call.input
         if (input !== null) {
           yield* Effect.addFinalizer(() => Effect.sync(() => input.complete()))
         }
-        emit(registry, input, request)
 
-        yield* received.pipe(
-          Stream.groupedWithin(Number.POSITIVE_INFINITY, FLUSH_INTERVAL),
-          Stream.runForEach((batch) =>
+        yield* coalesce<Notification>(
+          (emit) => subscribe(call.responses, emit),
+          (batch) =>
             Effect.sync(() => {
               const added: RpcMessageEntry[] = []
               for (const notification of batch) {
@@ -265,9 +249,8 @@ export const makeRpcModel = (
                 registry.set(responses, prepend(registry.get(responses), added))
               }
             })
-          ),
-          Effect.forkScoped
         )
+        emit(registry, input, request)
 
         return call.input
       })

@@ -147,7 +147,7 @@ const BINARY_ACCEPT = 'application/protobuf, application/x-protobuf, application
 /**
  * Fetch a `FileDescriptorSet` from an endpoint and build a registry from it.
  *
- * Interrupting it aborts the request.
+ * Interrupting it aborts the request — which is what closing the request dialog mid-load does.
  */
 export const fetchDescriptorSet = Effect.fnUntraced(function* (
   url: string
