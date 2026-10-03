@@ -22,7 +22,7 @@ import Stack from '@mui/material/Stack'
 import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { Cause, Effect, Fiber } from 'effect'
+import { Cause, Effect, Fiber, Predicate } from 'effect'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
@@ -93,9 +93,7 @@ const RequestFields = ({
     try {
       const value: unknown = JSON.parse(json)
 
-      return typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? (value as Record<string, JsonValue>)
-        : null
+      return Predicate.isObject(value) ? (value as Record<string, JsonValue>) : null
     } catch {
       return null
     }
@@ -242,14 +240,22 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
     inFlight.current = Effect.runFork(
       registry.pipe(
         Effect.flatMap((loaded) => Effect.sync(() => applyRegistry(loaded, source))),
-        // Every way a load can end is reported here, a defect included — not left to surface
-        // as an unhandled rejection. An abandoned load has no form left to report to.
+        // A source that could not be loaded is the user's to fix: its message says how.
+        Effect.catchTag('DescriptorSetError', (error) =>
+          Effect.sync(() =>
+            setLoadError(`Could not load definitions from ${source}: ${error.message}`)
+          )
+        ),
+        // Anything else is a defect — the console's own bug, not the source's. It is reported in
+        // the form too, rather than left to surface as an unhandled rejection, and logged with
+        // its stack. An abandoned load has no form left to report to.
         Effect.catchCause((cause) =>
           Effect.sync(() => {
             if (Cause.hasInterruptsOnly(cause)) return
-            const error = Cause.squash(cause)
+            const errors = Cause.prettyErrors(cause)
+            console.error(`Loading definitions from ${source} failed`, ...errors)
             setLoadError(
-              `Could not load definitions from ${source}: ${error instanceof Error ? error.message : String(error)}`
+              `Could not use the definitions from ${source}: ${errors.map((e) => e.message).join('; ')}`
             )
           })
         ),

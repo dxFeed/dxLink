@@ -80,24 +80,23 @@ export const channelStateAtoms = (atoms: ChannelAtoms): ReadonlyArray<Atom.Atom<
  *
  * Errors already recorded outlive the scope — they are a log.
  */
-export const trackChannel = (
+export const trackChannel = Effect.fnUntraced(function* (
   atoms: ChannelAtoms,
   channel: DXLinkChannel,
   { withParameters = true }: { withParameters?: boolean } = {}
-): Effect.Effect<void, never, Scope.Scope | AtomRegistry> =>
-  Effect.gen(function* () {
-    const registry = yield* AtomRegistry
-    registry.set(atoms.id, channel.id)
-    if (withParameters) {
-      registry.set(atoms.parameters, channel.parameters)
-    }
-    registry.set(atoms.state, channel.getState())
+): Effect.fn.Return<void, never, Scope.Scope | AtomRegistry> {
+  const registry = yield* AtomRegistry
+  registry.set(atoms.id, channel.id)
+  if (withParameters) {
+    registry.set(atoms.parameters, channel.parameters)
+  }
+  registry.set(atoms.state, channel.getState())
 
-    yield* on(channel, 'StateChange', (state) => registry.set(atoms.state, state))
-    yield* on(channel, 'Error', (error) =>
-      registry.update(atoms.errors, (errors) => prependError(errors, error))
-    )
-  })
+  yield* on(channel, 'StateChange', (state) => registry.set(atoms.state, state))
+  yield* on(channel, 'Error', (error) =>
+    registry.update(atoms.errors, (errors) => prependError(errors, error))
+  )
+})
 
 /**
  * Hold a channel service's dxLink object open — the session every channel model has.
@@ -136,8 +135,9 @@ export const channelSession = <A, E = never>(
 
       return Effect.gen(function* () {
         const registry = yield* AtomRegistry
-        const resource = yield* Effect.acquireRelease(Effect.sync(options.open), (resource) =>
-          Effect.sync(() => options.close(resource))
+        const resource = yield* Effect.acquireRelease(
+          Effect.sync(() => options.open()),
+          (resource) => Effect.sync(() => options.close(resource))
         )
         yield* trackChannel(atoms, options.channel(resource), {
           withParameters: options.withParameters,

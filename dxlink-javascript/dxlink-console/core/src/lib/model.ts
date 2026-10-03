@@ -1,10 +1,10 @@
-import { RegistryContext } from '@effect/atom-react'
+import { useAtomSubscribe } from '@effect/atom-react'
 import { Cause, Effect, Queue } from 'effect'
 import type { Scope } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import type { AtomRegistry } from 'effect/reactivity/AtomRegistry'
-import { useContext, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 /**
  * The primitives a console model is built from.
@@ -111,12 +111,15 @@ export const coalesce = <A, R = never>(
       const rest = yield* Queue.clear(queue)
       // A defect in `f` is reported and contained to this window, as `on` does for a listener:
       // left to escape, it would end the loop silently — a forked fiber's failure goes nowhere —
-      // and the model would stop updating for good.
-      yield* f([...opening, ...rest]).pipe(
+      // and the model would stop updating for good. Suspended, so a throw while `f` builds its
+      // Effect is caught too, not only one while it runs.
+      yield* Effect.suspend(() => f([...opening, ...rest])).pipe(
         Effect.catchCause((cause) =>
           Cause.hasInterruptsOnly(cause)
             ? Effect.failCause(cause)
-            : Effect.sync(() => console.error('dxLink batch handler failed', Cause.squash(cause)))
+            : Effect.sync(() =>
+                console.error('dxLink batch handler failed', ...Cause.prettyErrors(cause))
+              )
         )
       )
     }).pipe(Effect.forever, Effect.forkScoped)
@@ -214,18 +217,16 @@ export const session = <A, E = never>(options: {
  * so the nearest error boundary contains it to the one card that failed.
  */
 export const useSession = <A, E>(session: Session<A, E>): void => {
-  const registry = useContext(RegistryContext)
   const [failure, setFailure] = useState<Cause.Cause<E> | null>(null)
-
-  useEffect(
-    () =>
-      registry.subscribe(
-        session.atom,
-        (result) => setFailure(AsyncResult.isFailure(result) ? result.cause : null),
-        { immediate: true }
-      ),
-    [registry, session]
+  // Stable, as `useAtomSubscribe` resubscribes whenever its callback changes.
+  const onResult = useCallback(
+    (result: AsyncResult.AsyncResult<A, E>) =>
+      setFailure(AsyncResult.isFailure(result) ? result.cause : null),
+    []
   )
+
+  // Subscribes in an effect — on commit — and holds the atom mounted while subscribed.
+  useAtomSubscribe(session.atom, onResult, { immediate: true })
 
   if (failure !== null) {
     throw Cause.squash(failure)

@@ -209,14 +209,18 @@ export const makeRpcModel = (
         // `DxLinkRpcService` opens it with.
         registry.set(channel.parameters, { service: service.typeName, methodName: method.name })
 
-        let call: Call
-        try {
-          call = startCall()
-        } catch (error) {
+        const call = yield* Effect.try({ try: () => startCall(), catch: (error) => error }).pipe(
           // This call's failure, shown on its card — not a session failure, which would take
           // the card down with it.
-          fail(registry, error)
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              fail(registry, error)
 
+              return null
+            })
+          )
+        )
+        if (call === null) {
           return null
         }
 

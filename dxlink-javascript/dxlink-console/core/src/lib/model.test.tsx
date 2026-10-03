@@ -1,13 +1,14 @@
 import { RegistryProvider, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { Effect, Exit, Scope } from 'effect'
+import { Duration, Effect, Exit, Scope } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
+import { TestClock } from 'effect/testing'
 import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { coalesce, command, on, onBatch, session, useSession } from './model'
+import { coalesce, command, FLUSH_INTERVAL, on, onBatch, session, useSession } from './model'
 import { ErrorBoundary } from '../components/error-boundary'
 
 /** The listener shape every dxLink object has, with one listener kind. */
@@ -207,101 +208,132 @@ describe('session', () => {
 })
 
 describe('coalesce', () => {
-  /** A source the test pushes into, coalesced into `windows`. */
-  const coalesced = (options?: { latest?: boolean }) => {
-    let push: (value: number) => void = () => undefined
-    const windows: number[][] = []
-    const scope = Effect.runSync(Scope.make())
-    Effect.runSync(
-      coalesce<number>(
-        (emit) =>
-          Effect.sync(() => {
-            push = emit
-          }),
-        (batch) => Effect.sync(() => windows.push([...batch])),
-        options
-      ).pipe(Scope.provide(scope))
-    )
+  /** A flush interval less a millisecond: the last moment a window is still open. */
+  const JUST_BEFORE_FLUSH = Duration.toMillis(FLUSH_INTERVAL) - 1
 
-    return {
-      push: (value: number) => push(value),
-      windows,
-      close: () => Effect.runSync(Scope.close(scope, Exit.void)),
-    }
+  interface Source {
+    readonly push: (value: number) => void
+    readonly windows: number[][]
+    readonly close: Effect.Effect<void>
   }
 
-  it('flushes a window once, a flush interval after the value that opened it', async () => {
-    const source = coalesced()
+  /**
+   * Run `test` against a source it pushes into, coalesced through `f` into `windows`. Time is a
+   * test clock's: it moves only when the test adjusts it.
+   */
+  const withSource = (
+    test: (source: Source) => Effect.Effect<void>,
+    options: {
+      readonly latest?: boolean
+      readonly f?: (batch: ReadonlyArray<number>, windows: number[][]) => Effect.Effect<void>
+    } = {}
+  ): Promise<void> => {
+    const f = options.f ?? ((batch, windows) => Effect.sync(() => void windows.push([...batch])))
 
-    source.push(1)
-    source.push(2)
-    expect(source.windows).toEqual([])
-    await waitFor(() => expect(source.windows).toEqual([[1, 2]]))
+    return Effect.runPromise(
+      Effect.gen(function* () {
+        let push: (value: number) => void = () => undefined
+        const windows: number[][] = []
+        const scope = yield* Scope.make()
+        const close = Scope.close(scope, Exit.void)
 
-    // Quiet now: nothing is flushed until the next value opens another window.
-    await new Promise((resolve) => setTimeout(resolve, 250))
-    expect(source.windows).toEqual([[1, 2]])
+        yield* coalesce<number>(
+          (emit) =>
+            Effect.sync(() => {
+              push = emit
+            }),
+          (batch) => f(batch, windows),
+          options
+        ).pipe(Scope.provide(scope))
 
-    source.push(3)
-    await waitFor(() => expect(source.windows).toEqual([[1, 2], [3]]))
-    source.close()
-  })
+        yield* test({ push: (value) => push(value), windows, close }).pipe(Effect.ensuring(close))
+      }).pipe(Effect.provide(TestClock.layer()))
+    )
+  }
 
-  it('keeps only the newest value of a window when asked to', async () => {
-    const source = coalesced({ latest: true })
+  it('flushes a window once, a flush interval after the value that opened it', () =>
+    withSource(({ push, windows }) =>
+      Effect.gen(function* () {
+        push(1)
+        push(2)
+        yield* TestClock.adjust(JUST_BEFORE_FLUSH)
+        expect(windows).toEqual([])
+        yield* TestClock.adjust('1 millis')
+        expect(windows).toEqual([[1, 2]])
 
-    for (let value = 1; value <= 5; value += 1) source.push(value)
+        // Quiet now: nothing is flushed until the next value opens another window.
+        yield* TestClock.adjust('1 minute')
+        expect(windows).toEqual([[1, 2]])
 
-    await waitFor(() => expect(source.windows).toHaveLength(1))
-    const [window] = source.windows
-    expect(window?.[window.length - 1]).toBe(5)
-    // The value that opened the window, and the newest: never everything in between.
-    expect(window?.length).toBeLessThanOrEqual(2)
-    source.close()
-  })
+        push(3)
+        yield* TestClock.adjust(FLUSH_INTERVAL)
+        expect(windows).toEqual([[1, 2], [3]])
+      })
+    ))
+
+  it('keeps only the newest value of a window when asked to', () =>
+    withSource(
+      ({ push, windows }) =>
+        Effect.gen(function* () {
+          for (let value = 1; value <= 5; value += 1) push(value)
+          yield* TestClock.adjust(FLUSH_INTERVAL)
+
+          expect(windows).toHaveLength(1)
+          const [window] = windows
+          expect(window?.[window.length - 1]).toBe(5)
+          // The value that opened the window, and the newest: never everything in between.
+          expect(window?.length).toBeLessThanOrEqual(2)
+        }),
+      { latest: true }
+    ))
 
   it('survives a handler that dies, reporting it and flushing the next window', async () => {
-    let push: (value: number) => void = () => undefined
-    const windows: number[][] = []
-    const scope = Effect.runSync(Scope.make())
     const consoleError = console.error
     const reported: unknown[] = []
     console.error = (...args: unknown[]) => reported.push(args)
 
     try {
-      Effect.runSync(
-        coalesce<number>(
-          (emit) =>
-            Effect.sync(() => {
-              push = emit
-            }),
-          (batch) =>
-            Effect.sync(() => {
+      await withSource(
+        ({ push, windows }) =>
+          Effect.gen(function* () {
+            push(1)
+            yield* TestClock.adjust(FLUSH_INTERVAL)
+            expect(reported).toHaveLength(1)
+            push(2)
+            yield* TestClock.adjust(FLUSH_INTERVAL)
+            expect(reported).toHaveLength(2)
+            push(3)
+            yield* TestClock.adjust(FLUSH_INTERVAL)
+            expect(windows).toEqual([[3]])
+          }),
+        {
+          f: (batch, windows) => {
+            // Dies before it has an Effect to return…
+            if (batch.includes(2)) throw new Error('bad handler')
+
+            return Effect.sync(() => {
+              // …or while the Effect it returned runs.
               if (batch.includes(1)) throw new Error('bad batch')
               windows.push([...batch])
             })
-        ).pipe(Scope.provide(scope))
+          },
+        }
       )
-
-      push(1)
-      await waitFor(() => expect(reported).toHaveLength(1))
-      push(2)
-      await waitFor(() => expect(windows).toEqual([[2]]))
     } finally {
       console.error = consoleError
-      Effect.runSync(Scope.close(scope, Exit.void))
     }
   })
 
-  it('stops with its scope, dropping a window still open', async () => {
-    const source = coalesced()
+  it('stops with its scope, dropping a window still open', () =>
+    withSource(({ push, windows, close }) =>
+      Effect.gen(function* () {
+        push(1)
+        yield* close
+        yield* TestClock.adjust('1 minute')
 
-    source.push(1)
-    source.close()
-
-    await new Promise((resolve) => setTimeout(resolve, 250))
-    expect(source.windows).toEqual([])
-  })
+        expect(windows).toEqual([])
+      })
+    ))
 })
 
 describe('useSession', () => {

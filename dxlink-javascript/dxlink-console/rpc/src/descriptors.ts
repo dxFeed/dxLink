@@ -15,6 +15,7 @@ import {
 import { protoCamelCase } from '@bufbuild/protobuf/reflect'
 import { type FileDescriptorSet, FileDescriptorSetSchema } from '@bufbuild/protobuf/wkt'
 import { Effect, Schema } from 'effect'
+import type { Scope } from 'effect'
 
 /**
  * Reading protobuf service definitions at runtime.
@@ -148,12 +149,21 @@ const BINARY_ACCEPT = 'application/protobuf, application/x-protobuf, application
  * Fetch a `FileDescriptorSet` from an endpoint and build a registry from it.
  *
  * Interrupting it aborts the request — which is what closing the request dialog mid-load does.
+ * One controller covers the whole exchange: the signal `tryPromise` hands out is only aborted
+ * while the call it was handed to is pending, and the body is still downloading once `fetch`
+ * has resolved with the headers.
  */
 export const fetchDescriptorSet = Effect.fnUntraced(function* (
   url: string
-): Effect.fn.Return<FileRegistry, DescriptorSetError> {
+): Effect.fn.Return<FileRegistry, DescriptorSetError, Scope.Scope> {
+  // Aborting once the body has been read is a no-op, so the release need not tell the cases apart.
+  const controller = yield* Effect.acquireRelease(
+    Effect.sync(() => new AbortController()),
+    (controller) => Effect.sync(() => controller.abort())
+  )
+
   const response = yield* Effect.tryPromise({
-    try: (signal) => fetch(url, { headers: { Accept: BINARY_ACCEPT }, signal }),
+    try: () => fetch(url, { headers: { Accept: BINARY_ACCEPT }, signal: controller.signal }),
     // Browsers report every blocked cross-origin request as an opaque network error. Naming
     // the likely cause saves the next person a session in the network tab — and note that
     // asking for a media type makes the request preflighted, so an endpoint on another origin
@@ -179,7 +189,7 @@ export const fetchDescriptorSet = Effect.fnUntraced(function* (
   })
 
   return yield* decode(new Uint8Array(body))
-})
+}, Effect.scoped)
 
 /** Build a registry from a descriptor set the user picked from disk. */
 export const readDescriptorSet = Effect.fnUntraced(function* (

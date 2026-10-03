@@ -10,7 +10,7 @@ import type {
 } from '@dxfeed/dxlink-api'
 import { channelSession, command, makeChannelAtoms, on } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
-import { Effect } from 'effect'
+import { Effect, Predicate } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 
 export type ChartDataType = 'candles' | 'indicators' | 'update'
@@ -49,10 +49,6 @@ const OUTPUT_FIELDS: { field: string; kind: IndicatorOutputKind }[] = [
   { field: 'backgroundColors', kind: 'backgroundColor' },
 ]
 
-const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined)
-const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
-const bool = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined)
-
 const extractStateOutputs = (state: DXLinkIndiChartIndicatorState): IndicatorOutputMeta[] => {
   if (!state.enabled) return []
   const raw = state as unknown as Record<string, unknown>
@@ -61,14 +57,14 @@ const extractStateOutputs = (state: DXLinkIndiChartIndicatorState): IndicatorOut
     const series = raw[field]
     if (Array.isArray(series)) {
       for (const item of series) {
-        const o = (item ?? {}) as Record<string, unknown>
+        const o: Readonly<Record<string, unknown>> = Predicate.isObject(item) ? item : {}
         outputs.push({
           kind,
-          id: num(o.id),
-          title: str(o.title),
-          style: str(o.style),
-          offset: num(o.offset),
-          overlay: bool(o.overlay),
+          id: Predicate.isNumber(o.id) ? o.id : undefined,
+          title: Predicate.isString(o.title) ? o.title : undefined,
+          style: Predicate.isString(o.style) ? o.style : undefined,
+          offset: Predicate.isNumber(o.offset) ? o.offset : undefined,
+          overlay: Predicate.isBoolean(o.overlay) ? o.overlay : undefined,
         })
       }
     }

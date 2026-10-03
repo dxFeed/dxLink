@@ -4,8 +4,8 @@ import {
   DXLinkLogLevel,
   DXLinkWebSocketClient,
 } from '@dxfeed/dxlink-api'
-import type { DXLinkClient, DXLinkConnectionDetails } from '@dxfeed/dxlink-api'
-import { Effect } from 'effect'
+import type { DXLinkClient, DXLinkConnectionDetails, DXLinkError } from '@dxfeed/dxlink-api'
+import { Effect, Predicate } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
@@ -133,20 +133,23 @@ export const makeConnectionModel = (): ConnectionModel => {
           registry.update(errors, (current) => prependError(current, error))
         )
 
-        try {
-          client.connect(current.url)
-        } catch (error) {
+        yield* Effect.try({
+          try: () => client.connect(current.url),
+          catch: (error): DXLinkError => ({
+            type: 'UNKNOWN',
+            message: Predicate.isError(error) ? error.message : String(error),
+          }),
+        }).pipe(
           // `new WebSocket` throws on a URL it cannot parse — `localhost:8080`, a host with no
           // scheme. That is a typo in the form, so it goes with the connection's errors rather
           // than failing the session, which `useSession` would rethrow over the whole page.
-          registry.update(errors, (list) =>
-            prependError(list, {
-              type: 'UNKNOWN',
-              message: error instanceof Error ? error.message : String(error),
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              registry.update(errors, (list) => prependError(list, error))
+              client.close()
             })
           )
-          client.close()
-        }
+        )
         // Pull the state straight off the client: connect() can change it before any listener
         // would have reported it.
         syncConnection(client.getConnectionState())
