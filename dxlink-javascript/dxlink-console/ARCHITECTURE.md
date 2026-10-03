@@ -59,10 +59,10 @@ const addSubscription = useAtomSet(model.addSubscription)
 main.tsx
 └── <ThemeProvider>                         ← GLOBAL (theme spans all routes)
     └── <HashRouter>                        ← hash routing + Vite base:'' (sub-path/static hosting)
-        ├── "/"  <ConsolePage>
+        ├── "/"  <ConsolePage>              makeConnectionModel() ← created & owned here
         │     └── <RegistryProvider>        ← the page's atom registry (PAGE-SCOPED)
-        │           │  makeConnectionModel()   ← created & owned here
-        │           └── <ConnectionProvider value={model}>   ← context scoped to this page
+        │           └── <ConnectionProvider value={model}>   ← context scoped to this page;
+        │                 │                   useSession(model.session) holds the client
         │                 ├── <ConnectionPanel>   useAtomValue(model.connection)
         │                 ├── <AuthPanel>         useAtomValue(model.auth)
         │                 └── <ChannelsArea>      open channels (React state)

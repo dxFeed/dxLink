@@ -1,5 +1,5 @@
 import { ThemeProvider, createTheme } from '@mui/material/styles'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { ConsolePage } from './console-page'
@@ -49,6 +49,22 @@ describe('ConsolePage style boundary', () => {
 
     expect(document.documentElement.className).toBe('')
     expect(localStorage.getItem('mui-color-scheme')).toBeNull()
+  })
+
+  it('survives a URL the socket cannot parse, reporting it as a connection error', () => {
+    // `new WebSocket` throws on a URL with no ws scheme. Raised inside the connection's
+    // session, that used to be rethrown during render with no boundary above it — the whole
+    // console went blank over a typo in the form.
+    render(<ConsolePage config={builtinConsoleConfig()} channels={[]} />)
+
+    fireEvent.change(screen.getByLabelText(/WebSocket URL/), {
+      target: { value: 'localhost:8080' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+
+    expect(screen.getByLabelText(/WebSocket URL/)).toBeInTheDocument()
+    expect(screen.getByText('Not connected')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '1 error' })).toBeInTheDocument()
   })
 
   it('provides the theme it is handed', () => {

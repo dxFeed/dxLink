@@ -107,7 +107,9 @@ export interface Session<A, E = never> {
   /** Mount this — {@link useSession} does — to hold the session open. */
   readonly atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>
   /**
-   * What the session holds right now, or `undefined` while it holds nothing.
+   * What the open session holds right now: `undefined` while no session is open, otherwise
+   * whatever `open` produced — which for a closed channel is `null`, so commands guard with
+   * `?.` and cover both.
    *
    * For commands. It never opens a session: a command that runs while nothing is open — a test
    * driving a form, say — updates its atoms and leaves the wire alone.

@@ -1,5 +1,6 @@
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
 import type { DXLinkError } from '@dxfeed/dxlink-api'
+import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -50,12 +51,19 @@ const { FakeClient, clients } = vi.hoisted(() => {
     connect(url: string) {
       this.url = url
       this.setConnection(DXLinkConnectionState.CONNECTING)
+      // As the real one does: the state is CONNECTING before `new WebSocket` rejects the URL.
+      if (!/^wss?:\/\//.test(url)) {
+        throw new SyntaxError(`The URL '${url}' is invalid.`)
+      }
     }
     reconnect() {
       this.reconnects += 1
     }
     close() {
       this.closed = true
+      if (this.connectionState === DXLinkConnectionState.NOT_CONNECTED) return
+      this.setConnection(DXLinkConnectionState.NOT_CONNECTED)
+      this.setAuth(DXLinkAuthState.UNAUTHORIZED)
     }
     setAuthToken(token: string) {
       this.token = token
@@ -218,6 +226,25 @@ describe('connection model', () => {
     expect(registry.get(model.auth)).toBeUndefined()
     expect(registry.get(model.details)).toBeNull()
     expect(registry.get(model.everAuthorized)).toBe(false)
+  })
+
+  it('reports a URL the socket cannot parse as a connection error, not a failed session', () => {
+    registry.set(model.connect, { url: 'localhost:8080', params: PARAMS })
+    const client = latestClient()
+
+    // A failed session would be rethrown over the whole page by `useSession`.
+    expect(AsyncResult.isSuccess(registry.get(model.session.atom))).toBe(true)
+    expect(client.closed).toBe(true)
+    expect(registry.get(model.connection)).toBe(DXLinkConnectionState.NOT_CONNECTED)
+    expect(registry.get(model.auth)).toBeUndefined()
+    expect(registry.get(model.errors).map((error) => error.message)).toEqual([
+      "The URL 'localhost:8080' is invalid.",
+    ])
+
+    // Fixing the typo and connecting again starts a fresh client.
+    registry.set(model.connect, { url: 'wss://relay', params: PARAMS })
+    expect(latestClient()).not.toBe(client)
+    expect(registry.get(model.connection)).toBe(DXLinkConnectionState.CONNECTING)
   })
 
   it('closes the client when the page goes', () => {

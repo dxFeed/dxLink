@@ -133,7 +133,20 @@ export const makeConnectionModel = (): ConnectionModel => {
           registry.update(errors, (current) => prependError(current, error))
         )
 
-        client.connect(current.url)
+        try {
+          client.connect(current.url)
+        } catch (error) {
+          // `new WebSocket` throws on a URL it cannot parse — `localhost:8080`, a host with no
+          // scheme. That is a typo in the form, so it goes with the connection's errors; let it
+          // fail the session instead and `useSession` rethrows it over the whole page.
+          registry.update(errors, (list) =>
+            prependError(list, {
+              type: 'UNKNOWN',
+              message: error instanceof Error ? error.message : String(error),
+            })
+          )
+          client.close()
+        }
         // Pull the state straight off the client: connect() can change it before any listener
         // would have reported it.
         syncConnection(client.getConnectionState())
