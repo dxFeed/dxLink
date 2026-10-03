@@ -22,6 +22,19 @@ dxLink JavaScript API
 
 - `@dxfeed/dxlink-api` re-exports public API from all dxlink JavaScript protocol packages. The `dxlink-console/*` packages are not re-exported: they are UI libraries built on top of `@dxfeed/dxlink-api`.
 
+## Learning more about Effect
+
+This repository uses the Effect TypeScript library — in the console packages (`dxlink-console/*`).
+
+Before writing any Effect code, first read `node_modules/effect/AGENTS.md` **completely**, and
+follow the links in the file when required.
+
+If you need to learn more about particular Effect APIs and concepts that the guide doesn't cover,
+search through the source code in `node_modules/effect/src`.
+
+pnpm installs `effect` in each console package rather than at the workspace root, so both paths
+resolve inside one of them — for example `dxlink-console/core/node_modules/effect/AGENTS.md`.
+
 ## Development Commands
 
 - Run commands from `dxlink-javascript` directory.
