@@ -1,17 +1,9 @@
 import { DXLinkLogLevel } from '@dxfeed/dxlink-api'
 import type { DXLinkClient, DXLinkIndiChartCandle } from '@dxfeed/dxlink-api'
-import {
-  channelStateAtoms,
-  command,
-  makeChannelAtoms,
-  on,
-  session,
-  trackChannel,
-} from '@dxfeed/dxlink-console-core'
+import { channelSession, command, makeChannelAtoms, on } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
 import { Effect } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
 
 import { DXLinkCandles } from './candles'
 import type { DXLinkCandleEvent, DXLinkCandleSubscription } from './candles'
@@ -58,28 +50,19 @@ export const makeFeedCandlesModel = (
   const subscription = Atom.make<DXLinkCandleSubscription | null>(null)
   const candleCount = Atom.make(0)
 
-  const candlesSession = session({
-    state: [...channelStateAtoms(channel), subscription, candleCount],
-    open: (get) => {
-      if (get(channel.closed)) {
-        return Effect.succeed(null)
-      }
-
-      return Effect.gen(function* () {
-        const registry = yield* AtomRegistry
-        const candles = yield* Effect.acquireRelease(
-          Effect.sync(
-            () =>
-              new DXLinkCandles(client, {
-                feed: params.feed,
-                space: params.space,
-                // A debug console wants the protocol traffic in the browser log.
-                logLevel: DXLinkLogLevel.DEBUG,
-              })
-          ),
-          (candles) => Effect.sync(() => candles.close())
-        )
-        yield* trackChannel(channel, candles.getChannel())
+  const candlesSession = channelSession(channel, {
+    state: [subscription, candleCount],
+    open: () =>
+      new DXLinkCandles(client, {
+        feed: params.feed,
+        space: params.space,
+        // A debug console wants the protocol traffic in the browser log.
+        logLevel: DXLinkLogLevel.DEBUG,
+      }),
+    close: (candles) => candles.close(),
+    channel: (candles) => candles.getChannel(),
+    wire: (candles, registry) =>
+      Effect.gen(function* () {
         yield* on(candles, 'Data', (data) => {
           const batch = data.events.map(toChartCandle)
           registry.set(candleCount, batch.length)
@@ -90,10 +73,7 @@ export const makeFeedCandlesModel = (
         if (current !== null) {
           candles.setSubscription(current)
         }
-
-        return candles
-      })
-    },
+      }),
   })
 
   return {

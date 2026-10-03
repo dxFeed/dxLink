@@ -25,8 +25,13 @@ Breaking for code that builds a channel plugin on core's host API:
 - `ChannelErrorTracker`, `initialChannelErrorState` and `ChannelErrorState` are removed.
   `makeChannelAtoms()` and `trackChannel()` replace them, and `useChannelCard()` fills a
   `ChannelWidget` header from them.
-- A channel model is built from `session`, `on`, `listen` and `command`, exported from core
+- A channel model is built from `channelSession` — which holds a dxLink channel object open
+  until the channel is closed, follows its protocol channel and keeps the card's atoms alive —
+  or the plain `session` beneath it, with `on`, `listen` and `command`, exported from core
   together with `FLUSH_INTERVAL`.
+- `ChannelWidget` no longer keeps its own closed state: it shows the `closed` prop
+  (`useChannelCard` passes the model's), and offers the close button only when given
+  `onClose`.
 
 Plugins themselves, `ConsolePage`'s props, the configuration profile and the theming contract
 are unchanged.

@@ -41,8 +41,16 @@ Models:
   `connect / reconnect / disconnect / setAuthToken / clearErrors`.
 - **`makeFeedModel` / `makeDomModel` / `makeFeedCandlesModel` / `makeIndiChartModel` /
   `makeRpcModel`** — one per open channel. Each carries a `ChannelAtoms` (`core/src/lib/channel.ts`):
-  the channel's state, id, parameters and errors, plus `close` — what every card header shows,
-  bound in one line by `useChannelCard`.
+  the channel's state, id, parameters and errors, plus `closed` / `close` — what every card
+  header shows, bound in one line by `useChannelCard`. The card keeps no state of its own about
+  closing: `ChannelWidget` shows `closed` as the model holds it.
+
+The four models over a dxLink channel object (Feed, DOM, candles, IndiChart) hold it through
+`channelSession`, which does what they share — holds nothing once the channel is closed, opens
+and closes the object, follows its protocol channel for the card, keeps the card's atoms alive —
+so a model states only its own: which object to open, which extra atoms it writes, and how its
+listeners `wire` into them. RPC is a plain `session`: the transport opens its channel, so there
+is no object to hand over, and it fills only the card atoms a call has (parameters, errors).
 
 Views bind directly; there is no selector plumbing and no `useEffect` listener wiring:
 
@@ -353,9 +361,9 @@ everything the area used to hardcode as a four-way switch:
 
 Plugins reach the connection through `useConnection()` — or `useConnectionClient()` for the
 live client a channel model opens its channel on — and build their models from what
-`@dxfeed/dxlink-console-core` exports for it: `session`, `on`, `listen`, `command`,
-`makeChannelAtoms` / `trackChannel` / `useChannelCard`. That is the whole host API; there is no
-plugin-specific context.
+`@dxfeed/dxlink-console-core` exports for it: `channelSession` (or `session`, for a channel the
+plugin does not hold an object for), `on`, `listen`, `command`, and `makeChannelAtoms` /
+`useChannelCard` for the card. That is the whole host API; there is no plugin-specific context.
 
 `DraftChannel.config` is `unknown`. It was produced by the plugin named by `kind` and is only
 ever handed back to that same plugin, so no config type — and no config _dependency_ — needs

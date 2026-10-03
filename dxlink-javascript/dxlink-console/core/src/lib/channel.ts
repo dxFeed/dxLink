@@ -6,7 +6,8 @@ import type { Scope } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
 
-import { command, on } from './model'
+import { command, on, session } from './model'
+import type { Session } from './model'
 import { prependError } from './timestamped-error'
 import type { TimestampedError } from './timestamped-error'
 
@@ -31,7 +32,8 @@ export interface ChannelAtoms {
   readonly errors: Atom.Writable<readonly TimestampedError[]>
   /**
    * Whether the user closed the channel. Closing is terminal: a session reads this and holds
-   * nothing once it is set, which releases the dxLink object it held.
+   * nothing once it is set, which releases the dxLink object it held; the card reads it too, and
+   * stays as a header-only record.
    */
   readonly closed: Atom.Atom<boolean>
   readonly close: Atom.Writable<void>
@@ -53,7 +55,10 @@ export const makeChannelAtoms = (): ChannelAtoms => {
   }
 }
 
-/** The atoms {@link trackChannel} writes, for a session's `state` list. */
+/**
+ * The atoms {@link trackChannel} writes, for a session's `state` list. {@link channelSession}
+ * includes them itself; a model holding something other than a dxLink channel object lists them.
+ */
 export const channelStateAtoms = (atoms: ChannelAtoms): ReadonlyArray<Atom.Atom<unknown>> => [
   atoms.state,
   atoms.id,
@@ -90,8 +95,59 @@ export const trackChannel = (
   })
 
 /**
+ * Hold a channel service's dxLink object open — the session every channel model has.
+ *
+ * What all of them share is here, so a model states only what is its own:
+ *  - nothing is held once the user closes the channel, which releases what was;
+ *  - `open` creates the dxLink object and `close` closes it when the session ends;
+ *  - the object's protocol channel is followed with {@link trackChannel}, so the card shows its
+ *    id, parameters, state and errors;
+ *  - those card atoms are kept alive with the model's own `state` — list there every other atom
+ *    the session writes, or a value written while no view observes it is dropped;
+ *  - `wire` then connects the object's listeners to the model's atoms. It runs in the session's
+ *    scope, so everything it registers or forks is released with the session.
+ */
+export const channelSession = <A, E = never>(
+  atoms: ChannelAtoms,
+  options: {
+    readonly state: ReadonlyArray<Atom.Atom<unknown>>
+    readonly open: () => A
+    readonly close: (resource: A) => void
+    readonly channel: (resource: A) => DXLinkChannel
+    /** See {@link trackChannel}. */
+    readonly withParameters?: boolean
+    readonly wire: (
+      resource: A,
+      registry: AtomRegistry
+    ) => Effect.Effect<void, E, Scope.Scope | AtomRegistry>
+  }
+): Session<A | null, E> =>
+  session({
+    state: [...channelStateAtoms(atoms), ...options.state],
+    open: (get): Effect.Effect<A | null, E, Scope.Scope | AtomRegistry> => {
+      if (get(atoms.closed)) {
+        return Effect.succeed(null)
+      }
+
+      return Effect.gen(function* () {
+        const registry = yield* AtomRegistry
+        const resource = yield* Effect.acquireRelease(Effect.sync(options.open), (resource) =>
+          Effect.sync(() => options.close(resource))
+        )
+        yield* trackChannel(atoms, options.channel(resource), {
+          withParameters: options.withParameters,
+        })
+        yield* options.wire(resource, registry)
+
+        return resource
+      })
+    },
+  })
+
+/**
  * The parts of a channel card that every channel fills the same way, ready to spread onto
- * `ChannelWidget`.
+ * `ChannelWidget` — closed state included, so the card shows what the model holds rather than
+ * keeping a second copy of its own.
  */
 export const useChannelCard = (atoms: ChannelAtoms) => {
   const close = useAtomSet(atoms.close)
@@ -101,6 +157,7 @@ export const useChannelCard = (atoms: ChannelAtoms) => {
     channelId: useAtomValue(atoms.id),
     parameters: useAtomValue(atoms.parameters),
     errors: useAtomValue(atoms.errors),
+    closed: useAtomValue(atoms.closed),
     onClearErrors: () => clearErrors(),
     onClose: () => close(),
   }

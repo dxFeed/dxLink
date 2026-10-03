@@ -113,6 +113,10 @@ describe('RPC model session', () => {
 
     expect(calls).toHaveLength(1)
     expect(json(model, 'requests')).toEqual([{ value: 'hello' }])
+    expect(atoms.get(model.channel.parameters)).toEqual({
+      service: 'echo.v1.EchoService',
+      methodName: 'Say',
+    })
 
     lastCall().responses.next(textOf('hi'))
     lastCall().responses.complete()

@@ -10,18 +10,15 @@ import type {
 } from '@dxfeed/dxlink-api'
 import {
   FLUSH_INTERVAL,
-  channelStateAtoms,
+  channelSession,
   command,
   listen,
   makeChannelAtoms,
   on,
-  session,
-  trackChannel,
 } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
 import { Effect, Stream } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
 
 export type FeedSubKind = 'regular' | 'indexed' | 'timeSeries'
 
@@ -127,29 +124,20 @@ export const makeFeedModel = (
   const config = Atom.make<FeedConfig>(INITIAL_CONFIG)
   const events = Atom.make<FeedEventsByType>({})
 
-  const feedSession = session({
-    state: [...channelStateAtoms(channel), subscriptions, config, events],
-    open: (get) => {
-      if (get(channel.closed)) {
-        return Effect.succeed(null)
-      }
-
-      return Effect.gen(function* () {
-        const registry = yield* AtomRegistry
-        const feed = yield* Effect.acquireRelease(
-          Effect.sync(
-            () =>
-              new DXLinkFeed(client, FeedContract.AUTO, {
-                feed: params.feed,
-                space: params.space,
-                // A debug console wants the protocol traffic in the browser log.
-                logLevel: DXLinkLogLevel.DEBUG,
-              })
-          ),
-          // Closing the feed is terminal (CHANNEL_CANCEL).
-          (feed) => Effect.sync(() => feed.close())
-        )
-        yield* trackChannel(channel, feed.getChannel())
+  const feedSession = channelSession(channel, {
+    state: [subscriptions, config, events],
+    open: () =>
+      new DXLinkFeed(client, FeedContract.AUTO, {
+        feed: params.feed,
+        space: params.space,
+        // A debug console wants the protocol traffic in the browser log.
+        logLevel: DXLinkLogLevel.DEBUG,
+      }),
+    // Closing the feed is terminal (CHANNEL_CANCEL).
+    close: (feed) => feed.close(),
+    channel: (feed) => feed.getChannel(),
+    wire: (feed, registry) =>
+      Effect.gen(function* () {
         yield* on(feed, 'ConfigChange', (next) => registry.set(config, next))
 
         const received = yield* listen(feed, 'Event')
@@ -171,10 +159,7 @@ export const makeFeedModel = (
         if (pending.length > 0) {
           feed.addSubscriptions(pending.map(toProtocol))
         }
-
-        return feed
-      })
-    },
+      }),
   })
 
   return {

@@ -273,8 +273,9 @@ otherwise the new import fails to resolve and every request 500s with a blank pa
 - **A model writes atoms; it never reads them in its session's Effect with `get`** unless a
   change to that atom should close the session and open a new one — that is what `get` means
   inside an atom. Read current values with `registry.get` (as the feed session does for its
-  pending subscriptions), and list every atom the session writes in `session({ state })`, or a
-  value written while no view observes it is dropped with the unobserved node.
+  pending subscriptions), and list every atom the model writes in its session's `state` — or a
+  value written while no view observes it is dropped with the unobserved node. `channelSession`
+  lists the card's atoms itself; the model's own are still yours to list.
 - **Never write an atom from a finalizer.** A finalizer also runs while the page's registry is
   being disposed, and a write then throws. Commands find the live dxLink object through
   `session.current()`, which the session clears itself.

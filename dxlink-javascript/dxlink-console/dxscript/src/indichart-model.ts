@@ -8,18 +8,10 @@ import type {
   DXLinkIndiChartIndicatorsStates,
   DXLinkIndiChartIndicatorState,
 } from '@dxfeed/dxlink-api'
-import {
-  channelStateAtoms,
-  command,
-  makeChannelAtoms,
-  on,
-  session,
-  trackChannel,
-} from '@dxfeed/dxlink-console-core'
+import { channelSession, command, makeChannelAtoms, on } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
 import { Effect } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
 
 export type ChartDataType = 'candles' | 'indicators' | 'update'
 
@@ -214,26 +206,19 @@ export const makeIndiChartModel = (
   const subscription = Atom.make<IndiChartSubscription | null>(null)
   const coordinator = new ChartCoordinator(onData)
 
-  const chartSession = session({
-    state: [...channelStateAtoms(channel), indicatorStates, outputs, subscription],
-    open: (get) => {
-      if (get(channel.closed)) {
-        return Effect.succeed(null)
-      }
-
-      return Effect.gen(function* () {
-        const registry = yield* AtomRegistry
-        const chart = yield* Effect.acquireRelease(
-          Effect.sync(() => new DXLinkIndiChart(client, indicators)),
-          (chart) =>
-            Effect.sync(() => {
-              chart.close()
-              coordinator.reset()
-            })
-        )
-        // withParameters: false — an INDICHART channel's parameters carry the full source of
-        // every indicator, which the indicator panels already render.
-        yield* trackChannel(channel, chart.getChannel(), { withParameters: false })
+  const chartSession = channelSession(channel, {
+    state: [indicatorStates, outputs, subscription],
+    open: () => new DXLinkIndiChart(client, indicators),
+    close: (chart) => {
+      chart.close()
+      coordinator.reset()
+    },
+    channel: (chart) => chart.getChannel(),
+    // An INDICHART channel's parameters carry the full source of every indicator, which the
+    // indicator panels already render.
+    withParameters: false,
+    wire: (chart, registry) =>
+      Effect.gen(function* () {
         yield* on(chart, 'IndicatorsStateChange', (states) => {
           const declared: Record<string, IndicatorOutputMeta[]> = {}
           for (const [name, state] of Object.entries(states)) {
@@ -250,10 +235,7 @@ export const makeIndiChartModel = (
         if (current !== null) {
           chart.setSubscription(current, {})
         }
-
-        return chart
-      })
-    },
+      }),
   })
 
   return {

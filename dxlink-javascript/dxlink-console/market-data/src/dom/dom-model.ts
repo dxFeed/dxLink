@@ -7,18 +7,15 @@ import type {
 } from '@dxfeed/dxlink-api'
 import {
   FLUSH_INTERVAL,
-  channelStateAtoms,
+  channelSession,
   command,
   listen,
   makeChannelAtoms,
   on,
-  session,
-  trackChannel,
 } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
 import { Effect, Stream } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
 
 export interface DomSnapshot {
   time: number
@@ -47,32 +44,23 @@ export const makeDomModel = (
   const config = Atom.make<DepthOfMarketConfig | null>(null)
   const snapshot = Atom.make<DomSnapshot | null>(null)
 
-  const domSession = session({
-    state: [...channelStateAtoms(channel), config, snapshot],
-    open: (get) => {
-      if (get(channel.closed)) {
-        return Effect.succeed(null)
-      }
-
-      return Effect.gen(function* () {
-        const registry = yield* AtomRegistry
-        const dom = yield* Effect.acquireRelease(
-          Effect.sync(
-            () =>
-              new DXLinkDepthOfMarket(
-                client,
-                { symbol: params.symbol, sources: params.sources },
-                {
-                  feed: params.feed,
-                  space: params.space,
-                  // A debug console wants the protocol traffic in the browser log.
-                  logLevel: DXLinkLogLevel.DEBUG,
-                }
-              )
-          ),
-          (dom) => Effect.sync(() => dom.close())
-        )
-        yield* trackChannel(channel, dom.getChannel())
+  const domSession = channelSession(channel, {
+    state: [config, snapshot],
+    open: () =>
+      new DXLinkDepthOfMarket(
+        client,
+        { symbol: params.symbol, sources: params.sources },
+        {
+          feed: params.feed,
+          space: params.space,
+          // A debug console wants the protocol traffic in the browser log.
+          logLevel: DXLinkLogLevel.DEBUG,
+        }
+      ),
+    close: (dom) => dom.close(),
+    channel: (dom) => dom.getChannel(),
+    wire: (dom, registry) =>
+      Effect.gen(function* () {
         registry.set(config, dom.getConfig())
         yield* on(dom, 'ConfigChange', (next) => registry.set(config, next))
 
@@ -88,10 +76,7 @@ export const makeDomModel = (
           }),
           Effect.forkScoped
         )
-
-        return dom
-      })
-    },
+      }),
   })
 
   return {

@@ -211,7 +211,9 @@ export const makeRpcModel = (
   }
 
   const callSession = session({
-    state: [channel.errors, callState, responses, requests],
+    // Not a dxLink channel object — the transport opens that — so this is a plain session,
+    // filling only the card atoms an RPC call has: its parameters and its errors.
+    state: [channel.parameters, channel.errors, callState, responses, requests],
     open: (get) => {
       if (get(channel.closed)) {
         return Effect.succeed(null)
@@ -219,6 +221,9 @@ export const makeRpcModel = (
 
       return Effect.gen(function* () {
         const registry = yield* AtomRegistry
+        // The channel's protocol id stays inside the RPC transport; its parameters are the ones
+        // `DxLinkRpcService` opens it with.
+        registry.set(channel.parameters, { service: service.typeName, methodName: method.name })
 
         let call: Call
         try {

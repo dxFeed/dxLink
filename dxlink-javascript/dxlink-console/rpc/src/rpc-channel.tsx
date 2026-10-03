@@ -158,9 +158,6 @@ export const RpcChannel = ({ title, config }: RpcChannelProps) => {
       subtitle={`${config.service.typeName} · ${config.method.name}`}
       status={<RpcStatusChip state={callState} responses={responses.length} />}
       {...card}
-      // The channel is opened inside the RPC transport, so its protocol id is not exposed
-      // here; the parameters are the ones `DxLinkRpcService` opens it with.
-      parameters={{ service: config.service.typeName, methodName: config.method.name }}
     >
       <Stack spacing={2}>
         <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>

@@ -37,7 +37,13 @@ export type {
 // that session, commands, and the atoms every channel card shows.
 export { FLUSH_INTERVAL, command, listen, on, session, useSession } from './lib/model'
 export type { ListenerArgs, ListenerName, Session } from './lib/model'
-export { channelStateAtoms, makeChannelAtoms, trackChannel, useChannelCard } from './lib/channel'
+export {
+  channelSession,
+  channelStateAtoms,
+  makeChannelAtoms,
+  trackChannel,
+  useChannelCard,
+} from './lib/channel'
 export type { ChannelAtoms } from './lib/channel'
 
 // Shared UI and error records.
