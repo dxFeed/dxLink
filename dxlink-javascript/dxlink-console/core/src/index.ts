@@ -2,9 +2,9 @@
  * Public surface of the console core.
  *
  * Three groups: the page a host embeds, the channel-plugin contract, and the host API a
- * plugin uses (`useConnectionVM` + the view-model hooks). Everything else in this package is
- * internal — if a channel package needs something that is not here, that is a boundary
- * decision, not an import to reach for.
+ * plugin uses (`useConnection` + the model primitives its channel model is built from).
+ * Everything else in this package is internal — if a channel package needs something that is
+ * not here, that is a boundary decision, not an import to reach for.
  */
 
 // The page a host embeds, the theme it renders with, and the area it composes.
@@ -21,17 +21,35 @@ export type { DraftChannel } from './channels/types'
 export { ChannelWidget } from './channels/channel-widget'
 
 // The host API a plugin reaches the connection through.
-export { ConnectionProvider, useConnectionVM } from './connection/connection-context'
-export { ConnectionViewModel } from './connection/connection-view-model'
-export { useOwnedViewModel, useVM, createViewModelContext } from './view-model'
-export type { ViewModel } from './view-model'
+export {
+  ConnectionProvider,
+  useConnection,
+  useConnectionClient,
+} from './connection/connection-context'
+export { makeConnectionModel } from './connection/connection-model'
+export type {
+  ConnectionModel,
+  ConnectionParams,
+  ConnectRequest,
+} from './connection/connection-model'
 
-// Shared UI and the channel-error plumbing every channel view model builds on.
+// What a channel model is built from: a session holding its dxLink object, listeners scoped to
+// that session, commands, and the atoms every channel card shows.
+export { FLUSH_INTERVAL, coalesce, command, on, onBatch, session, useSession } from './lib/model'
+export type { ListenerArgs, ListenerName, Session } from './lib/model'
+export {
+  channelSession,
+  channelStateAtoms,
+  makeChannelAtoms,
+  trackChannel,
+  useChannelCard,
+} from './lib/channel'
+export type { ChannelAtoms } from './lib/channel'
+
+// Shared UI and error records.
 export { ErrorBoundary } from './components/error-boundary'
 export { MAX_ERRORS, prependError } from './lib/timestamped-error'
 export type { TimestampedError } from './lib/timestamped-error'
-export { ChannelErrorTracker, initialChannelErrorState } from './lib/channel-errors'
-export type { ChannelErrorState } from './lib/channel-errors'
 
 // The configuration profile. Sources arrive already parsed — reading an injected global or a
 // query string belongs to whoever owns the page, not here.

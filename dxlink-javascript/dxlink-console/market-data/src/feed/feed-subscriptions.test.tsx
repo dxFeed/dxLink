@@ -1,13 +1,28 @@
 import type { DXLinkClient } from '@dxfeed/dxlink-api'
+import { RegistryContext } from '@effect/atom-react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import { describe, expect, it } from 'vitest'
 
+import { makeFeedModel } from './feed-model'
+import type { FeedModel } from './feed-model'
 import { SubscriptionManager } from './feed-subscriptions'
-import { FeedViewModel } from './feed-view-model'
 
-// The VM's constructor is pure — the channel only opens in start(), which these tests
-// never call. So commands fall through to the store and no client is touched.
-const createVM = () => new FeedViewModel({} as DXLinkClient, {})
+// Creating a model is pure, and the form never holds its session open — so no channel opens,
+// commands update the atoms alone and no client is touched.
+const createModel = () => makeFeedModel({} as DXLinkClient, {})
+
+/** Render the form against a registry the test can read the model's atoms back from. */
+const renderManager = (model: FeedModel = createModel()) => {
+  const registry = AtomRegistry.make()
+  render(
+    <RegistryContext.Provider value={registry}>
+      <SubscriptionManager model={model} />
+    </RegistryContext.Provider>
+  )
+
+  return { subscriptions: () => registry.get(model.subscriptions) }
+}
 
 const openListbox = (input: HTMLElement) => {
   fireEvent.mouseDown(input)
@@ -32,7 +47,7 @@ const setValue = (input: HTMLElement, value: string) => {
 
 describe('SubscriptionManager', () => {
   it('offers the event types the old console had, less the deprecated one', () => {
-    render(<SubscriptionManager vm={createVM()} />)
+    renderManager()
 
     const options = optionsOf(screen.getByLabelText('Event type'))
 
@@ -46,7 +61,7 @@ describe('SubscriptionManager', () => {
   })
 
   it('opens the event-type list from the field itself, not only by typing a prefix', () => {
-    render(<SubscriptionManager vm={createVM()} />)
+    renderManager()
 
     const input = screen.getByLabelText('Event type')
     // The popup indicator only exists because `forcePopupIcon` is set: MUI hides it for a
@@ -58,7 +73,7 @@ describe('SubscriptionManager', () => {
   })
 
   it('selects the current event type on click, so typing replaces it', () => {
-    render(<SubscriptionManager vm={createVM()} />)
+    renderManager()
 
     const input = screen.getByLabelText('Event type') as HTMLInputElement
     setValue(input, 'Quote')
@@ -73,14 +88,13 @@ describe('SubscriptionManager', () => {
   })
 
   it('accepts an event type that is not on the list', () => {
-    const vm = createVM()
-    render(<SubscriptionManager vm={vm} />)
+    const { subscriptions } = renderManager()
 
     fireEvent.change(screen.getByLabelText('Event type'), { target: { value: 'FutureEvent' } })
     fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-    expect(vm.store.getState().subscriptions).toEqual([
+    expect(subscriptions()).toEqual([
       {
         type: 'FutureEvent',
         symbol: 'AAPL',
@@ -92,7 +106,7 @@ describe('SubscriptionManager', () => {
   })
 
   it('offers the predefined order sources for indexed subscriptions', () => {
-    render(<SubscriptionManager vm={createVM()} />)
+    renderManager()
     fireEvent.click(screen.getByRole('button', { name: 'Indexed' }))
 
     const options = optionsOf(screen.getByLabelText('Order source'))
@@ -106,8 +120,7 @@ describe('SubscriptionManager', () => {
   })
 
   it('keeps two sources of one symbol as separate subscriptions', () => {
-    const vm = createVM()
-    render(<SubscriptionManager vm={vm} />)
+    const { subscriptions } = renderManager()
     fireEvent.click(screen.getByRole('button', { name: 'Indexed' }))
 
     // Captured once: these inputs persist across adds, and re-querying by label would
@@ -124,13 +137,13 @@ describe('SubscriptionManager', () => {
       fireEvent.click(add)
     }
 
-    expect(vm.store.getState().subscriptions).toHaveLength(2)
+    expect(subscriptions()).toHaveLength(2)
     expect(screen.getByText('Order#NTV:AAPL')).toBeInTheDocument()
     expect(screen.getByText('Order#DEX:AAPL')).toBeInTheDocument()
   })
 
   it('shows the order source only for indexed, and from time only for time series', () => {
-    render(<SubscriptionManager vm={createVM()} />)
+    renderManager()
 
     expect(screen.queryByLabelText('Order source')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('From time')).not.toBeInTheDocument()
@@ -145,19 +158,18 @@ describe('SubscriptionManager', () => {
   })
 
   it('keeps the from time numeric', () => {
-    const vm = createVM()
-    render(<SubscriptionManager vm={vm} />)
+    const { subscriptions } = renderManager()
     fireEvent.click(screen.getByRole('button', { name: 'Time series' }))
 
     fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL{=d}' } })
     fireEvent.change(screen.getByLabelText('From time'), { target: { value: '17e0abc99' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-    expect(vm.store.getState().subscriptions[0]?.fromTime).toBe(17099)
+    expect(subscriptions()[0]?.fromTime).toBe(17099)
   })
 
   it('links the documentation the old console linked', () => {
-    render(<SubscriptionManager vm={createVM()} />)
+    renderManager()
 
     expect(screen.getByRole('link', { name: 'kb.dxfeed.com' })).toHaveAttribute(
       'href',

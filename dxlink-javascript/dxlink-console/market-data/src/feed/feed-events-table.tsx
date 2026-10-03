@@ -1,5 +1,5 @@
 import type { FeedEventData } from '@dxfeed/dxlink-api'
-import { useVM } from '@dxfeed/dxlink-console-core'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import PauseIcon from '@mui/icons-material/Pause'
@@ -14,7 +14,7 @@ import Typography from '@mui/material/Typography'
 import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import { useState } from 'react'
 
-import type { FeedEventsByType, FeedViewModel } from './feed-view-model'
+import type { FeedEventsByType, FeedModel } from './feed-model'
 
 // Columns shown first when present; the rest follow alphabetically. Used only when
 // the server has not reported an event-field order yet.
@@ -67,9 +67,10 @@ export const buildColumns = (
 }
 
 /** Live received-events grid: one tab per event type, one row per symbol. */
-export const EventsTable = ({ vm }: { vm: FeedViewModel }) => {
-  const events = useVM(vm, (s) => s.events)
-  const eventFields = useVM(vm, (s) => s.config.eventFields)
+export const EventsTable = ({ model }: { model: FeedModel }) => {
+  const events = useAtomValue(model.events)
+  const eventFields = useAtomValue(model.config).eventFields
+  const clearEvents = useAtomSet(model.clearEvents)
   const [activeType, setActiveType] = useState<string | null>(null)
   const [paused, setPaused] = useState(false)
   const [frozen, setFrozen] = useState<FeedEventsByType | null>(null)
@@ -129,7 +130,7 @@ export const EventsTable = ({ vm }: { vm: FeedViewModel }) => {
             </IconButton>
           </Tooltip>
           <Tooltip title="Clear">
-            <IconButton size="small" onClick={vm.clearEvents}>
+            <IconButton size="small" onClick={() => clearEvents()}>
               <DeleteSweepIcon />
             </IconButton>
           </Tooltip>

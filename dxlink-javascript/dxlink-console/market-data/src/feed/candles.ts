@@ -121,11 +121,12 @@ export class DXLinkCandles {
     this.feed.addSubscriptions({ type: 'Candle', ...subscription })
   }
 
-  addListener(listener: (snapshot: DXLinkCandleData) => void) {
+  // Named like every dxLink object's listener pair, so a model can scope it with `on`.
+  addDataListener(listener: (snapshot: DXLinkCandleData) => void) {
     this.listeners.add(listener)
   }
 
-  removeListener(listener: (snapshot: DXLinkCandleData) => void) {
+  removeDataListener(listener: (snapshot: DXLinkCandleData) => void) {
     this.listeners.delete(listener)
   }
 

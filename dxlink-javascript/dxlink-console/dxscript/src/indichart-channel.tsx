@@ -1,10 +1,14 @@
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
 import type { DXLinkIndiChartIndicatorState } from '@dxfeed/dxlink-api'
-import { useVM } from '@dxfeed/dxlink-console-core'
-import { ChannelWidget } from '@dxfeed/dxlink-console-core'
-import { useConnectionVM } from '@dxfeed/dxlink-console-core'
+import {
+  ChannelWidget,
+  useChannelCard,
+  useConnectionClient,
+  useSession,
+} from '@dxfeed/dxlink-console-core'
 import { IndiChart } from '@dxscript/dxlink-dxcharts-lite'
 import type { IndiChartHandle } from '@dxscript/dxlink-dxcharts-lite'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import CheckCircleIcon from '@mui/icons-material/CheckCircleOutlineOutlined'
 import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -29,8 +33,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { DocLink } from './doc-link'
 import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from './doc-urls'
-import { IndiChartViewModel } from './indichart-view-model'
-import type { IndicatorOutputKind, IndicatorOutputMeta } from './indichart-view-model'
+import { makeIndiChartModel } from './indichart-model'
+import type { IndicatorOutputKind, IndicatorOutputMeta } from './indichart-model'
 import { ParameterField, initialParameterValue } from './parameter-field'
 import type { ParameterValue } from './parameter-field'
 import { describeScriptError } from './script-error'
@@ -284,33 +288,18 @@ interface IndiChartChannelProps {
   config: IndiChartConfig
 }
 
-/** Live IndiChart channel — wraps {@link IndiChartViewModel} + the dxcharts IndiChart. */
+/** Live IndiChart channel — wraps an {@link IndiChartModel} + the dxcharts IndiChart. */
 export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
-  const connectionVM = useConnectionVM()
-  const [vm] = useState(() => {
-    const client = connectionVM.getClient()
-    if (client === null) {
-      throw new Error('IndiChart channel opened without an active connection')
-    }
-    return new IndiChartViewModel(client, config.indicators)
-  })
-
+  const client = useConnectionClient()
   const chartRef = useRef<IndiChartHandle>(null)
-  const [resetKey, setResetKey] = useState(0)
-  const [symbol, setSymbol] = useState('AAPL{=d}')
-  const [fromTime, setFromTime] = useState('0')
-  const [values, setValues] = useState<ParamValues>({})
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const [chartError, setChartError] = useState<string | null>(null)
   const [hasData, setHasData] = useState(false)
 
-  useEffect(() => {
-    vm.start()
-    vm.setChartListener((candles, indicators, dataType) => {
-      // pushData runs synchronously inside the WebSocket frame dispatch, which does not
-      // guard its listeners. An escaping throw would abort processing of that frame for
-      // every other channel, and React's error boundary cannot see it — this is not a
-      // render error. Contain it here and report it as a chart error.
+  const [model] = useState(() =>
+    makeIndiChartModel(client, config.indicators, (candles, indicators, dataType) => {
+      // pushData runs synchronously inside the WebSocket frame dispatch. A chart that throws
+      // is this channel's problem, and React's error boundary cannot see it — this is not a
+      // render error — so report it here, as a chart error on this card.
       try {
         chartRef.current?.pushData(candles, indicators, dataType)
         if (candles.length > 0) setHasData(true)
@@ -318,20 +307,24 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
         setChartError(error instanceof Error ? error.message : String(error))
       }
     })
-    return () => {
-      vm.setChartListener(null)
-      vm.stop()
-    }
-  }, [vm])
+  )
+  useSession(model.session)
 
-  const channelState = useVM(vm, (s) => s.channelState)
-  const indicatorStates = useVM(vm, (s) => s.indicatorStates)
-  const indicatorOutputs = useVM(vm, (s) => s.outputs)
-  const subscription = useVM(vm, (s) => s.subscription)
-  const channelId = useVM(vm, (s) => s.channelId)
-  // `parameters` is deliberately not shown: for INDICHART it carries the full
-  // indicator source, which the panels below already render properly.
-  const errors = useVM(vm, (s) => s.errors)
+  const [resetKey, setResetKey] = useState(0)
+  const [symbol, setSymbol] = useState('AAPL{=d}')
+  const [fromTime, setFromTime] = useState('0')
+  const [values, setValues] = useState<ParamValues>({})
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+
+  const channelState = useAtomValue(model.channel.state)
+  const indicatorStates = useAtomValue(model.indicatorStates)
+  const indicatorOutputs = useAtomValue(model.outputs)
+  const subscription = useAtomValue(model.subscription)
+  // `parameters` is deliberately not recorded: for INDICHART it carries the full indicator
+  // source, which the panels below already render properly.
+  const card = useChannelCard(model.channel)
+  const applySubscription = useAtomSet(model.apply)
+  const applyIndicatorParameters = useAtomSet(model.applyParameters)
 
   // Seed parameter values from the inParameters defaults as states arrive.
   useEffect(() => {
@@ -382,7 +375,11 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
     setHasData(false)
     chartRef.current?.reset()
     setResetKey((k) => k + 1)
-    vm.apply(symbol.trim(), Number(fromTime) || 0, values)
+    applySubscription({
+      symbol: symbol.trim(),
+      fromTime: Number(fromTime) || 0,
+      parameters: values,
+    })
   }
 
   /**
@@ -392,7 +389,7 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
    */
   const applyParameters = () => {
     setChartError(null)
-    vm.applyParameters(values)
+    applyIndicatorParameters(values)
   }
 
   const statusChip =
@@ -416,11 +413,8 @@ export const IndiChartChannel = ({ title, config }: IndiChartChannelProps) => {
       icon={<InsightsIcon />}
       title={title}
       subtitle={`IndiChart · ${entries.length} indicator${entries.length === 1 ? '' : 's'}`}
-      onClose={vm.close}
       status={statusChip}
-      channelId={channelId}
-      errors={errors}
-      onClearErrors={vm.clearErrors}
+      {...card}
     >
       <Stack spacing={2}>
         <Box>

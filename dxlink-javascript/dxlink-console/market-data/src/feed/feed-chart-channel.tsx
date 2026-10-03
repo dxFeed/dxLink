@@ -1,7 +1,11 @@
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
-import { useVM } from '@dxfeed/dxlink-console-core'
-import { ChannelWidget } from '@dxfeed/dxlink-console-core'
-import { useConnectionVM } from '@dxfeed/dxlink-console-core'
+import {
+  ChannelWidget,
+  useChannelCard,
+  useConnectionClient,
+  useSession,
+} from '@dxfeed/dxlink-console-core'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
@@ -12,11 +16,11 @@ import Chip from '@mui/material/Chip'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { CandleChart } from './candle-chart'
 import type { CandleChartHandle } from './candle-chart'
-import { FeedCandlesViewModel } from './feed-candles-view-model'
+import { makeFeedCandlesModel } from './feed-candles-model'
 import type { FeedConfig } from './types'
 import { DocLink } from '../components/doc-link'
 import { CANDLE_SYMBOLS_DOC_URL, EPOCH_MILLIS_DOC_URL } from '../lib/order-sources'
@@ -36,55 +40,43 @@ const StatusChip = ({ state }: { state: DXLinkChannelState }) => {
   return <Chip size="small" color="warning" variant="outlined" label="opening" />
 }
 
-/** Live Feed candle-chart view — wraps {@link FeedCandlesViewModel} + {@link CandleChart}. */
+/** Live Feed candle-chart view — wraps a {@link FeedCandlesModel} + {@link CandleChart}. */
 export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
-  const connectionVM = useConnectionVM()
-  const [vm] = useState(() => {
-    const client = connectionVM.getClient()
-    if (client === null) {
-      throw new Error('Feed chart channel opened without an active connection')
-    }
-    return new FeedCandlesViewModel(client, {
-      feed: config.feed || undefined,
-      space: config.space || undefined,
-    })
-  })
-
+  const client = useConnectionClient()
   const chartRef = useRef<CandleChartHandle>(null)
-  const [symbol, setSymbol] = useState('AAPL{=d}')
-  const [fromTime, setFromTime] = useState('0')
   const [chartError, setChartError] = useState<string | null>(null)
 
-  useEffect(() => {
-    vm.start()
-    vm.setChartListener((candles, dataType) => {
-      // This runs synchronously inside the WebSocket frame dispatch, which does not guard
-      // its listeners. An escaping throw would abort processing of that frame for every
-      // other channel, and React's error boundary cannot see it — this is not a render
-      // error. Contain it here and report it as a chart error.
-      try {
-        chartRef.current?.push(candles, dataType)
-      } catch (error) {
-        setChartError(error instanceof Error ? error.message : String(error))
+  const [model] = useState(() =>
+    makeFeedCandlesModel(
+      client,
+      { feed: config.feed || undefined, space: config.space || undefined },
+      (candles, dataType) => {
+        // This runs synchronously inside the WebSocket frame dispatch. A chart that throws is
+        // this channel's problem, and React's error boundary cannot see it — this is not a
+        // render error — so report it here, as a chart error on this card.
+        try {
+          chartRef.current?.push(candles, dataType)
+        } catch (error) {
+          setChartError(error instanceof Error ? error.message : String(error))
+        }
       }
-    })
-    return () => {
-      vm.setChartListener(null)
-      vm.stop()
-    }
-  }, [vm])
+    )
+  )
+  useSession(model.session)
 
-  const channelState = useVM(vm, (s) => s.channelState)
-  const subscription = useVM(vm, (s) => s.subscription)
-  const candleCount = useVM(vm, (s) => s.candleCount)
-  const channelId = useVM(vm, (s) => s.channelId)
-  const channelParameters = useVM(vm, (s) => s.channelParameters)
-  const errors = useVM(vm, (s) => s.errors)
+  const [symbol, setSymbol] = useState('AAPL{=d}')
+  const [fromTime, setFromTime] = useState('0')
+
+  const channelState = useAtomValue(model.channel.state)
+  const subscription = useAtomValue(model.subscription)
+  const candleCount = useAtomValue(model.candleCount)
+  const card = useChannelCard(model.channel)
+  const setSubscription = useAtomSet(model.setSubscription)
 
   const subscribe = () => {
     setChartError(null)
     chartRef.current?.reset()
-    vm.setSubscription(symbol.trim(), Number(fromTime) || 0)
+    setSubscription({ symbol: symbol.trim(), fromTime: Number(fromTime) || 0 })
   }
 
   return (
@@ -92,12 +84,8 @@ export const FeedChartChannel = ({ title, config }: FeedChartChannelProps) => {
       icon={<ShowChartIcon />}
       title={title}
       subtitle="Feed · candle chart"
-      onClose={vm.close}
       status={<StatusChip state={channelState} />}
-      channelId={channelId}
-      parameters={channelParameters}
-      errors={errors}
-      onClearErrors={vm.clearErrors}
+      {...card}
     >
       <Stack spacing={2}>
         <Box>

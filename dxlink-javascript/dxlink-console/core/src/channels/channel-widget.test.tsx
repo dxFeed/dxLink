@@ -80,15 +80,29 @@ describe('ChannelWidget', () => {
     expect(screen.queryByRole('button', { name: /error/ })).not.toBeInTheDocument()
   })
 
-  it('drops the body and the actions once closed, keeping a closed record', () => {
+  it('asks to close, and leaves showing it closed to whoever owns the channel', () => {
     const onClose = vi.fn()
-    renderWidget({ onClose, errors, channelId: 7 })
+    renderWidget({ onClose })
 
     fireEvent.click(screen.getByRole('button', { name: 'Close channel' }))
 
     expect(onClose).toHaveBeenCalledOnce()
+    // Closed is the model's to say: the card has not decided it on its own.
+    expect(screen.getByText('channel body')).toBeInTheDocument()
+  })
+
+  it('drops the body and the actions once closed, keeping a closed record', () => {
+    renderWidget({ closed: true, onClose: vi.fn(), errors, channelId: 7 })
+
     expect(screen.getByText('closed')).toBeInTheDocument()
     expect(screen.queryByText('channel body')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /error/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Close channel' })).not.toBeInTheDocument()
+  })
+
+  it('offers no close button when nothing would act on it', () => {
+    renderWidget()
+
+    expect(screen.queryByRole('button', { name: 'Close channel' })).not.toBeInTheDocument()
   })
 })

@@ -3,8 +3,8 @@ import type { DXLinkError } from '@dxfeed/dxlink-api'
 /**
  * A protocol error captured for display, stamped with the time it arrived.
  *
- * Used by both scopes: connection errors aggregate on the `ConnectionViewModel`,
- * channel errors stay on the channel VM that owns them.
+ * Used by both scopes: connection errors aggregate on the connection model, channel errors
+ * stay on the channel model that owns them.
  */
 export interface TimestampedError {
   /** Stable identity for React keys — errors are prepended, so an index is not stable. */

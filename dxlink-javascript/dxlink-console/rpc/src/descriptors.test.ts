@@ -4,16 +4,19 @@ import {
   FieldDescriptorProto_Type,
   FileDescriptorSetSchema,
 } from '@bufbuild/protobuf/wkt'
+import { Effect } from 'effect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createRequestTemplate,
+  DescriptorSetError,
   fetchDescriptorSet,
   formatMessage,
   isMethodSupported,
   listServices,
   parseDescriptorSet,
   parseRequest,
+  readDescriptorSet,
 } from './descriptors'
 
 const field = (
@@ -223,7 +226,7 @@ describe('fetchDescriptorSet', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(binary(), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await fetchDescriptorSet('/proto/docs')
+    await Effect.runPromise(fetchDescriptorSet('/proto/docs'))
 
     const accept = String(fetchMock.mock.calls[0]?.[1]?.headers?.Accept)
     expect(accept).toContain('application/protobuf')
@@ -236,7 +239,7 @@ describe('fetchDescriptorSet', () => {
     // protobuf-JSON still has to work.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(json(), { status: 200 })))
 
-    const registry = await fetchDescriptorSet('/proto/docs')
+    const registry = await Effect.runPromise(fetchDescriptorSet('/proto/docs'))
 
     expect(listServices(registry).map((s) => s.typeName)).toEqual([
       'demo.v1.AccountService',
@@ -250,14 +253,40 @@ describe('fetchDescriptorSet', () => {
       vi.fn().mockResolvedValue(new Response(null, { status: 404, statusText: 'Not Found' }))
     )
 
-    await expect(fetchDescriptorSet('/proto/docs')).rejects.toThrow('404')
+    const error = await Effect.runPromise(Effect.flip(fetchDescriptorSet('/proto/docs')))
+
+    expect(error).toBeInstanceOf(DescriptorSetError)
+    expect(error.message).toBe('404 Not Found')
   })
 
   it('explains an opaque network failure, keeping the original as the cause', async () => {
     const cause = new TypeError('Failed to fetch')
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(cause))
 
-    await expect(fetchDescriptorSet('http://elsewhere/proto/docs')).rejects.toThrow(/cross-origin/)
-    await expect(fetchDescriptorSet('http://elsewhere/proto/docs')).rejects.toMatchObject({ cause })
+    const error = await Effect.runPromise(
+      Effect.flip(fetchDescriptorSet('http://elsewhere/proto/docs'))
+    )
+
+    expect(error.message).toMatch(/cross-origin/)
+    expect(error.cause).toBe(cause)
+  })
+
+  it('reports a body that is not a descriptor set', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"file": 42}', { status: 200 })))
+
+    const error = await Effect.runPromise(Effect.flip(fetchDescriptorSet('/proto/docs')))
+
+    expect(error._tag).toBe('DescriptorSetError')
+    expect(error.message).not.toBe('')
+  })
+})
+
+describe('readDescriptorSet', () => {
+  it('reads a descriptor set picked from disk', async () => {
+    const file = new File([binary()], 'descriptors.binpb')
+
+    const registry = await Effect.runPromise(readDescriptorSet(file))
+
+    expect(listServices(registry)).toHaveLength(2)
   })
 })

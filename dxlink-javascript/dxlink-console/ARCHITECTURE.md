@@ -3,102 +3,165 @@
 Design for the `@dxfeed/dxlink-debug-console` rebuild. For how to validate a change see
 [CLAUDE.md](./CLAUDE.md); for what is still open see [README.md](./README.md).
 
-The app follows **MVVM**. There is **no global store** — only ViewModels, each owning a
-local Zustand vanilla store.
+The console follows **MVVM**, built on [Effect 4](https://effect.website). There is **no global
+store**: each dxLink object is wrapped in a _model_ — a bundle of atoms — and every atom's value
+lives in the page's own registry.
 
 ```
 VIEW         MUI + React components — declarative, dumb
-   │  binds slice ▲          calls command ▼
-VIEWMODEL    plain TS class — UI state (Zustand vanilla store) + commands; no JSX
-   │  wraps ▲                 calls ▼
-MODEL        @dxfeed/dxlink-api — DXLinkWebSocketClient, DXLinkFeed, … (listener API)
+   │  useAtomValue ▲          useAtomSet ▼          (@effect/atom-react)
+MODEL        atoms — state, commands, and one session (effect/reactivity)
+   │  scoped Effect ▲             acquires ▼
+DXLINK       @dxfeed/dxlink-api — DXLinkWebSocketClient, DXLinkFeed, … (listener API)
 ```
 
-## 1. ViewModels
+## 1. Models
 
-Every dxlink-api entity is wrapped in a **ViewModel** — a plain class that:
+Every dxlink-api entity is wrapped in a **model** — a plain object of atoms, made by a
+`make…Model` function:
 
-- owns the underlying dxlink-api instance **as a private field** (kept _off_ the store),
-- registers the model's `add*Listener` wiring **once** and maps it into store state,
-- holds UI state in a **per-VM Zustand vanilla store** (`createStore`),
-- exposes typed **commands** (`connect`, `configure`, `addSubscription`, `setAuthToken`, …),
-- **coalesces** high-frequency updates (throttle/rAF) before `set`,
-- has `dispose()` to remove listeners + close the model.
+- **state** is writable atoms (`Atom.make(initial)`), one per thing a view shows, so a view
+  re-renders only for the atoms it reads;
+- **commands** are write-only atoms (`command()` in `core/src/lib/model.ts`) that a view calls
+  through `useAtomSet`;
+- **one session** holds the dxLink object open: an atom whose value is computed by a **scoped
+  Effect**. Everything that Effect acquires — the dxLink object itself
+  (`Effect.acquireRelease`), its listeners (`on` / `onBatch`), the fibers that drain them
+  (`Effect.forkScoped`) — belongs to the atom's `Scope`, and is released with it.
 
-ViewModels:
+The session replaces the ViewModel's hand-written `start()` / `stop()` pair. Nothing has to be
+torn down in the mirror image of how it was set up: the scope closes in reverse order of
+acquisition, a listener is removed by the same `acquireRelease` that added it, and a fiber
+draining a stream is interrupted with the scope it was forked into.
 
-- **`ConnectionViewModel`** (page-scoped) — owns the `DXLinkWebSocketClient`; state:
-  `connection · auth · details · channels[] · errors[]`; commands: `connect / disconnect /
-reconnect / setAuthToken / openFeed / openDom / openCandles / openScript / closeChannel`.
-- **`FeedViewModel` / `DomViewModel` / `CandlesViewModel` / `IndiChartViewModel`** — one per
-  open channel; `CandlesViewModel` ports the `DXLinkCandles` flag/snapshot logic + `SortedList`,
-  `IndiChartViewModel` ports the `chart-wrapper.ts` `ChartHolder` logic.
+Models:
 
-Views bind through a single helper — no `useEffect` listener plumbing, no 260-line god component:
+- **`makeConnectionModel`** (page-scoped) — holds the `DXLinkWebSocketClient`; state:
+  `connection · auth · details · errors · sessionId · everAuthorized · client`; commands:
+  `connect / reconnect / disconnect / setAuthToken / clearErrors`.
+- **`makeFeedModel` / `makeDomModel` / `makeFeedCandlesModel` / `makeIndiChartModel` /
+  `makeRpcModel`** — one per open channel. Each carries a `ChannelAtoms` (`core/src/lib/channel.ts`):
+  the channel's state, id, parameters and errors, plus `closed` / `close` — what every card
+  header shows, bound in one line by `useChannelCard`. The card keeps no state of its own about
+  closing: `ChannelWidget` shows `closed` as the model holds it.
+
+The four models over a dxLink channel object (Feed, DOM, candles, IndiChart) hold it through
+`channelSession`, which does what they share — holds nothing once the channel is closed, opens
+and closes the object, follows its protocol channel for the card, keeps the card's atoms alive —
+so a model states only its own: which object to open, which extra atoms it writes, and how its
+listeners `wire` into them. RPC is a plain `session`: the transport opens its channel, so there
+is no object to hand over, and it fills only the card atoms a call has (parameters, errors).
+
+Views bind directly; there is no selector plumbing and no `useEffect` listener wiring:
 
 ```ts
-const useVM = (vm, selector) => useStore(vm.store, selector) // wraps useStore
-const connection = useVM(connectionVM, (s) => s.connection) // re-renders only on this slice
+const [model] = useState(() => makeFeedModel(client, params)) // pure: atoms only describe
+useSession(model.session) // holds the feed open while mounted
+const events = useAtomValue(model.events) // re-renders only on this atom
+const addSubscription = useAtomSet(model.addSubscription)
 ```
 
 ## 2. Ownership, lifecycle & scope (nothing global but the theme)
 
 ```
 main.tsx
-└── <ThemeProvider>                         ← GLOBAL (theme spans all routes) ✅
+└── <ThemeProvider>                         ← GLOBAL (theme spans all routes)
     └── <HashRouter>                        ← hash routing + Vite base:'' (sub-path/static hosting)
-        ├── "/"  <ConsolePage>
-        │     │  new ConnectionViewModel()    ← created & owned here (PAGE-SCOPED)
-        │     └── <VMProvider value={connectionVM}>   ← context scoped to this page only
-        │           ├── <ConnectionPanel>   useVM(vm, s => s.connection)
-        │           ├── <AuthPanel>         useVM(vm, s => s.auth)
-        │           └── <ChannelsArea>      useVM(vm, s => s.channels)
-        │                 └── <ChannelWidget vm={feedVM}>   useVM(feedVM, …)
-        └── "/protocol" <AsyncApiViewer>      ← independent, no VM
+        ├── "/"  <ConsolePage>              makeConnectionModel() ← created & owned here
+        │     └── <RegistryProvider>        ← the page's atom registry (PAGE-SCOPED)
+        │           └── <ConnectionProvider value={model}>   ← context scoped to this page;
+        │                 │                   useSession(model.session) holds the client
+        │                 ├── <ConnectionPanel>   useAtomValue(model.connection)
+        │                 ├── <AuthPanel>         useAtomValue(model.auth)
+        │                 └── <ChannelsArea>      open channels (React state)
+        │                       └── <FeedChannel>   makeFeedModel(client, …) · useSession
+        └── "/protocol" <AsyncApiViewer>      ← independent, no model
 ```
 
-- `ConnectionViewModel` lives for the Console page's mount lifetime; `dispose()` on unmount
-  closes the socket. The page provides it to its subtree via a small context (avoids
-  prop-drilling) — it is **not** mounted at the app root.
-- **StrictMode-safe construction/disposal (important):** never `new VM()` in render. Lazy-init
-  once — `const [vm] = useState(() => new ConnectionViewModel())` (or a `useRef` guard) — and
-  `dispose()` in a `useEffect` cleanup; make `dispose()` **idempotent** so React 19's
-  mount→unmount→remount double-invoke can't leak a second client. Same rule for channel VMs.
-- **Channel identity:** each channel VM gets a **synthetic client-side id at construction** for
-  React keys and `closeChannel(id)`. Do **not** key on `DXLinkChannel.id` — for IndiChart it is
-  `undefined` until a subscription is set. Channel VMs live in `ConnectionViewModel.channels[]`;
-  `openFeed()` constructs one (via the channel registry), `closeChannel(id)` calls its `dispose()`.
-- **Error scoping:** connection-level errors aggregate on `ConnectionViewModel.errors[]`;
-  **channel-level errors stay on their channel VM** (surfaced in the `ChannelWidget`), as today.
+- **The registry is the page's.** `ConsolePage` renders its own `RegistryProvider`, so every
+  atom the console reads lives and dies with the page — the client is closed when the page
+  unmounts, exactly as before — and a host's own registry, if it has one, is neither read nor
+  written. Two consoles on one page share nothing.
+- **Sessions follow the atom's lifetime.** A session is open while something observes its atom
+  (`useSession` does), and is released when nothing has for the registry's idle TTL, or when an
+  atom its Effect read changes — `channel.closed` for a channel, the connect request for the
+  connection — which closes it and opens the next.
+- **Sessions open on commit.** `useSession` subscribes from an effect, not while rendering, so a
+  render React discards — an interrupted concurrent render, a later hook that throws — puts
+  nothing on the wire. A model's atoms show their initial values for that first render.
+- **StrictMode-safe by construction.** Creating a model is pure — `useState(() => make…Model())`
+  may run twice, and the discarded copy never opened anything. React 19's mount → unmount →
+  remount happens before the registry releases an unobserved atom, so the remount finds the
+  session still open: one channel, never two. (The page's `IDLE_TTL` is margin on top of that.)
+- **A model's state outlives a closed session.** A session mounts the atoms it writes for as long
+  as it is open — the registry drops an atom nobody observes, and with it a value written while
+  no view was reading — and a closed channel keeps its last values for the card that shows it.
+- **Commands reach the dxLink object through `session.current()`**, which never opens one. A
+  command run with no session open updates its atoms and leaves the wire alone, which is what lets
+  a form be tested without a socket.
+- **Channel identity:** each open channel gets a **synthetic client-side id** from the channels
+  area, for React keys and the card title. Do **not** key on `DXLinkChannel.id` — for IndiChart it
+  is `undefined` until a subscription is set.
+- **Error scoping:** connection-level errors aggregate on the connection model's `errors`;
+  **channel-level errors stay on their channel model** (surfaced in the `ChannelWidget`). A
+  session that fails to open — a dxLink constructor that throws — is rethrown by `useSession`
+  during render, so the card's error boundary contains it.
 - **Connection params are not persisted** — the theme is the only thing that survives a
   reload. They come instead from the configuration profile (§7), which a host supplies and
-  the forms start from. **Tab-nav lifecycle (resolved): page-scoped** — navigating
-  `/`→`/protocol` unmounts the page and closes the socket (exact current behavior),
-  reconnect on return. An overlay/persist variant is a possible future UX change, not in scope.
+  the forms start from. **Tab-nav lifecycle: page-scoped** — navigating `/`→`/protocol`
+  unmounts the page and closes the socket, reconnect on return.
 
-## 3. Reactive data flow (one VM — same shape for all)
+## 3. Reactive data flow (one model — same shape for all)
 
 ```
             ┌──────────────── dxlink-api entity (e.g. DXLinkFeed) ────────────────┐
-            │  add*Listener(...)  ◀── wired ONCE inside the VM                     │
+            │  add*Listener(...)  ◀── registered in the session's own fiber        │
             └─────────────────────────────────────────────────────────────────────┘
                        │  events / state-change / config-change / errors
                        ▼
-        ┌──────────────────────── FeedViewModel ──────────────────────────┐
-        │  • maps model events → store.setState (immutable)                │
-        │  • COALESCES high-frequency events (rAF / throttle ~10–20fps)    │
-        │  • createStore() (Zustand vanilla) — local to this VM            │
-        │  commands: configure(), addSubscription(), removeSubscription()… │
-        └───────▲───────────────────────────────────────────┬─────────────┘
-                │ useVM(vm, selector) → useStore(vm.store, …) │ vm.command()
-                │ (re-renders only on the selected slice)     │
+        ┌──────────────────────── feed session (scoped Effect) ───────────┐
+        │  • on(feed, 'ConfigChange', …)  → registry.set(config, …)       │
+        │  • onBatch(feed, 'Event', …) → Atom.update(events, …)          │
+        │      once per 100 ms window, and only while events arrive       │
+        │  • trackChannel → channel state, id, parameters, errors         │
+        └───────▲─────────────────────────────────────────────┬───────────┘
+                │ useAtomValue(model.events)                   │ useAtomSet(model.addSubscription)
+                │ (re-renders only on that atom)               │ → session.current()?.addSubscriptions
         ┌───────┴─────────────────────────────────────────────▼─────────────┐
-        │  MUI views: <FeedEventsTable> (DataGrid),                          │
-        │             <FeedConfigForm> / <FeedSubscriptionForm> (RHF + zod)  │
+        │  MUI views: <EventsTable> (DataGrid), <ConfigurationSection>,       │
+        │             <SubscriptionManager>                                   │
         └─────────────────────────────────────────────────────────────────────┘
 ```
 
-The live dxlink objects stay as private VM fields; only UI state goes in the store.
+Two ways in from a listener, for two kinds of data:
+
+- **`on(target, name, f)`** — call `f` for each notification, for the scope's lifetime. For what
+  changes rarely (channel state, configuration) and should land at once.
+- **`onBatch(target, name, f, { latest? })`** — the same notifications gathered into windows,
+  for high-frequency data (feed events, DOM snapshots, RPC responses through `coalesce`, which it
+  is built on). The first notification after a quiet spell opens a window; everything arriving
+  within `FLUSH_INTERVAL` (100 ms) of it is written once, together (~10fps at most). The loop
+  waits on its queue, so **an idle channel runs no timer**; `latest: true` backs the queue with a
+  one-slot sliding queue, so a DOM window holds the snapshot that opened it and the newest one,
+  never the ones in between.
+
+Both register **in the session's own fiber**, never in a forked one. A Stream built with
+`Stream.callback` only registers once a forked consumer first pulls it — a scheduler tick later —
+and a channel can be answered within that tick: an OPENED state missed there is never sent again.
+`onBatch` therefore registers immediately and buffers into the queue its forked loop drains.
+(`Stream.groupedWithin` was the first choice here and was dropped: its schedule keeps firing
+every window while nothing arrives.)
+
+Neither lets a callback throw into the dxLink dispatch, which does not guard its listeners — a
+throw there would abort the frame for every other channel. Chart data is the exception to "state
+goes to atoms": a chart consumes batches in order through a ref, so the candle and IndiChart
+models hand them to a callback the view supplies, and the view reports a chart that throws as a
+chart error on that card.
+
+The RPC model takes its responses from an rxjs `Observable` rather than a listener, and feeds it
+to the same `coalesce` with its notifications as data — next, error and complete — so a failure
+travels through the same window, after every response that preceded it, instead of overtaking
+them.
 
 ## 4. Package layout
 
@@ -112,34 +175,35 @@ dxlink-javascript/dxlink-console/
 
   core/        @dxfeed/dxlink-console-core        no market-data anything
     src/index.ts                 # the public surface: page, plugin contract, host API, profile
-    console-page.tsx             # page-scoped ConnectionViewModel + providers; connection/auth/channels
-    view-model.ts                # ViewModel + useVM + useOwnedViewModel + createViewModelContext
+    console-page.tsx             # page registry + connection model + providers; connection/auth/channels
     channels/
       plugin.ts                  # ChannelPlugin contract + defineChannelPlugin (§8)
       types.ts                   # DraftChannel — { id, kind, config: unknown }
       channels-area.tsx          # registry-driven: add-buttons, request dialog, open channels
       channel-widget.tsx         # the collapsible card every channel body sits in
-    connection/                  # connection-view-model · connection-context · connection-panel
+    connection/                  # connection-model · connection-context · connection-panel
     auth/ · errors/
     components/                  # error-boundary
-    lib/                         # console-config(+context) · channel-errors · timestamped-error
+    lib/                         # model (session, on, onBatch, coalesce, command) · channel
+                                 # · console-config(+context)
+                                 # · timestamped-error
 
   market-data/ @dxfeed/dxlink-console-market-data   dxcharts-lite · x-data-grid
     src/index.ts                 # both plugins; subpaths below expose them one at a time
-    feed/       plugin.tsx · types.ts · feed-view-model · feed-candles-view-model · feed-channel
+    feed/       plugin.tsx · types.ts · feed-model · feed-candles-model · feed-channel
                 · feed-channel-request · feed-chart-channel · candle-chart · feed-configuration
                 · feed-subscriptions · feed-events-table · candles · sorted-list · event-types
-    dom/        plugin.tsx · types.ts · dom-view-model · dom-channel · dom-channel-request
+    dom/        plugin.tsx · types.ts · dom-model · dom-channel · dom-channel-request
     lib/        order-sources.ts · color-scheme.ts
     components/ doc-link.tsx     # see below: a plugin package carries its own UI helpers
 
   dxscript/    @dxfeed/dxlink-console-dxscript    @dxscript editor · @dxscript dxcharts-lite
-    src/       index.ts · plugin.tsx · types.ts · indichart-view-model · indichart-channel
+    src/       index.ts · plugin.tsx · types.ts · indichart-model · indichart-channel
                · indichart-channel-request · parameter-field · session-parameter-field
                · script-error · colors · session · doc-urls · color-scheme · doc-link
 
   rpc/         @dxfeed/dxlink-console-rpc          @bufbuild/protobuf · dxlink-protobuf-es
-    src/       index.ts · plugin.tsx · types.ts · rpc-view-model · rpc-channel
+    src/       index.ts · plugin.tsx · types.ts · rpc-model · rpc-channel
                · rpc-channel-request · descriptors.ts
 
   app/         @dxfeed/dxlink-debug-console        the app; composes all of the above
@@ -153,10 +217,12 @@ dxlink-javascript/dxlink-console/
 
 The four libraries are published; the app is not. Each library follows the same packaging as
 the rest of the workspace: a tsup build to `build/`, dual ESM/CJS behind a conditional
-`exports` map, and `files: ["/build", "/package.json"]`. React, MUI and emotion are
-**peer** dependencies, because each has to be one instance shared with the host — a second
-React breaks the hooks, a second MUI theme context leaves the console unstyled, a second
-emotion cache loses the styles.
+`exports` map, and `files: ["/build", "/package.json"]`. React, MUI, emotion, `effect` and
+`@effect/atom-react` are **peer** dependencies, because each has to be one instance shared
+with the host — a second React breaks the hooks, a second MUI theme context leaves the console
+unstyled, a second emotion cache loses the styles, and a second `@effect/atom-react` gives a
+channel package a registry context the page never provided, so its atoms would live outside
+the page that is meant to own them.
 
 The cost of that is paid in development: the app now consumes `build/`, not `src/`, so a
 `turbo run build` has to precede running it and a library edit needs a rebuild to appear.
@@ -179,8 +245,8 @@ declares a `ChannelPlugin` and `app/src/channels.ts` aggregates them, so `Channe
 renders channels without importing any of them. Adding a channel kind = a plugin + a line at
 the composition site. The one departure from the original sketch is the layer: the descriptor
 registers _UI_ per service (add-button, request form, channel body) rather than teaching
-`ConnectionViewModel` how to open channels, because each channel view model already opens its
-own channel off the client it is handed. §8 has the contract.
+the connection model how to open channels, because each channel model already opens its own
+channel off the client it is handed. §8 has the contract.
 
 **Core receives; it never reaches.** It reads no globals, no `import.meta.env`, no
 `localStorage`; it holds no hostname, and it names no channel service. Everything about how a
@@ -304,9 +370,11 @@ everything the area used to hardcode as a four-way switch:
 | `buildConfig(request)`          | request → channel config, or `null` when it cannot be opened   |
 | `Channel`                       | the opened channel, `{ title, config }`                        |
 
-Plugins reach the connection exactly as the channel components always have —
-`useConnectionVM()` for the view model, `useVM` to read its state. Those two are the whole
-host API; there is no plugin-specific context.
+Plugins reach the connection through `useConnection()` — or `useConnectionClient()` for the
+live client a channel model opens its channel on — and build their models from what
+`@dxfeed/dxlink-console-core` exports for it: `channelSession` (or `session`, for a channel the
+plugin does not hold an object for), `on`, `onBatch` / `coalesce`, `command`, and `makeChannelAtoms` /
+`useChannelCard` for the card. That is the whole host API; there is no plugin-specific context.
 
 `DraftChannel.config` is `unknown`. It was produced by the plugin named by `kind` and is only
 ever handed back to that same plugin, so no config type — and no config _dependency_ — needs
@@ -379,7 +447,8 @@ and read it — the dxScript editor's own light/dark prop, and the candle chart'
 — and neither is on the docs site's path, so this stays a channel-package problem rather than
 a blocker.
 
-> Sections 1–3, 5 and 6 above are the design written before the rebuild and have drifted from
-> the code in wording and in small details. §2's "nothing global but the theme" is one such
-> place — see §9, where the theme is no longer necessarily global. §4 describes the package
-> layout as it now stands, and §§7–9 were written against it.
+> Sections 5 and 6 above are the design written before the rebuild and have drifted from the
+> code in wording and in small details. §§1–3 were rewritten with the move to Effect and match
+> the code; §2's "nothing global but the theme" holds for state — see §9 for where the theme
+> is no longer necessarily global either. §4 describes the package layout as it now stands,
+> and §§7–9 were written against it.
