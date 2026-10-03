@@ -137,8 +137,8 @@ export const makeConnectionModel = (): ConnectionModel => {
           client.connect(current.url)
         } catch (error) {
           // `new WebSocket` throws on a URL it cannot parse — `localhost:8080`, a host with no
-          // scheme. That is a typo in the form, so it goes with the connection's errors; let it
-          // fail the session instead and `useSession` rethrows it over the whole page.
+          // scheme. That is a typo in the form, so it goes with the connection's errors rather
+          // than failing the session, which `useSession` would rethrow over the whole page.
           registry.update(errors, (list) =>
             prependError(list, {
               type: 'UNKNOWN',

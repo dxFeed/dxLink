@@ -260,6 +260,39 @@ describe('coalesce', () => {
     source.close()
   })
 
+  it('survives a handler that dies, reporting it and flushing the next window', async () => {
+    let push: (value: number) => void = () => undefined
+    const windows: number[][] = []
+    const scope = Effect.runSync(Scope.make())
+    const consoleError = console.error
+    const reported: unknown[] = []
+    console.error = (...args: unknown[]) => reported.push(args)
+
+    try {
+      Effect.runSync(
+        coalesce<number>(
+          (emit) =>
+            Effect.sync(() => {
+              push = emit
+            }),
+          (batch) =>
+            Effect.sync(() => {
+              if (batch.includes(1)) throw new Error('bad batch')
+              windows.push([...batch])
+            })
+        ).pipe(Scope.provide(scope))
+      )
+
+      push(1)
+      await waitFor(() => expect(reported).toHaveLength(1))
+      push(2)
+      await waitFor(() => expect(windows).toEqual([[2]]))
+    } finally {
+      console.error = consoleError
+      Effect.runSync(Scope.close(scope, Exit.void))
+    }
+  })
+
   it('stops with its scope, dropping a window still open', async () => {
     const source = coalesced()
 

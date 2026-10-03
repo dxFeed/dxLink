@@ -10,7 +10,7 @@ import {
 } from '@dxfeed/dxlink-console-core'
 import type { ChannelAtoms, Session } from '@dxfeed/dxlink-console-core'
 import { createDXLinkDynamicService } from '@dxfeed/dxlink-protobuf-es'
-import { Effect } from 'effect'
+import { Effect, Predicate } from 'effect'
 import type { Scope } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { AtomRegistry } from 'effect/reactivity/AtomRegistry'
@@ -56,11 +56,9 @@ const prepend = (
  */
 const toDXLinkError = (error: unknown): DXLinkError => {
   if (
-    typeof error === 'object' &&
-    error !== null &&
-    'type' in error &&
-    'message' in error &&
-    typeof (error as { message: unknown }).message === 'string'
+    Predicate.hasProperty(error, 'type') &&
+    Predicate.hasProperty(error, 'message') &&
+    Predicate.isString(error.message)
   ) {
     return error as DXLinkError
   }

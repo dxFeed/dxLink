@@ -109,7 +109,16 @@ export const coalesce = <A, R = never>(
       const opening = yield* Queue.takeAll(queue)
       yield* Effect.sleep(FLUSH_INTERVAL)
       const rest = yield* Queue.clear(queue)
-      yield* f([...opening, ...rest])
+      // A defect in `f` is reported and contained to this window, as `on` does for a listener:
+      // left to escape, it would end the loop silently — a forked fiber's failure goes nowhere —
+      // and the model would stop updating for good.
+      yield* f([...opening, ...rest]).pipe(
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.failCause(cause)
+            : Effect.sync(() => console.error('dxLink batch handler failed', Cause.squash(cause)))
+        )
+      )
     }).pipe(Effect.forever, Effect.forkScoped)
   })
 
