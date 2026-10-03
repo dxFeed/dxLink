@@ -32,8 +32,9 @@ follow the links in the file when required.
 If you need to learn more about particular Effect APIs and concepts that the guide doesn't cover,
 search through the source code in `node_modules/effect/src`.
 
-pnpm installs `effect` in each console package rather than at the workspace root, so both paths
-resolve inside one of them — for example `dxlink-console/core/node_modules/effect/AGENTS.md`.
+Both paths resolve from this directory: the workspace root lists `effect` as a dev dependency for
+exactly that, at the same version the console packages use. Keep the two ranges in step, so the
+guide you read is the Effect you are writing against.
 
 ## Development Commands
 
