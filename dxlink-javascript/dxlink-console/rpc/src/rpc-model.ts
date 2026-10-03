@@ -110,7 +110,20 @@ const notifications = (
     return Stream.fromQueue(queue)
   })
 
-type Update = <A>(atom: Atom.Writable<A>, f: (current: A) => A) => void
+/**
+ * What reads and writes atoms: the registry inside the session, a command's write context
+ * inside `send`. Both have this shape, so the helpers below take either.
+ */
+interface Atoms {
+  get<A>(atom: Atom.Atom<A>): A
+  set<R, W>(atom: Atom.Writable<R, W>, value: W): void
+}
+
+/** A call in flight: its responses, and for a bidirectional method the request stream. */
+interface Call {
+  readonly input: ReplaySubject<Record<string, unknown>> | null
+  readonly responses: Observable<Message>
+}
 
 /** One RPC call: a method of a protobuf service, bound to the connection. */
 export interface RpcModel {
@@ -146,25 +159,55 @@ export const makeRpcModel = (
   const responses = Atom.make<readonly RpcMessageEntry[]>([])
   const requests = Atom.make<readonly RpcMessageEntry[]>([])
 
-  // Written from the session (through the registry) and from `send` (through its write
-  // context), which share no interface for updating an atom — hence the function.
-  const fail = (update: Update, error: unknown) => {
-    update<RpcCallState>(callState, () => 'failed')
-    update(channel.errors, (errors) => prependError(errors, toDXLinkError(error)))
+  const fail = (atoms: Atoms, error: unknown) => {
+    atoms.set(callState, 'failed')
+    atoms.set(channel.errors, prependError(atoms.get(channel.errors), toDXLinkError(error)))
   }
 
   /** Put a request on the wire (or a unary call's one request, already sent) and log it. */
   const emit = (
-    update: Update,
+    atoms: Atoms,
     input: ReplaySubject<Record<string, unknown>> | null,
     message: Message
   ) => {
     try {
       input?.next(message as Record<string, unknown>)
-      update(requests, (sent) => prepend(sent, [entry(formatMessage(method.input, message))]))
+      atoms.set(
+        requests,
+        prepend(atoms.get(requests), [entry(formatMessage(method.input, message))])
+      )
     } catch (error) {
-      fail(update, error)
+      fail(atoms, error)
     }
+  }
+
+  /**
+   * Bind the descriptor and invoke the method. Both can throw — a method the wire cannot
+   * carry, a request the binding rejects.
+   */
+  const startCall = (): Call => {
+    const bound = createDXLinkDynamicService(client, service, {
+      // A descriptor chosen at runtime may declare methods the wire cannot carry; the picker
+      // never offers them, and the rest of the service stays callable.
+      skipUnsupportedMethods: true,
+      // A debug console wants the protocol traffic in the browser log.
+      logLevel: DXLinkLogLevel.DEBUG,
+    })
+    const invoke = bound[method.localName]
+    if (invoke === undefined) {
+      throw new Error(`${service.typeName} does not expose ${method.name}`)
+    }
+
+    if (method.methodKind === 'bidi_streaming') {
+      // `DxLinkRpcService` subscribes to the request stream only once the channel is OPENED, so
+      // values emitted before that would be dropped. A ReplaySubject holds them until then —
+      // and replays them if the channel re-opens after a drop.
+      const input = new ReplaySubject<Record<string, unknown>>()
+
+      return { input, responses: invoke(input) }
+    }
+
+    return { input: null, responses: invoke(request as Record<string, unknown>) }
   }
 
   const callSession = session({
@@ -176,44 +219,15 @@ export const makeRpcModel = (
 
       return Effect.gen(function* () {
         const registry = yield* AtomRegistry
-        const update: Update = (atom, f) => registry.update(atom, f)
 
-        // Binding the descriptor and making the call can both throw — a method the wire cannot
-        // carry, a request the binding rejects. Either is this call's failure, shown on its card.
-        const call = yield* Effect.try({
-          try: () => {
-            const bound = createDXLinkDynamicService(client, service, {
-              // A descriptor chosen at runtime may declare methods the wire cannot carry; the
-              // picker never offers them, and the rest of the service stays callable.
-              skipUnsupportedMethods: true,
-              // A debug console wants the protocol traffic in the browser log.
-              logLevel: DXLinkLogLevel.DEBUG,
-            })
-            const invoke = bound[method.localName]
-            if (invoke === undefined) {
-              throw new Error(`${service.typeName} does not expose ${method.name}`)
-            }
+        let call: Call
+        try {
+          call = startCall()
+        } catch (error) {
+          // This call's failure, shown on its card — not a session failure, which would take
+          // the card down with it.
+          fail(registry, error)
 
-            if (method.methodKind === 'bidi_streaming') {
-              // `DxLinkRpcService` subscribes to the request stream only once the channel is
-              // OPENED, so values emitted before that would be dropped. A ReplaySubject holds
-              // them until then — and replays them if the channel re-opens after a drop.
-              const input = new ReplaySubject<Record<string, unknown>>()
-
-              return { input, responses: invoke(input) }
-            }
-
-            return { input: null, responses: invoke(request as Record<string, unknown>) }
-          },
-          catch: (error) => error,
-        }).pipe(
-          Effect.catch((error) => {
-            fail(update, error)
-
-            return Effect.succeed(null)
-          })
-        )
-        if (call === null) {
           return null
         }
 
@@ -222,7 +236,7 @@ export const makeRpcModel = (
         if (input !== null) {
           yield* Effect.addFinalizer(() => Effect.sync(() => input.complete()))
         }
-        emit(update, input, request)
+        emit(registry, input, request)
 
         yield* received.pipe(
           Stream.groupedWithin(Number.POSITIVE_INFINITY, FLUSH_INTERVAL),
@@ -234,16 +248,16 @@ export const makeRpcModel = (
                   try {
                     added.unshift(entry(formatMessage(method.output, notification.message)))
                   } catch (error) {
-                    fail(update, error)
+                    fail(registry, error)
                   }
                 } else if (notification._tag === 'Error') {
-                  fail(update, notification.error)
+                  fail(registry, notification.error)
                 } else {
                   registry.set(callState, 'completed')
                 }
               }
               if (added.length > 0) {
-                update(responses, (current) => prepend(current, added))
+                registry.set(responses, prepend(registry.get(responses), added))
               }
             })
           ),
@@ -262,9 +276,10 @@ export const makeRpcModel = (
     responses,
     requests,
     send: command((ctx, message: Message) => {
+      // Only a bidirectional call holds a request stream; any other holds `null`.
       const input = callSession.current()
       if (input === null || input === undefined) return
-      emit((atom, f) => ctx.set(atom, f(ctx.get(atom))), input, message)
+      emit(ctx, input, message)
     }),
   }
 }
