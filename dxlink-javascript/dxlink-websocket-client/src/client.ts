@@ -45,6 +45,23 @@ const DXLWS_SCHEDULER_KEY_AUTH_STATE_TIMEOUT = 'DXLWS_AUTH_STATE_TIMEOUT'
 const DXLWS_SCHEDULER_KEY_TIMEOUT = 'DXLWS_TIMEOUT'
 const DXLWS_SCHEDULER_KEY_KEEPALIVE = 'DXLWS_KEEPALIVE'
 
+/**
+ * Delay before the first reconnect attempt. It doubles with each further attempt.
+ */
+const RECONNECT_BASE_DELAY_MS = 1000
+
+/**
+ * Removes credentials, query and fragment from the URL, so that it can be logged.
+ */
+const toLoggableUrl = (url: string): string => {
+  try {
+    const { protocol, host, pathname } = new URL(url)
+    return `${protocol}//${host}${pathname}`
+  } catch {
+    return url.split(/[?#]/)[0] ?? url
+  }
+}
+
 const DEFAULT_CONNECTION_DETAILS: DXLinkConnectionDetails = {
   protocolVersion: DXLINK_WS_PROTOCOL_VERSION,
   clientVersion: CLIENT_VERSION,
@@ -92,6 +109,11 @@ export class DXLinkWebSocketClient implements DXLinkClient {
    */
   private reconnectAttempts = 0
 
+  /**
+   * Last connection-level error, reported when the client stops connecting.
+   */
+  private lastError: DXLinkError | undefined
+
   // Channels
   private globalChannelId = 1
   private readonly channels = new Map<number, DXLinkWebSocketChannel>()
@@ -108,6 +130,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
       actionTimeout: 10,
       logLevel: DXLinkLogLevel.WARN,
       maxReconnectAttempts: -1,
+      maxReconnectDelay: 30,
       connectorFactory: (url) => new DefaultDXLinkWebSocketConnector(url),
       ...config,
     }
@@ -140,22 +163,21 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
   reconnect = () => {
     if (
-      this.config.maxReconnectAttempts >= 0 &&
-      this.reconnectAttempts >= this.config.maxReconnectAttempts
-    ) {
-      this.logger.warn('Max reconnect attempts reached')
-
-      this.disconnect()
-      return
-    }
-
-    if (
       this.connectionState === DXLinkConnectionState.NOT_CONNECTED ||
       this.connector === undefined
     )
       return
 
-    this.logger.debug('Trying to reconnect', this.connector.getUrl())
+    if (
+      this.config.maxReconnectAttempts >= 0 &&
+      this.reconnectAttempts >= this.config.maxReconnectAttempts
+    ) {
+      this.stopConnecting({
+        type: this.lastError?.type ?? 'UNKNOWN',
+        message: this.withLastError('Max reconnect attempts reached'),
+      })
+      return
+    }
 
     this.connector.stop()
 
@@ -184,6 +206,9 @@ export class DXLinkWebSocketClient implements DXLinkClient {
       channel.processStatusRequested()
     }
 
+    const delay = this.getReconnectDelay(this.reconnectAttempts)
+    this.logger.debug('Trying to reconnect to', this.getLoggableUrl(), 'in', delay, 'ms')
+
     // Schedule reconnect attempt after some time
     // Additionally, task will be executed in case when tab is active again
     // coz browser sometimes doesn't run scheduled tasks when tab is inactive
@@ -194,7 +219,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
         // Start new connection attempt
         this.connector.start()
       },
-      this.reconnectAttempts * 1000,
+      delay,
       DXLWS_SCHEDULER_KEY_RECONNECT
     )
   }
@@ -217,6 +242,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     this.lastSentMillis = 0
     this.isFirstAuthState = true
     this.reconnectAttempts = 0
+    this.lastError = undefined
 
     this.setConnectionState(DXLinkConnectionState.NOT_CONNECTED)
     this.setAuthState(DXLinkAuthState.UNAUTHORIZED)
@@ -378,7 +404,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
       return channel.processPayloadMessage(message)
     }
 
-    this.logger.warn('Unhandeled message', message.type)
+    this.logger.warn('Unhandled message', message.type)
   }
 
   private processSetupMessage = (serverSetup: SetupMessage): void => {
@@ -397,8 +423,9 @@ export class DXLinkWebSocketClient implements DXLinkClient {
         serverKeepaliveTimeout: serverSetup.keepaliveTimeout,
       }
 
-      // Reset reconnect attempts counter after successful connection
+      // Reset reconnect attempts counter and last error after successful connection
       this.reconnectAttempts = 0
+      this.lastError = undefined
 
       if (this.lastSettedAuthToken === undefined) {
         this.setConnectionState(DXLinkConnectionState.CONNECTED)
@@ -417,8 +444,13 @@ export class DXLinkWebSocketClient implements DXLinkClient {
   private publishError = (error: DXLinkError): void => {
     this.logger.debug('Publishing error', error)
 
+    this.lastError = error
+
     if (this.errorListeners.size === 0) {
-      this.logger.error('Unhandled dxLink error', error)
+      // Details go into the text: log pipelines that stringify arguments print an object as [object Object]
+      this.logger.error(
+        `Unhandled dxLink error (${this.getLoggableUrl()}): ${error.type}: ${error.message}`
+      )
       return
     }
 
@@ -544,28 +576,82 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
   /**
    *  Process transport close event from connector.
-   *  After transport is closed by server:
-   * - reconnect if connection is authorized
-   * - disconnect if connection is not authorized
+   *  After transport is closed:
+   * - disconnect if the server has refused authorization on this connection
+   * - reconnect otherwise, including when the connection failed before the server answered
    */
-  private processTransportClose = (reason: string, error: boolean): void => {
-    this.logger.debug('Connection closed', reason)
+  private processTransportClose = (reason: string, error: boolean, code?: number): void => {
+    this.logger.debug('Connection closed', reason, code)
 
-    if (error !== undefined) {
+    if (error) {
+      const details = code !== undefined ? ` (code ${code})` : ''
       this.publishError({
         type: 'UNKNOWN',
-        message: reason,
+        message: `${reason || 'Connection closed'}${details}`,
       })
     }
 
-    if (this.authState === DXLinkAuthState.UNAUTHORIZED) {
-      this.lastSettedAuthToken = undefined
-      this.disconnect()
+    if (this.isAuthorizationRefused()) {
+      this.stopConnecting({
+        type: 'UNAUTHORIZED',
+        message: this.withLastError('Authorization refused by the server'),
+      })
       return
     }
 
     this.reconnect()
   }
+
+  /**
+   * Checks if the server has refused authorization on the current connection.
+   * It has, when it answered with AUTH_STATE and the client has no token left to offer:
+   * the server rejected the token, or no token was set while the server requires one.
+   * A connection that failed before the server answered is a transport failure and is retried.
+   */
+  private isAuthorizationRefused = (): boolean =>
+    !this.isFirstAuthState &&
+    this.authState === DXLinkAuthState.UNAUTHORIZED &&
+    this.lastSettedAuthToken === undefined
+
+  /**
+   * Stops connecting after a failure that reconnecting does not fix.
+   * Channels still waiting to open receive the error, so that services do not wait for them forever.
+   * They stay requested and are opened by the next successful {@link DXLinkWebSocketClient.connect}.
+   */
+  private stopConnecting = (error: DXLinkError): void => {
+    this.logger.warn(
+      `Stopped connecting to ${this.getLoggableUrl()}: ${error.type}: ${error.message}`
+    )
+
+    const waitingChannels = [...this.channels.values()].filter(
+      (channel) => channel.getState() === DXLinkChannelState.REQUESTED
+    )
+
+    this.disconnect()
+
+    for (const channel of waitingChannels) {
+      channel.processError(error)
+    }
+  }
+
+  private withLastError = (message: string): string =>
+    this.lastError !== undefined ? `${message}. Last error: ${this.lastError.message}` : message
+
+  /**
+   * Returns the delay before the given reconnect attempt: exponential backoff up to
+   * {@link DXLinkWebSocketClientConfig.maxReconnectDelay}, randomized between half and full value.
+   */
+  private getReconnectDelay = (attempt: number): number => {
+    const delay = Math.min(
+      this.config.maxReconnectDelay * 1000,
+      RECONNECT_BASE_DELAY_MS * 2 ** (attempt - 1)
+    )
+
+    return Math.round(delay / 2 + (Math.random() * delay) / 2)
+  }
+
+  private getLoggableUrl = (): string =>
+    this.connector !== undefined ? toLoggableUrl(this.connector.getUrl()) : 'no endpoint'
 
   private timeoutCheck = (timeoutMills: number) => {
     const now = Date.now()

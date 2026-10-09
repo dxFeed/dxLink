@@ -90,15 +90,17 @@ Keepalive messages are handled automatically and are not exposed in the public A
 
 The client automatically attempts to reconnect when the WebSocket connection is closed unexpectedly. Reconnection occurs when:
 
-- The WebSocket transport closes and the client was previously authorized
+- The WebSocket transport closes, including when the connection failed before it opened or before the server answered authorization
 - A keepalive timeout is detected
 - A connection error occurs
 
 Reconnection does not occur if:
 
-- The client was not authorized (UNAUTHORIZED state) - in this case, the client disconnects completely
+- The server refused authorization on the connection: it answered with AUTH_STATE `UNAUTHORIZED` and the client has no token left to offer, because the server rejected the token or because no token was set while the server requires one. In this case, the client disconnects completely
 - `disconnect()` was called explicitly
 - Maximum reconnect attempts have been reached (if configured)
+
+When the client stops reconnecting for one of the first or last reasons, it publishes the error to the channels that are still waiting to open (`REQUESTED` state), so that services such as `DXLinkFeed` do not wait for them forever. The channels stay requested and open after the next successful `connect()`.
 
 **Reconnection process**:
 
@@ -107,7 +109,7 @@ Reconnection does not occur if:
 3. Connection details are reset to defaults
 4. Connection state transitions to `CONNECTING`
 5. All active channels (not closed) transition to `REQUESTED` state
-6. After a delay (based on reconnect attempt count: `attemptNumber * 1000ms`), a new connection attempt is made
+6. After a delay, a new connection attempt is made. The delay starts at 1 second and doubles with each attempt up to `maxReconnectDelay` (30 seconds by default). Each delay is randomized between half and full value, so that clients do not reconnect in lockstep
 7. Once reconnected, all previously opened channels are automatically re-requested
 
 The reconnect attempt counter is reset to 0 after a successful connection is established.
@@ -457,7 +459,9 @@ The client uses standardized error types:
 Errors are reported through error listeners:
 
 - **Client-level errors**: Registered via `addErrorListener()` on the client instance. These handle connection-level errors and protocol errors.
-- **Channel-level errors**: Registered via `addErrorListener()` on channel instances. These handle service-specific errors.
+- **Channel-level errors**: Registered via `addErrorListener()` on channel instances. These handle service-specific errors, and the error the client publishes when it stops connecting while the channel is waiting to open.
+
+A transport failure is published as an `UNKNOWN` error with the WebSocket close code, for example `Unable to connect (code 1006)` when the connection failed before it opened. Browsers do not expose why a WebSocket failed to connect (network error, rejected handshake, blocked by Content Security Policy), so the browser console is the place to look for the cause. A clean close (codes 1000, 1001 and 1005) is not an error.
 
 When an error occurs:
 
@@ -470,7 +474,7 @@ When an error occurs:
 
 If no error listeners are registered when an error occurs:
 
-- The error is logged at ERROR level
+- The error is logged at ERROR level, with its type and message in the log text and, for client-level errors, the endpoint URL without credentials, query and fragment
 - The error is not propagated to application code
 - The client continues operating normally
 
@@ -504,6 +508,7 @@ The client can be configured via `DXLinkWebSocketClientConfig` passed to the con
 - **actionTimeout**: Timeout (in seconds) for protocol actions requiring server response (SETUP, AUTH_STATE). Default: 10 seconds.
 - **logLevel**: Logging level for internal logger. Default: WARN.
 - **maxReconnectAttempts**: Maximum reconnection attempts. `-1` means unlimited (default). `0` or positive number limits attempts.
+- **maxReconnectDelay**: Maximum delay (in seconds) between reconnection attempts. Default: 30 seconds.
 - **connectorFactory**: Factory function to create custom WebSocket connectors. Default: Creates `DefaultDXLinkWebSocketConnector`.
 
 All configuration options are optional. If not provided, defaults are used.

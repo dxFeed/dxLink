@@ -125,7 +125,7 @@ export class DXLinkWebSocketChannel implements DXLinkChannel {
 
   processError = (error: DXLinkError) => {
     if (this.errorListeners.size === 0) {
-      this.logger.error(`Unhandled error in channel#${this.id}: `, error)
+      this.logger.error(`Unhandled error in channel#${this.id}: ${error.type}: ${error.message}`)
       return
     }
 
