@@ -448,14 +448,22 @@ Errors can originate from several sources:
 
 ### Error Types
 
-The client uses standardized error types:
+The error type is a category that tells where an error comes from, and so where to look first. The message has the details.
 
-- **UNKNOWN**: Generic error that doesn't fit other categories
-- **UNSUPPORTED_PROTOCOL**: Server doesn't support the client's protocol version
-- **TIMEOUT**: Expected message not received within timeout period
-- **UNAUTHORIZED**: Authentication failed or authorization required
-- **INVALID_MESSAGE**: Message format is invalid or cannot be parsed
-- **BAD_ACTION**: Protocol violation detected
+| Type                   | Source           | Meaning                                                                                                                                                                                          | Check first                                     |
+| ---------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `CONNECT_FAILED`       | client           | The connection could not be established: it did not open (network, DNS, TLS, proxy, Content Security Policy, invalid URL, handshake refused by the server) or it closed before it was authorized | The environment of the client, the endpoint URL |
+| `CONNECTION_LOST`      | client           | An established (authorized) connection closed unexpectedly: an abnormal close, a server restart, or a server close with a reason                                                                 | Network stability, server restarts              |
+| `TIMEOUT`              | client or server | An expected message did not arrive in time: SETUP, AUTH_STATE or keepalive                                                                                                                       | Network latency, server load                    |
+| `UNAUTHORIZED`         | server or client | Authorization was refused or expired, or is required and no token is set                                                                                                                         | The token and its entitlements                  |
+| `UNSUPPORTED_PROTOCOL` | server           | The protocol versions of the client and the server do not match                                                                                                                                  | The library version                             |
+| `INVALID_MESSAGE`      | server           | The server could not parse a message from the client                                                                                                                                             | Application code, library version               |
+| `BAD_ACTION`           | server           | A message from the client violates the protocol                                                                                                                                                  | Application code, library version               |
+| `UNKNOWN`              | server           | An unexpected error on the server. The client never reports its own failures as `UNKNOWN`                                                                                                        | Report it to dxFeed with the message            |
+
+`CONNECT_FAILED` and `CONNECTION_LOST` are detected by the client and never sent to the server: a channel can only send the protocol types (`DXLinkProtocolErrorType`). A connection counts as established once the server has authorized it, so a connection that opened and closed during setup is `CONNECT_FAILED`.
+
+Errors caused by a closed connection carry its WebSocket close code in `closeCode`. The error the client stops connecting with is marked `final: true`; the client does not reconnect until `connect()` is called again.
 
 ### Error Propagation
 
@@ -464,7 +472,7 @@ Errors are reported through error listeners:
 - **Client-level errors**: Registered via `addErrorListener()` on the client instance. These handle connection-level errors and protocol errors.
 - **Channel-level errors**: Registered via `addErrorListener()` on channel instances. These handle service-specific errors, and the error the client publishes when it stops connecting while the channel is waiting to open.
 
-A transport failure is published as an `UNKNOWN` error with the WebSocket close code, for example `Unable to connect (code 1006)` when the connection failed before it opened. Browsers do not expose why a WebSocket failed to connect (network error, rejected handshake, blocked by Content Security Policy), so the browser console is the place to look for the cause. A clean close (codes 1000, 1001 and 1005) of an authorized connection without a reason is routine and not reported. A clean close before authorization, or with a reason, is reported.
+A transport failure is published as a `CONNECT_FAILED` or `CONNECTION_LOST` error with the WebSocket close code, for example `CONNECT_FAILED: Unable to connect (code 1006)` when the connection failed before it opened. If the runtime refuses to open the connection at all, e.g. `ws://` from an https page or an invalid URL, the client stops with a final `CONNECT_FAILED` error, since another attempt would be refused the same way. Browsers do not expose why a WebSocket failed to connect (network error, rejected handshake, blocked by Content Security Policy), so the browser console is the place to look for the cause. A clean close (codes 1000, 1001 and 1005) of an authorized connection without a reason is routine and not reported. A clean close before authorization, or with a reason, is reported.
 
 When an error occurs:
 

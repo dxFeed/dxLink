@@ -8,6 +8,7 @@ import {
   type DXLinkErrorListener,
   type DXLinkChannelMessage,
   type DXLinkError,
+  type DXLinkProtocolErrorType,
 } from '@dxfeed/dxlink-core'
 
 import { type DXLinkWebSocketClientConfig } from './config'
@@ -64,7 +65,8 @@ export class DXLinkWebSocketChannel implements DXLinkChannel {
   addErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.add(listener)
   removeErrorListener = (listener: DXLinkErrorListener) => this.errorListeners.delete(listener)
 
-  error = ({ type, message }: DXLinkError) =>
+  // Only protocol error types go on the wire; the types the client detects itself stay local
+  error = ({ type, message }: DXLinkError & { type: DXLinkProtocolErrorType }) =>
     this.send({
       type: 'ERROR',
       error: type,
