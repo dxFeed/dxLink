@@ -1,4 +1,6 @@
 import {
+  DXLinkAuthState,
+  DXLinkChannelState,
   DXLinkConnectionState,
   type DXLinkError,
   DXLinkLogLevel,
@@ -193,6 +195,88 @@ describe('connection failure before authorization', () => {
     ])
   })
 
+  test('stops and keeps the reason when the server refuses the token with an error', () => {
+    const { client, scheduler, errors, connector } = setup()
+    const { errors: channelErrors } = openWaitingChannel(client)
+    client.setAuthToken('token')
+    client.connect(URL)
+
+    connector().handshake('UNAUTHORIZED')
+    connector().receive({
+      type: 'ERROR',
+      channel: 0,
+      error: 'UNAUTHORIZED',
+      message: 'Token expired',
+    })
+    connector().close('', true, 1006)
+
+    const refusal = {
+      type: 'UNAUTHORIZED',
+      message: 'Authorization refused by the server: Token expired',
+    }
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
+    expect(scheduler.has(RECONNECT_KEY)).toBe(false)
+    expect(channelErrors).toEqual([refusal])
+    expect(errors[errors.length - 1]).toEqual(refusal)
+  })
+
+  test('stops when the token is rejected even if a listener sets it again', () => {
+    const { client, scheduler, connector } = setup()
+    client.setAuthToken('token')
+    client.addAuthStateChangeListener((state) => {
+      if (state === DXLinkAuthState.UNAUTHORIZED) client.setAuthToken('token')
+    })
+    client.connect(URL)
+
+    connector().handshake('UNAUTHORIZED')
+    connector().receive({ type: 'AUTH_STATE', channel: 0, state: 'UNAUTHORIZED' })
+    connector().close('', false, 1000)
+
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
+    expect(scheduler.has(RECONNECT_KEY)).toBe(false)
+  })
+
+  test('stops when the server rejects the protocol', () => {
+    const { client, scheduler, errors, connector } = setup()
+    client.connect(URL)
+
+    connector().open()
+    connector().receive({
+      type: 'ERROR',
+      channel: 0,
+      error: 'UNSUPPORTED_PROTOCOL',
+      message: 'Unsupported protocol version',
+    })
+    connector().close('', false, 1000)
+
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
+    expect(scheduler.has(RECONNECT_KEY)).toBe(false)
+    expect(errors[errors.length - 1]).toEqual({
+      type: 'UNSUPPORTED_PROTOCOL',
+      message: 'Unsupported protocol version',
+    })
+  })
+
+  test('backs off and counts attempts that fail after SETUP', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(1)
+    const { client, scheduler, connector } = setup({ maxReconnectAttempts: 3 })
+    client.setAuthToken('token')
+    client.connect(URL)
+
+    const delays: (number | undefined)[] = []
+    for (let i = 0; i < 3; i++) {
+      connector().handshake('UNAUTHORIZED')
+      connector().close('', true, 1006)
+      delays.push(scheduler.timeoutOf(RECONNECT_KEY))
+      scheduler.run(RECONNECT_KEY)
+    }
+    connector().handshake('UNAUTHORIZED')
+    connector().close('', true, 1006)
+
+    expect(delays).toEqual([1000, 2000, 4000])
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
+  })
+
   test('stops when the server requires a token and none is set', () => {
     const { client, scheduler, connector } = setup()
     client.connect(URL)
@@ -202,6 +286,30 @@ describe('connection failure before authorization', () => {
 
     expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
     expect(scheduler.has(RECONNECT_KEY)).toBe(false)
+  })
+
+  test('retries when the connection drops before a token is set', () => {
+    const { client, scheduler, connector } = setup()
+    client.connect(URL)
+
+    connector().handshake('UNAUTHORIZED')
+    connector().close('Service Restart', true, 1012)
+
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.CONNECTING)
+    expect(scheduler.has(RECONNECT_KEY)).toBe(true)
+  })
+
+  test('a channel opened without reconnect gets the error before it is closed', () => {
+    const { client, connector } = setup()
+    const channel = client.openChannel('RPC', {}, { reconnect: false })
+    const events: string[] = []
+    channel.addErrorListener((error) => events.push(`error: ${error.message}`))
+    channel.addStateChangeListener((state) => events.push(`state: ${state}`))
+    client.connect(URL)
+
+    connector().close('Unable to connect', true, 1006)
+
+    expect(events).toEqual(['error: Unable to connect (code 1006)', 'state: CLOSED'])
   })
 })
 
@@ -237,6 +345,26 @@ describe('transport close', () => {
 
     expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Server restart (code 1012)' }])
   })
+
+  test('a clean close before authorization is reported', () => {
+    const { client, errors, connector } = setup()
+    client.connect(URL)
+    connector().open()
+
+    connector().close('', false, 1001)
+
+    expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Connection closed (code 1001)' }])
+  })
+
+  test('a clean close with a reason is reported', () => {
+    const { client, errors, connector } = setup()
+    client.connect(URL)
+    connector().handshake('AUTHORIZED')
+
+    connector().close('Limit Violation', false, 1000)
+
+    expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Limit Violation (code 1000)' }])
+  })
 })
 
 describe('reconnect backoff', () => {
@@ -270,11 +398,27 @@ describe('reconnect backoff', () => {
 
     expect(collectDelays(4, { maxReconnectDelay: 3 })).toEqual([1000, 2000, 3000, 3000])
   })
+
+  test.each([undefined, Number.NaN, 0, -1])('an invalid cap %s falls back to 30 seconds', (cap) => {
+    vi.spyOn(Math, 'random').mockReturnValue(1)
+
+    expect(collectDelays(7, { maxReconnectDelay: cap as number })).toEqual([
+      1000, 2000, 4000, 8000, 16000, 30000, 30000,
+    ])
+  })
+
+  test('the delay stays within the timer limit', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(1)
+
+    const delays = collectDelays(40, { maxReconnectDelay: Infinity }) as number[]
+
+    expect(Math.max(...delays)).toBe(2 ** 31 - 1)
+  })
 })
 
 describe('max reconnect attempts', () => {
-  test('stops and tells waiting channels with the last error', () => {
-    const { client, scheduler, connector } = setup({ maxReconnectAttempts: 2 })
+  test('stops and tells client listeners and waiting channels with the last error', () => {
+    const { client, scheduler, errors, connector } = setup({ maxReconnectAttempts: 2 })
     const { errors: channelErrors } = openWaitingChannel(client)
     client.connect(URL)
 
@@ -284,27 +428,86 @@ describe('max reconnect attempts', () => {
     scheduler.run(RECONNECT_KEY)
     connector().close('Unable to connect', true, 1006)
 
+    const stop = {
+      type: 'UNKNOWN',
+      message: 'Max reconnect attempts reached. Last error: Unable to connect (code 1006)',
+    }
     expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
     expect(scheduler.has(RECONNECT_KEY)).toBe(false)
-    expect(channelErrors).toEqual([
-      {
-        type: 'UNKNOWN',
-        message: 'Max reconnect attempts reached. Last error: Unable to connect (code 1006)',
-      },
-    ])
+    expect(channelErrors).toEqual([stop])
+    expect(errors[errors.length - 1]).toEqual(stop)
   })
 
-  test('opened channels are not told, they are re-requested on the next connect', () => {
+  test('opened channels are told, and re-requested on the next connect', () => {
     const { client, connector } = setup({ maxReconnectAttempts: 0 })
     client.connect(URL)
     connector().handshake('AUTHORIZED')
     const { channel, errors: channelErrors } = openWaitingChannel(client)
+    const oneShot = client.openChannel('RPC', {}, { reconnect: false })
     connector().receive({ type: 'CHANNEL_OPENED', channel: channel.id, service: 'FEED' })
+    connector().receive({ type: 'CHANNEL_OPENED', channel: oneShot.id, service: 'RPC' })
 
     connector().close('', true, 1006)
 
     expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
+    expect(channelErrors).toEqual([
+      {
+        type: 'UNKNOWN',
+        message: 'Max reconnect attempts reached. Last error: Connection closed (code 1006)',
+      },
+    ])
+    expect(channel.getState()).toBe(DXLinkChannelState.REQUESTED)
+    expect(oneShot.getState()).toBe(DXLinkChannelState.CLOSED)
+  })
+
+  test('a protocol error is not given as the reason to stop', () => {
+    const { client, connector } = setup({ maxReconnectAttempts: 0 })
+    client.connect(URL)
+    connector().handshake('AUTHORIZED')
+    const { errors: channelErrors } = openWaitingChannel(client)
+
+    connector().receive({
+      type: 'ERROR',
+      channel: 0,
+      error: 'BAD_ACTION',
+      message: 'Unknown message type',
+    })
+    connector().close('', false, 1000)
+
+    expect(channelErrors).toEqual([{ type: 'UNKNOWN', message: 'Max reconnect attempts reached' }])
+  })
+
+  test('a channel closed by its error listener leaves no timers behind', () => {
+    const { client, scheduler, connector } = setup({ maxReconnectAttempts: 0 })
+    const channel = client.openChannel('FEED', { contract: 'AUTO' })
+    channel.addErrorListener(() => channel.close())
+    client.connect(URL)
+
+    connector().close('Unable to connect', true, 1006)
+
+    expect(channel.getState()).toBe(DXLinkChannelState.CLOSED)
+    expect([...scheduler.tasks.keys()]).toEqual([])
+  })
+
+  test('a listener that connects again keeps the channels', () => {
+    const { client, connector } = setup({ maxReconnectAttempts: 0 })
+    const { channel, errors: channelErrors } = openWaitingChannel(client)
+    client.addConnectionStateChangeListener((state) => {
+      if (state === DXLinkConnectionState.NOT_CONNECTED) client.connect('wss://backup.test/dxlink')
+    })
+    client.connect(URL)
+
+    connector().close('Unable to connect', true, 1006)
+
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.CONNECTING)
     expect(channelErrors).toEqual([])
+
+    connector().handshake('AUTHORIZED')
+
+    expect(connector().getUrl()).toBe('wss://backup.test/dxlink')
+    expect(connector().sent).toContainEqual(
+      expect.objectContaining({ type: 'CHANNEL_REQUEST', channel: channel.id })
+    )
   })
 })
 
@@ -324,6 +527,23 @@ describe('logging', () => {
     expect(consoleError).toHaveBeenCalledTimes(1)
     expect(consoleError.mock.calls[0]).toEqual([
       '[DXLinkWebSocketClient] Unhandled dxLink error (wss://example.test/dxlink): UNKNOWN: Unable to connect (code 1006)',
+    ])
+  })
+
+  test('logs a URL that cannot be parsed without credentials and query', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const scheduler = new FakeScheduler()
+    let connector: FakeConnector | undefined
+    const client = new DXLinkWebSocketClient({
+      scheduler,
+      connectorFactory: (url) => (connector = new FakeConnector(url)),
+    })
+
+    client.connect('//user:secret@example.test/dxlink?token=secret')
+    connector?.close('Unable to connect', true, 1006)
+
+    expect(consoleError.mock.calls[0]).toEqual([
+      '[DXLinkWebSocketClient] Unhandled dxLink error (//example.test/dxlink): UNKNOWN: Unable to connect (code 1006)',
     ])
   })
 

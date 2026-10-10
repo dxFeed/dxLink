@@ -636,7 +636,8 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
       return
     }
 
-    for (const listener of this.errorListeners) {
+    // A copy: a listener may close the feed, which clears the listeners
+    for (const listener of [...this.errorListeners]) {
       try {
         listener(error)
       } catch (e) {

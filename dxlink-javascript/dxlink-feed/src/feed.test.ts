@@ -163,6 +163,18 @@ describe('DXLinkFeed errors', () => {
     expect(errors).toEqual([UNABLE_TO_CONNECT])
   })
 
+  test('a listener that closes the feed does not keep the error from later listeners', () => {
+    const { client, emitChannelError } = createClient()
+    const feed = new DXLinkFeed(client, FeedContract.AUTO)
+    const later = vi.fn()
+    feed.addErrorListener(() => feed.close())
+    feed.addErrorListener(later)
+
+    emitChannelError(UNABLE_TO_CONNECT)
+
+    expect(later).toHaveBeenCalledWith(UNABLE_TO_CONNECT)
+  })
+
   test('a removed error listener is not called', () => {
     const { client, emitChannelError } = createClient()
     const feed = new DXLinkFeed(client, FeedContract.AUTO)

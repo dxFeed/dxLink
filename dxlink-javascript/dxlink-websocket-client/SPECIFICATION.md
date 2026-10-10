@@ -96,11 +96,14 @@ The client automatically attempts to reconnect when the WebSocket connection is 
 
 Reconnection does not occur if:
 
-- The server refused authorization on the connection: it answered with AUTH_STATE `UNAUTHORIZED` and the client has no token left to offer, because the server rejected the token or because no token was set while the server requires one. In this case, the client disconnects completely
+- The server sent an error that reconnecting does not fix, then closed the connection. It refused authorization (a second AUTH_STATE `UNAUTHORIZED`, or an `UNAUTHORIZED` error before the connection was authorized), it does not support the protocol version (`UNSUPPORTED_PROTOCOL`), or it rejected the SETUP message (`BAD_ACTION` before its own SETUP). In this case, the client disconnects completely
+- The server requires a token, none is set, and the server closed the connection. A connection that dropped instead (an error close) is retried, so that a token set meanwhile is used
 - `disconnect()` was called explicitly
 - Maximum reconnect attempts have been reached (if configured)
 
-When the client stops reconnecting for one of the first or last reasons, it publishes the error to the channels that are still waiting to open (`REQUESTED` state), so that services such as `DXLinkFeed` do not wait for them forever. The channels stay requested and open after the next successful `connect()`.
+When the client stops reconnecting for any of these reasons other than `disconnect()`, it publishes the error to the client error listeners and to every channel that is not closed, so that services such as `DXLinkFeed` do not wait for them forever. Channels opened with `reconnect: false` are then closed. The others move to `REQUESTED` and open after the next successful `connect()`. If a listener connects the client again meanwhile, the channels are left to the new connection.
+
+With unlimited reconnect attempts (the default), the client does not stop on a failure that may pass, such as a network error, so channels receive no error while it retries. Listen for client errors or connection state changes to show that the connection is failing.
 
 **Reconnection process**:
 
@@ -108,11 +111,11 @@ When the client stops reconnecting for one of the first or last reasons, it publ
 2. All scheduled timeouts are cleared
 3. Connection details are reset to defaults
 4. Connection state transitions to `CONNECTING`
-5. All active channels (not closed) transition to `REQUESTED` state
+5. All active channels (not closed) transition to `REQUESTED` state, except channels opened with `reconnect: false`: they receive the error that failed the connection, if any, and are closed
 6. After a delay, a new connection attempt is made. The delay starts at 1 second and doubles with each attempt up to `maxReconnectDelay` (30 seconds by default). Each delay is randomized between half and full value, so that clients do not reconnect in lockstep
 7. Once reconnected, all previously opened channels are automatically re-requested
 
-The reconnect attempt counter is reset to 0 after a successful connection is established.
+The reconnect attempt counter, and with it the delay, is reset after the connection is authorized (AUTH_STATE `AUTHORIZED`). A connection that fails after SETUP but before authorization counts as a failed attempt.
 
 **Reconnection limits**: You can configure `maxReconnectAttempts` to limit reconnection attempts. If set to `-1` (default), reconnection attempts are unlimited. If set to `0` or a positive number, the client will stop attempting to reconnect after that many failed attempts and will disconnect completely.
 
@@ -461,7 +464,7 @@ Errors are reported through error listeners:
 - **Client-level errors**: Registered via `addErrorListener()` on the client instance. These handle connection-level errors and protocol errors.
 - **Channel-level errors**: Registered via `addErrorListener()` on channel instances. These handle service-specific errors, and the error the client publishes when it stops connecting while the channel is waiting to open.
 
-A transport failure is published as an `UNKNOWN` error with the WebSocket close code, for example `Unable to connect (code 1006)` when the connection failed before it opened. Browsers do not expose why a WebSocket failed to connect (network error, rejected handshake, blocked by Content Security Policy), so the browser console is the place to look for the cause. A clean close (codes 1000, 1001 and 1005) is not an error.
+A transport failure is published as an `UNKNOWN` error with the WebSocket close code, for example `Unable to connect (code 1006)` when the connection failed before it opened. Browsers do not expose why a WebSocket failed to connect (network error, rejected handshake, blocked by Content Security Policy), so the browser console is the place to look for the cause. A clean close (codes 1000, 1001 and 1005) of an authorized connection without a reason is routine and not reported. A clean close before authorization, or with a reason, is reported.
 
 When an error occurs:
 
