@@ -15,6 +15,7 @@ import type { DXLinkWebSocketMessage } from './messages'
 
 const URL = 'wss://example.test/dxlink'
 const RECONNECT_KEY = 'DXLWS_RECONNECT'
+const TIMEOUT_KEY = 'DXLWS_TIMEOUT'
 
 /**
  * Connector that records what the client sends and lets the test play the server side.
@@ -115,6 +116,7 @@ const openWaitingChannel = (client: DXLinkWebSocketClient) => {
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -126,7 +128,9 @@ describe('connection failure before authorization', () => {
 
     connector().close('Unable to connect', true, 1006)
 
-    expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Unable to connect (code 1006)' }])
+    expect(errors).toEqual([
+      { type: 'CONNECT_FAILED', message: 'Unable to connect (code 1006)', closeCode: 1006 },
+    ])
     expect(client.getConnectionState()).toBe(DXLinkConnectionState.CONNECTING)
     expect(scheduler.has(RECONNECT_KEY)).toBe(true)
 
@@ -191,7 +195,7 @@ describe('connection failure before authorization', () => {
     connector().close('', false, 1000)
 
     expect(channelErrors).toEqual([
-      { type: 'UNAUTHORIZED', message: 'Authorization refused by the server' },
+      { type: 'UNAUTHORIZED', message: 'Authorization refused by the server', final: true },
     ])
   })
 
@@ -213,6 +217,7 @@ describe('connection failure before authorization', () => {
     const refusal = {
       type: 'UNAUTHORIZED',
       message: 'Authorization refused by the server: Token expired',
+      final: true,
     }
     expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
     expect(scheduler.has(RECONNECT_KEY)).toBe(false)
@@ -254,6 +259,7 @@ describe('connection failure before authorization', () => {
     expect(errors[errors.length - 1]).toEqual({
       type: 'UNSUPPORTED_PROTOCOL',
       message: 'Unsupported protocol version',
+      final: true,
     })
   })
 
@@ -332,7 +338,9 @@ describe('transport close', () => {
 
     connector().close('', true, 1006)
 
-    expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Connection closed (code 1006)' }])
+    expect(errors).toEqual([
+      { type: 'CONNECTION_LOST', message: 'Connection closed (code 1006)', closeCode: 1006 },
+    ])
     expect(scheduler.has(RECONNECT_KEY)).toBe(true)
   })
 
@@ -343,7 +351,9 @@ describe('transport close', () => {
 
     connector().close('Server restart', true, 1012)
 
-    expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Server restart (code 1012)' }])
+    expect(errors).toEqual([
+      { type: 'CONNECTION_LOST', message: 'Server restart (code 1012)', closeCode: 1012 },
+    ])
   })
 
   test('a clean close before authorization is reported', () => {
@@ -353,7 +363,9 @@ describe('transport close', () => {
 
     connector().close('', false, 1001)
 
-    expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Connection closed (code 1001)' }])
+    expect(errors).toEqual([
+      { type: 'CONNECT_FAILED', message: 'Connection closed (code 1001)', closeCode: 1001 },
+    ])
   })
 
   test('a clean close with a reason is reported', () => {
@@ -363,7 +375,78 @@ describe('transport close', () => {
 
     connector().close('Limit Violation', false, 1000)
 
-    expect(errors).toEqual([{ type: 'UNKNOWN', message: 'Limit Violation (code 1000)' }])
+    expect(errors).toEqual([
+      { type: 'CONNECTION_LOST', message: 'Limit Violation (code 1000)', closeCode: 1000 },
+    ])
+  })
+})
+
+describe('error categories', () => {
+  test('a failed attempt to reconnect an established connection is CONNECT_FAILED', () => {
+    const { client, scheduler, errors, connector } = setup()
+    client.connect(URL)
+    connector().handshake('AUTHORIZED')
+
+    connector().close('', true, 1006)
+    scheduler.run(RECONNECT_KEY)
+    connector().close('Unable to connect', true, 1006)
+
+    expect(errors.map((error) => error.type)).toEqual(['CONNECTION_LOST', 'CONNECT_FAILED'])
+  })
+
+  test('a keepalive timeout is published as TIMEOUT', () => {
+    vi.useFakeTimers({ now: 0 })
+    const { client, scheduler, errors, connector } = setup()
+    client.connect(URL)
+    connector().handshake('AUTHORIZED')
+
+    vi.setSystemTime(61_000)
+    scheduler.run(TIMEOUT_KEY)
+
+    expect(errors).toEqual([
+      { type: 'TIMEOUT', message: 'No keepalive received for 61000ms from server' },
+    ])
+    expect(scheduler.has(RECONNECT_KEY)).toBe(true)
+  })
+
+  test('a connection the runtime refuses to open stops with CONNECT_FAILED', () => {
+    const scheduler = new FakeScheduler()
+    let refuse = true
+    let connector: FakeConnector | undefined
+    const client = new DXLinkWebSocketClient({
+      logLevel: DXLinkLogLevel.ERROR,
+      scheduler,
+      connectorFactory: (url) => {
+        connector = new FakeConnector(url)
+        if (refuse) {
+          connector.start = () => {
+            throw new Error('An insecure WebSocket connection may not be initiated')
+          }
+        }
+        return connector
+      },
+    })
+    const errors: DXLinkError[] = []
+    client.addErrorListener((error) => errors.push(error))
+    const { errors: channelErrors } = openWaitingChannel(client)
+
+    client.connect('ws://example.test/dxlink')
+
+    const refusal = {
+      type: 'CONNECT_FAILED',
+      message: 'Unable to connect: An insecure WebSocket connection may not be initiated',
+      final: true,
+    }
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
+    expect(scheduler.has(RECONNECT_KEY)).toBe(false)
+    expect(errors).toEqual([refusal])
+    expect(channelErrors).toEqual([refusal])
+
+    refuse = false
+    client.connect('ws://example.test/dxlink')
+
+    expect(client.getConnectionState()).toBe(DXLinkConnectionState.CONNECTING)
+    expect(connector?.starts).toBe(1)
   })
 })
 
@@ -429,8 +512,10 @@ describe('max reconnect attempts', () => {
     connector().close('Unable to connect', true, 1006)
 
     const stop = {
-      type: 'UNKNOWN',
+      type: 'CONNECT_FAILED',
       message: 'Max reconnect attempts reached. Last error: Unable to connect (code 1006)',
+      closeCode: 1006,
+      final: true,
     }
     expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
     expect(scheduler.has(RECONNECT_KEY)).toBe(false)
@@ -452,8 +537,10 @@ describe('max reconnect attempts', () => {
     expect(client.getConnectionState()).toBe(DXLinkConnectionState.NOT_CONNECTED)
     expect(channelErrors).toEqual([
       {
-        type: 'UNKNOWN',
+        type: 'CONNECTION_LOST',
         message: 'Max reconnect attempts reached. Last error: Connection closed (code 1006)',
+        closeCode: 1006,
+        final: true,
       },
     ])
     expect(channel.getState()).toBe(DXLinkChannelState.REQUESTED)
@@ -474,7 +561,9 @@ describe('max reconnect attempts', () => {
     })
     connector().close('', false, 1000)
 
-    expect(channelErrors).toEqual([{ type: 'UNKNOWN', message: 'Max reconnect attempts reached' }])
+    expect(channelErrors).toEqual([
+      { type: 'CONNECTION_LOST', message: 'Max reconnect attempts reached', final: true },
+    ])
   })
 
   test('a channel closed by its error listener leaves no timers behind', () => {
@@ -526,7 +615,7 @@ describe('logging', () => {
 
     expect(consoleError).toHaveBeenCalledTimes(1)
     expect(consoleError.mock.calls[0]).toEqual([
-      '[DXLinkWebSocketClient] Unhandled dxLink error (wss://example.test/dxlink): UNKNOWN: Unable to connect (code 1006)',
+      '[DXLinkWebSocketClient] Unhandled dxLink error (wss://example.test/dxlink): CONNECT_FAILED: Unable to connect (code 1006)',
     ])
   })
 
@@ -543,7 +632,7 @@ describe('logging', () => {
     connector?.close('Unable to connect', true, 1006)
 
     expect(consoleError.mock.calls[0]).toEqual([
-      '[DXLinkWebSocketClient] Unhandled dxLink error (//example.test/dxlink): UNKNOWN: Unable to connect (code 1006)',
+      '[DXLinkWebSocketClient] Unhandled dxLink error (//example.test/dxlink): CONNECT_FAILED: Unable to connect (code 1006)',
     ])
   })
 

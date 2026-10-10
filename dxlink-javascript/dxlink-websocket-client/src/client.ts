@@ -132,6 +132,12 @@ export class DXLinkWebSocketClient implements DXLinkClient {
   private terminalError: DXLinkError | undefined
 
   /**
+   * Whether the current connection was established, that is authorized. It tells a lost connection
+   * from one that could not be established. The auth state alone does not: it outlives a reconnect.
+   */
+  private isEstablished = false
+
+  /**
    * URL of the endpoint without credentials, query and fragment, for logs.
    */
   private loggableUrl = 'no endpoint'
@@ -181,7 +187,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     this.connector.setCloseListener(this.processTransportClose)
 
     // Initiate websocket connection
-    this.connector.start()
+    this.startConnector(this.connector)
   }
 
   reconnect = () => {
@@ -196,13 +202,15 @@ export class DXLinkWebSocketClient implements DXLinkClient {
       this.reconnectAttempts >= this.config.maxReconnectAttempts
     ) {
       const lastError = this.lastError
-      this.stopConnecting({
-        type: lastError?.type ?? 'UNKNOWN',
-        message:
-          lastError !== undefined
-            ? `Max reconnect attempts reached. Last error: ${lastError.message}`
-            : 'Max reconnect attempts reached',
-      })
+      this.stopConnecting(
+        lastError !== undefined
+          ? {
+              ...lastError,
+              message: `Max reconnect attempts reached. Last error: ${lastError.message}`,
+            }
+          : // Only a routine close of an established connection leaves no error behind
+            { type: 'CONNECTION_LOST', message: 'Max reconnect attempts reached' }
+      )
       return
     }
 
@@ -217,6 +225,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     this.lastSentMillis = 0
     this.isFirstAuthState = true
     this.terminalError = undefined
+    this.isEstablished = false
 
     // Increase reconnect attempts counter
     this.reconnectAttempts++
@@ -247,7 +256,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
         if (this.connector === undefined) return
 
         // Start new connection attempt
-        this.connector.start()
+        this.startConnector(this.connector)
       },
       delay,
       DXLWS_SCHEDULER_KEY_RECONNECT
@@ -274,6 +283,7 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     this.reconnectAttempts = 0
     this.lastError = undefined
     this.terminalError = undefined
+    this.isEstablished = false
 
     this.setConnectionState(DXLinkConnectionState.NOT_CONNECTED)
     this.setAuthState(DXLinkAuthState.UNAUTHORIZED)
@@ -545,7 +555,8 @@ export class DXLinkWebSocketClient implements DXLinkClient {
 
     // Request active channels if connection is authorized
     if (state === 'AUTHORIZED') {
-      // The connection is usable: the next failure starts the backoff and the attempt count over
+      // The connection is established: the next failure starts the backoff and the attempt count over
+      this.isEstablished = true
       this.reconnectAttempts = 0
       this.lastError = undefined
       this.terminalError = undefined
@@ -657,12 +668,13 @@ export class DXLinkWebSocketClient implements DXLinkClient {
       return
     }
 
-    // A clean close of an authorized connection, without a reason, is routine (e.g. load balancing)
-    if (error || reason !== '' || this.authState !== DXLinkAuthState.AUTHORIZED) {
-      const details = code !== undefined ? ` (code ${code})` : ''
+    // A clean close of an established connection, without a reason, is routine (e.g. load balancing)
+    if (error || reason !== '' || !this.isEstablished) {
+      const message = `${reason || 'Connection closed'}${code !== undefined ? ` (code ${code})` : ''}`
       this.publishConnectionError({
-        type: 'UNKNOWN',
-        message: `${reason || 'Connection closed'}${details}`,
+        type: this.isEstablished ? 'CONNECTION_LOST' : 'CONNECT_FAILED',
+        message,
+        ...(code !== undefined && { closeCode: code }),
       })
     }
 
@@ -688,11 +700,28 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     this.lastSettedAuthToken === undefined
 
   /**
-   * Stops connecting after a failure that reconnecting does not fix, and reports the error to the error
-   * listeners and to the channels that are not closed. The channels are requested again by the next
-   * successful {@link DXLinkWebSocketClient.connect}, except those opened without reconnect: they are closed.
+   * Starts a connection attempt. A connector that refuses to start, e.g. because the runtime rejects the URL,
+   * stops the client: another attempt would be refused the same way.
    */
-  private stopConnecting = (error: DXLinkError): void => {
+  private startConnector = (connector: DXLinkWebSocketConnector): void => {
+    try {
+      connector.start()
+    } catch (e) {
+      this.stopConnecting({
+        type: 'CONNECT_FAILED',
+        message: `Unable to connect: ${e instanceof Error ? e.message : String(e)}`,
+      })
+    }
+  }
+
+  /**
+   * Stops connecting after a failure that reconnecting does not fix, and reports the error, marked final,
+   * to the error listeners and to the channels that are not closed. The channels are requested again by
+   * the next successful {@link DXLinkWebSocketClient.connect}, except those opened without reconnect:
+   * they are closed.
+   */
+  private stopConnecting = (cause: DXLinkError): void => {
+    const error: DXLinkError = { ...cause, final: true }
     this.logger.debug('Stopped connecting', error)
 
     this.disconnect()
@@ -740,12 +769,15 @@ export class DXLinkWebSocketClient implements DXLinkClient {
     const now = Date.now()
     const noKeepaliveDuration = now - this.lastReceivedMillis
     if (noKeepaliveDuration >= timeoutMills) {
+      const message = 'No keepalive received for ' + noKeepaliveDuration + 'ms'
       this.sendMessage({
         type: 'ERROR',
         channel: 0,
         error: 'TIMEOUT',
-        message: 'No keepalive received for ' + noKeepaliveDuration + 'ms',
+        message,
       })
+
+      this.publishConnectionError({ type: 'TIMEOUT', message: `${message} from server` })
 
       return this.reconnect()
     }
