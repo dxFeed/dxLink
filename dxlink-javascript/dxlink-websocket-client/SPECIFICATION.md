@@ -90,15 +90,20 @@ Keepalive messages are handled automatically and are not exposed in the public A
 
 The client automatically attempts to reconnect when the WebSocket connection is closed unexpectedly. Reconnection occurs when:
 
-- The WebSocket transport closes and the client was previously authorized
+- The WebSocket transport closes, including when the connection failed before it opened or before the server answered authorization
 - A keepalive timeout is detected
 - A connection error occurs
 
 Reconnection does not occur if:
 
-- The client was not authorized (UNAUTHORIZED state) - in this case, the client disconnects completely
+- The server sent an error that reconnecting does not fix, then closed the connection. It refused authorization (a second AUTH_STATE `UNAUTHORIZED`, or an `UNAUTHORIZED` error before the connection was authorized), it does not support the protocol version (`UNSUPPORTED_PROTOCOL`), or it rejected the SETUP message (`BAD_ACTION` before its own SETUP). In this case, the client disconnects completely
+- The server requires a token, none is set, and the server closed the connection. A connection that dropped instead (an error close) is retried, so that a token set meanwhile is used
 - `disconnect()` was called explicitly
 - Maximum reconnect attempts have been reached (if configured)
+
+When the client stops reconnecting for any of these reasons other than `disconnect()`, it publishes the error to the client error listeners and to every channel that is not closed, so that applications listening on a channel, e.g. through `feed.getChannel().addErrorListener()`, do not wait for it forever. Channels opened with `reconnect: false` are then closed. The others move to `REQUESTED` and open after the next successful `connect()`. If a listener connects the client again meanwhile, the channels are left to the new connection.
+
+With unlimited reconnect attempts (the default), the client does not stop on a failure that may pass, such as a network error, so channels receive no error while it retries. Listen for client errors or connection state changes to show that the connection is failing.
 
 **Reconnection process**:
 
@@ -106,11 +111,11 @@ Reconnection does not occur if:
 2. All scheduled timeouts are cleared
 3. Connection details are reset to defaults
 4. Connection state transitions to `CONNECTING`
-5. All active channels (not closed) transition to `REQUESTED` state
-6. After a delay (based on reconnect attempt count: `attemptNumber * 1000ms`), a new connection attempt is made
+5. All active channels (not closed) transition to `REQUESTED` state, except channels opened with `reconnect: false`: they receive the error that failed the connection, if any, and are closed
+6. After a delay, a new connection attempt is made. The delay starts at 1 second and doubles with each attempt up to `maxReconnectDelay` (30 seconds by default). Each delay is randomized between half and full value, so that clients do not reconnect in lockstep
 7. Once reconnected, all previously opened channels are automatically re-requested
 
-The reconnect attempt counter is reset to 0 after a successful connection is established.
+The reconnect attempt counter, and with it the delay, is reset after the connection is authorized (AUTH_STATE `AUTHORIZED`). A connection that fails after SETUP but before authorization counts as a failed attempt.
 
 **Reconnection limits**: You can configure `maxReconnectAttempts` to limit reconnection attempts. If set to `-1` (default), reconnection attempts are unlimited. If set to `0` or a positive number, the client will stop attempting to reconnect after that many failed attempts and will disconnect completely.
 
@@ -457,7 +462,9 @@ The client uses standardized error types:
 Errors are reported through error listeners:
 
 - **Client-level errors**: Registered via `addErrorListener()` on the client instance. These handle connection-level errors and protocol errors.
-- **Channel-level errors**: Registered via `addErrorListener()` on channel instances. These handle service-specific errors.
+- **Channel-level errors**: Registered via `addErrorListener()` on channel instances. These handle service-specific errors, and the error the client publishes when it stops connecting while the channel is waiting to open.
+
+A transport failure is published as an `UNKNOWN` error with the WebSocket close code, for example `Unable to connect (code 1006)` when the connection failed before it opened. Browsers do not expose why a WebSocket failed to connect (network error, rejected handshake, blocked by Content Security Policy), so the browser console is the place to look for the cause. A clean close (codes 1000, 1001 and 1005) of an authorized connection without a reason is routine and not reported. A clean close before authorization, or with a reason, is reported.
 
 When an error occurs:
 
@@ -470,7 +477,7 @@ When an error occurs:
 
 If no error listeners are registered when an error occurs:
 
-- The error is logged at ERROR level
+- The error is logged at ERROR level, with its type and message in the log text and, for client-level errors, the endpoint URL without credentials, query and fragment
 - The error is not propagated to application code
 - The client continues operating normally
 
@@ -504,6 +511,7 @@ The client can be configured via `DXLinkWebSocketClientConfig` passed to the con
 - **actionTimeout**: Timeout (in seconds) for protocol actions requiring server response (SETUP, AUTH_STATE). Default: 10 seconds.
 - **logLevel**: Logging level for internal logger. Default: WARN.
 - **maxReconnectAttempts**: Maximum reconnection attempts. `-1` means unlimited (default). `0` or positive number limits attempts.
+- **maxReconnectDelay**: Maximum delay (in seconds) between reconnection attempts. Default: 30 seconds.
 - **connectorFactory**: Factory function to create custom WebSocket connectors. Default: Creates `DefaultDXLinkWebSocketConnector`.
 
 All configuration options are optional. If not provided, defaults are used.

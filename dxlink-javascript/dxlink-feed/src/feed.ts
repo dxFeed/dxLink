@@ -608,8 +608,8 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
   /**
    * Process error received from the channel.
    */
-  private processError = (processError: DXLinkError) => {
-    this.logger.error('Error in channel', processError)
+  private processError = (error: DXLinkError) => {
+    this.logger.error(`Error in channel: ${error.type}: ${error.message}`)
   }
 
   /**

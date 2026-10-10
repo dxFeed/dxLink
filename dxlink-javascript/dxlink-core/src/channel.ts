@@ -99,7 +99,8 @@ export interface DXLinkChannel {
   removeStateChangeListener(listener: DXLinkChannelStateChangeListener): void
 
   /**
-   * Add a listener for errors from the server.
+   * Add a listener for errors from the server, and for the error the client reports when it stops
+   * connecting while the channel is waiting to open.
    * @see {DXLinkError}
    */
   addErrorListener(listener: DXLinkErrorListener): void
