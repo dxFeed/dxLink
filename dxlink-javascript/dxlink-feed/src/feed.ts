@@ -4,7 +4,6 @@ import {
   DXLinkChannelState,
   type DXLinkChannelStateChangeListener,
   type DXLinkError,
-  type DXLinkErrorListener,
   type DXLinkClient,
   DXLinkLogLevel,
   type DXLinkLogger,
@@ -204,18 +203,6 @@ export interface DXLinkFeedRequester<Contract extends FeedContract = FeedContrac
   removeEventListener(listener: DXLinkFeedEventListener): void
 
   /**
-   * Add a listener for errors of the feed channel: errors from the service, and the error the client
-   * reports when it stops connecting while the channel is waiting to open.
-   * Without listeners, errors are logged.
-   * @see {DXLinkError}
-   */
-  addErrorListener(listener: DXLinkErrorListener): void
-  /**
-   * Remove a listener for errors of the feed channel.
-   */
-  removeErrorListener(listener: DXLinkErrorListener): void
-
-  /**
    * Close the feed channel.
    */
   close(): void
@@ -288,7 +275,6 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
   // Listeners
   private readonly configListeners = new Set<DXLinkFeedConfigChangeListener>()
   private readonly eventListeners = new Set<DXLinkFeedEventListener>()
-  private readonly errorListeners = new Set<DXLinkErrorListener>()
 
   /**
    * Pending add subscriptions to be sent to the channel.
@@ -375,7 +361,6 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
 
     this.configListeners.clear()
     this.eventListeners.clear()
-    this.errorListeners.clear()
 
     this.pendingAdd.clear()
     this.pendingRemove.clear()
@@ -444,13 +429,6 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
   }
   removeEventListener = (listener: DXLinkFeedEventListener) => {
     this.eventListeners.delete(listener)
-  }
-
-  addErrorListener = (listener: DXLinkErrorListener) => {
-    this.errorListeners.add(listener)
-  }
-  removeErrorListener = (listener: DXLinkErrorListener) => {
-    this.errorListeners.delete(listener)
   }
 
   /**
@@ -631,19 +609,7 @@ export class DXLinkFeed<Contract extends FeedContract> implements DXLinkFeedRequ
    * Process error received from the channel.
    */
   private processError = (error: DXLinkError) => {
-    if (this.errorListeners.size === 0) {
-      this.logger.error(`Error in channel: ${error.type}: ${error.message}`)
-      return
-    }
-
-    // A copy: a listener may close the feed, which clears the listeners
-    for (const listener of [...this.errorListeners]) {
-      try {
-        listener(error)
-      } catch (e) {
-        this.logger.error('Error in error listener', e)
-      }
-    }
+    this.logger.error(`Error in channel: ${error.type}: ${error.message}`)
   }
 
   /**

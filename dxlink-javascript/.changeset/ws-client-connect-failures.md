@@ -1,6 +1,6 @@
 ---
 '@dxfeed/dxlink-websocket-client': minor
-'@dxfeed/dxlink-feed': minor
+'@dxfeed/dxlink-feed': patch
 '@dxfeed/dxlink-core': patch
 '@dxfeed/dxlink-dom': patch
 '@dxfeed/dxlink-indichart': patch
@@ -18,12 +18,10 @@ Recover from connection failures before authorization, and report when the clien
   connection, or when `maxReconnectAttempts` is reached.
 - When the client stops connecting, the error goes to the client error listeners and to every
   channel that is not closed. Channels opened with `reconnect: false` are then closed; the others
-  are requested again by the next successful `connect()`. With unlimited reconnect attempts (the
-  default) a failure that may pass is retried without telling the channels: listen for client
-  errors to show it.
-- `DXLinkFeed` gains `addErrorListener` / `removeErrorListener`; without listeners, it logs the
-  error as before. Adding the methods to `DXLinkFeedRequester` is a breaking change only for code
-  that implements the interface itself.
+  are requested again by the next successful `connect()`. A service such as `DXLinkFeed` logs it;
+  listen on its channel, e.g. `feed.getChannel().addErrorListener()`, to handle it. With unlimited
+  reconnect attempts (the default) a failure that may pass is retried without telling the channels:
+  listen for client errors to show it.
 - Reconnect delays now back off exponentially from 1 second up to the new `maxReconnectDelay`
   option (30 seconds by default), randomized between half and full value. They used to grow by
   1 second per attempt without a limit. The delay and the attempt count start over once the

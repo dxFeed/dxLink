@@ -101,7 +101,7 @@ Reconnection does not occur if:
 - `disconnect()` was called explicitly
 - Maximum reconnect attempts have been reached (if configured)
 
-When the client stops reconnecting for any of these reasons other than `disconnect()`, it publishes the error to the client error listeners and to every channel that is not closed, so that services such as `DXLinkFeed` do not wait for them forever. Channels opened with `reconnect: false` are then closed. The others move to `REQUESTED` and open after the next successful `connect()`. If a listener connects the client again meanwhile, the channels are left to the new connection.
+When the client stops reconnecting for any of these reasons other than `disconnect()`, it publishes the error to the client error listeners and to every channel that is not closed, so that applications listening on a channel, e.g. through `feed.getChannel().addErrorListener()`, do not wait for it forever. Channels opened with `reconnect: false` are then closed. The others move to `REQUESTED` and open after the next successful `connect()`. If a listener connects the client again meanwhile, the channels are left to the new connection.
 
 With unlimited reconnect attempts (the default), the client does not stop on a failure that may pass, such as a network error, so channels receive no error while it retries. Listen for client errors or connection state changes to show that the connection is failing.
 

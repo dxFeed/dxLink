@@ -132,19 +132,21 @@ describe('DXLinkFeed when the connection fails before it opens', () => {
     expect(connector.sent.filter(isCandleSubscription)).toHaveLength(1)
   })
 
-  test('reports the error to the feed when the client stops connecting', () => {
+  test('reports the error to the feed channel when the client stops connecting', () => {
     const { client, feed, connector } = createConnectedFeed(0)
     const errors: DXLinkError[] = []
-    feed.addErrorListener((error) => errors.push(error))
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    feed.getChannel().addErrorListener((error) => errors.push(error))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     connector.failToConnect()
 
-    expect(errors).toEqual([
-      {
-        type: 'UNKNOWN',
-        message: 'Max reconnect attempts reached. Last error: Unable to connect (code 1006)',
-      },
+    const stop = {
+      type: 'UNKNOWN',
+      message: 'Max reconnect attempts reached. Last error: Unable to connect (code 1006)',
+    }
+    expect(errors).toEqual([stop])
+    expect(consoleError.mock.calls).toEqual([
+      [`[DXLinkFeed#${feed.id}] Error in channel: ${stop.type}: ${stop.message}`],
     ])
     expect(connector.sent.filter(isCandleSubscription)).toHaveLength(0)
     expect(client.getConnectionState()).toBe('NOT_CONNECTED')
@@ -152,56 +154,7 @@ describe('DXLinkFeed when the connection fails before it opens', () => {
 })
 
 describe('DXLinkFeed errors', () => {
-  test('error listeners receive channel errors', () => {
-    const { client, emitChannelError } = createClient()
-    const feed = new DXLinkFeed(client, FeedContract.AUTO)
-    const errors: DXLinkError[] = []
-    feed.addErrorListener((error) => errors.push(error))
-
-    emitChannelError(UNABLE_TO_CONNECT)
-
-    expect(errors).toEqual([UNABLE_TO_CONNECT])
-  })
-
-  test('a listener that closes the feed does not keep the error from later listeners', () => {
-    const { client, emitChannelError } = createClient()
-    const feed = new DXLinkFeed(client, FeedContract.AUTO)
-    const later = vi.fn()
-    feed.addErrorListener(() => feed.close())
-    feed.addErrorListener(later)
-
-    emitChannelError(UNABLE_TO_CONNECT)
-
-    expect(later).toHaveBeenCalledWith(UNABLE_TO_CONNECT)
-  })
-
-  test('a removed error listener is not called', () => {
-    const { client, emitChannelError } = createClient()
-    const feed = new DXLinkFeed(client, FeedContract.AUTO)
-    const listener = vi.fn()
-    feed.addErrorListener(listener)
-    feed.removeErrorListener(listener)
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    emitChannelError(UNABLE_TO_CONNECT)
-
-    expect(listener).not.toHaveBeenCalled()
-  })
-
-  test('close removes error listeners', () => {
-    const { client, emitChannelError } = createClient()
-    const feed = new DXLinkFeed(client, FeedContract.AUTO)
-    const listener = vi.fn()
-    feed.addErrorListener(listener)
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    feed.close()
-    emitChannelError(UNABLE_TO_CONNECT)
-
-    expect(listener).not.toHaveBeenCalled()
-  })
-
-  test('without error listeners the error is logged as text', () => {
+  test('a channel error is logged as text', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { client, emitChannelError } = createClient()
     new DXLinkFeed(client, FeedContract.AUTO)
