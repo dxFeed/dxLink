@@ -35,6 +35,13 @@ export interface DXLinkWebSocketClientConfig {
    */
   readonly maxReconnectAttempts: number
   /**
+   * Maximum delay in seconds between reconnect attempts.
+   * The delay starts at 1 second and doubles with each failed attempt up to this value.
+   * Each delay is randomized between half and full value, so that clients do not reconnect in lockstep.
+   * Default: 30.
+   */
+  readonly maxReconnectDelay: number
+  /**
    * Scheduler used by the client for reconnect and timeout handling.
    * If not provided, {@link DefaultDXLinkScheduler} is used.
    */

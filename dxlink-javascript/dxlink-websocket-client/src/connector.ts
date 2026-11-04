@@ -43,8 +43,19 @@ export interface DXLinkWebSocketConnector {
  * Type for a close listener that is called when the WebSocket connection is closed.
  * @param reason - The reason for the closure.
  * @param error - Indicates if the closure was due to an error.
+ * @param code - WebSocket close code, if known (for example 1006 for an abnormal closure).
  */
-export type DXLinkWebSocketCloseListener = (reason: string, error: boolean) => void
+export type DXLinkWebSocketCloseListener = (reason: string, error: boolean, code?: number) => void
+
+/**
+ * Close codes of a clean closure: normal closure, going away and no status received.
+ */
+const CLEAN_CLOSE_CODES: ReadonlySet<number> = new Set([1000, 1001, 1005])
+
+/**
+ * Close code of a connection that failed or dropped without a closing handshake.
+ */
+const ABNORMAL_CLOSE_CODE = 1006
 
 /**
  * Default connector for the WebSocket connection.
@@ -126,15 +137,23 @@ export class DefaultDXLinkWebSocketConnector implements DXLinkWebSocketConnector
 
     this.stop()
 
-    this.closeListener?.(ev.reason, false)
+    this.closeListener?.(ev.reason, !CLEAN_CLOSE_CODES.has(ev.code), ev.code)
   }
 
   private handleError = (_ev: Event) => {
     if (this.socket === undefined) return
 
+    const wasOpened = this.isAvailable
+
     this.stop()
 
-    this.closeListener?.('Unable to connect', true)
+    // The error event carries no details. The browser follows it with a close event with code 1006,
+    // but stop() has already detached that listener, so the code is reported here.
+    this.closeListener?.(
+      wasOpened ? 'Connection error' : 'Unable to connect',
+      true,
+      ABNORMAL_CLOSE_CODE
+    )
   }
 
   private handleMessage = (ev: MessageEvent) => {

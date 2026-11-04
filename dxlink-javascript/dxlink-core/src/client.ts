@@ -148,7 +148,8 @@ export interface DXLinkClient {
   removeAuthStateChangeListener(listener: DXLinkAuthStateChangeListener): void
 
   /**
-   * Error listener that can be used to handle errors from the server.
+   * Error listener that can be used to handle connection errors and errors from the server.
+   * Connection errors include each failed connection attempt, for example `Unable to connect (code 1006)`.
    */
   addErrorListener(listener: DXLinkErrorListener): void
   /**
