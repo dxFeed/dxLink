@@ -17,7 +17,7 @@ import {
 
 import { DXLinkFeed, FeedContract } from './'
 
-const UNABLE_TO_CONNECT: DXLinkError = { type: 'UNKNOWN', message: 'Unable to connect' }
+const UNABLE_TO_CONNECT: DXLinkError = { type: 'CONNECT_FAILED', message: 'Unable to connect' }
 
 /**
  * Client with a single channel that stays requested; the test emits errors on it.
@@ -141,8 +141,10 @@ describe('DXLinkFeed when the connection fails before it opens', () => {
     connector.failToConnect()
 
     const stop = {
-      type: 'UNKNOWN',
+      type: 'CONNECT_FAILED',
       message: 'Max reconnect attempts reached. Last error: Unable to connect (code 1006)',
+      closeCode: 1006,
+      final: true,
     }
     expect(errors).toEqual([stop])
     expect(consoleError.mock.calls).toEqual([
@@ -162,7 +164,7 @@ describe('DXLinkFeed errors', () => {
     emitChannelError(UNABLE_TO_CONNECT)
 
     expect(consoleError.mock.calls).toEqual([
-      ['[DXLinkFeed#1] Error in channel: UNKNOWN: Unable to connect'],
+      ['[DXLinkFeed#1] Error in channel: CONNECT_FAILED: Unable to connect'],
     ])
   })
 })

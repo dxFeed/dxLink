@@ -1,3 +1,5 @@
+import type { DXLinkProtocolErrorType } from '@dxfeed/dxlink-core'
+
 export interface AuthMessage {
   type: 'AUTH'
   channel: 0
@@ -49,8 +51,7 @@ export interface ChannelClosedMessage {
   channel: number
 }
 
-export type ErrorType =
-  'UNKNOWN' | 'UNSUPPORTED_PROTOCOL' | 'TIMEOUT' | 'UNAUTHORIZED' | 'INVALID_MESSAGE' | 'BAD_ACTION'
+export type ErrorType = DXLinkProtocolErrorType
 
 export interface ErrorMessage {
   type: 'ERROR'
