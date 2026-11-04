@@ -1,4 +1,5 @@
 import { DXLinkConnectionState } from '@dxfeed/dxlink-api'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -11,11 +12,10 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 
-import { useConnectionVM } from './connection-context'
+import { useConnection } from './connection-context'
 import { ErrorCenter } from '../errors/error-center'
 import type { ConsoleConfig } from '../lib/console-config'
 import { useConsoleConfig } from '../lib/console-config-context'
-import { useVM } from '../view-model'
 
 const STATUS: Record<DXLinkConnectionState, { label: string; color: ChipProps['color'] }> = {
   [DXLinkConnectionState.NOT_CONNECTED]: { label: 'Not connected', color: 'default' },
@@ -59,18 +59,22 @@ const InfoLine = ({ label, value }: { label: string; value: string }) => (
 
 /**
  * Connection panel — the live connection view. Reads connection state / details /
- * errors from the page-scoped {@link ConnectionViewModel} and drives connect /
+ * errors from the page-scoped {@link ConnectionModel} and drives connect /
  * reconnect / disconnect. Form fields (URL + keepalive) are local draft state seeded from
  * the console's configuration profile, which can also pin a field: a pinned field renders
  * read-only rather than hidden, since which endpoint you are talking to is worth seeing
  * even when the deployment fixed it.
  */
 export const ConnectionPanel = () => {
-  const vm = useConnectionVM()
+  const model = useConnection()
   const config = useConsoleConfig()
-  const connection = useVM(vm, (s) => s.connection)
-  const details = useVM(vm, (s) => s.details)
-  const errors = useVM(vm, (s) => s.errors)
+  const connection = useAtomValue(model.connection)
+  const details = useAtomValue(model.details)
+  const errors = useAtomValue(model.errors)
+  const connect = useAtomSet(model.connect)
+  const reconnect = useAtomSet(model.reconnect)
+  const disconnect = useAtomSet(model.disconnect)
+  const clearErrors = useAtomSet(model.clearErrors)
 
   const [form, setForm] = useState<ConnectionForm>(() => createDefaultForm(config))
 
@@ -89,13 +93,16 @@ export const ConnectionPanel = () => {
 
   const handlePrimary = () => {
     if (connected) {
-      vm.reconnect()
+      reconnect()
       return
     }
-    vm.connect(form.url.trim(), {
-      keepaliveInterval: Number(form.keepaliveInterval) || 0,
-      keepaliveTimeout: Number(form.keepaliveTimeout) || 0,
-      acceptKeepaliveTimeout: Number(form.acceptKeepalive) || 0,
+    connect({
+      url: form.url.trim(),
+      params: {
+        keepaliveInterval: Number(form.keepaliveInterval) || 0,
+        keepaliveTimeout: Number(form.keepaliveTimeout) || 0,
+        acceptKeepaliveTimeout: Number(form.acceptKeepalive) || 0,
+      },
     })
   }
 
@@ -183,7 +190,7 @@ export const ConnectionPanel = () => {
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <ErrorCenter
               errors={errors}
-              onClear={vm.clearErrors}
+              onClear={() => clearErrors()}
               scope="Connection"
               size="medium"
             />
@@ -193,7 +200,7 @@ export const ConnectionPanel = () => {
             <Button
               variant="outlined"
               color="inherit"
-              onClick={vm.disconnect}
+              onClick={() => disconnect()}
               disabled={connection === DXLinkConnectionState.NOT_CONNECTED}
             >
               Disconnect

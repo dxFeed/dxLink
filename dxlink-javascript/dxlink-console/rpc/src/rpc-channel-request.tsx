@@ -22,10 +22,12 @@ import Stack from '@mui/material/Stack'
 import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useMemo, useRef, useState } from 'react'
+import { Cause, Effect, Fiber, Predicate } from 'effect'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   createRequestTemplate,
+  type DescriptorSetError,
   fetchDescriptorSet,
   isMethodSupported,
   listServices,
@@ -91,9 +93,7 @@ const RequestFields = ({
     try {
       const value: unknown = JSON.parse(json)
 
-      return typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? (value as Record<string, JsonValue>)
-        : null
+      return Predicate.isObject(value) ? (value as Record<string, JsonValue>) : null
     } catch {
       return null
     }
@@ -224,18 +224,49 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
   const selectService = (next: DescService | undefined) =>
     selectMethod(next?.methods.find(isMethodSupported), { serviceName: next?.typeName ?? '' })
 
-  const load = async (source: string, loader: () => Promise<void>) => {
+  // A load belongs to this form. Closing the dialog abandons the one in flight — aborting its
+  // request — rather than letting it write into a form that is gone.
+  const inFlight = useRef<Fiber.Fiber<void> | null>(null)
+  useEffect(
+    () => () => {
+      if (inFlight.current !== null) Effect.runFork(Fiber.interrupt(inFlight.current))
+    },
+    []
+  )
+
+  const load = (source: string, registry: Effect.Effect<FileRegistry, DescriptorSetError>) => {
     setLoading(true)
     setLoadError(null)
-    try {
-      await loader()
-    } catch (error) {
-      setLoadError(
-        `Could not load definitions from ${source}: ${error instanceof Error ? error.message : String(error)}`
+    inFlight.current = Effect.runFork(
+      registry.pipe(
+        Effect.flatMap((loaded) => Effect.sync(() => applyRegistry(loaded, source))),
+        // A source that could not be loaded is the user's to fix: its message says how.
+        Effect.catchTag('DescriptorSetError', (error) =>
+          Effect.sync(() =>
+            setLoadError(`Could not load definitions from ${source}: ${error.message}`)
+          )
+        ),
+        // Anything else is a defect — the console's own bug, not the source's. It is reported in
+        // the form too, rather than left to surface as an unhandled rejection, and logged with
+        // its stack. An abandoned load has no form left to report to.
+        Effect.catchCause((cause) =>
+          Effect.sync(() => {
+            if (Cause.hasInterruptsOnly(cause)) return
+            const errors = Cause.prettyErrors(cause)
+            console.error(`Loading definitions from ${source} failed`, ...errors)
+            setLoadError(
+              `Could not use the definitions from ${source}: ${errors.map((e) => e.message).join('; ')}`
+            )
+          })
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            inFlight.current = null
+            setLoading(false)
+          })
+        )
       )
-    } finally {
-      setLoading(false)
-    }
+    )
   }
 
   // Loading a new set invalidates the current selection — preselect its first service and
@@ -254,15 +285,9 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
     })
   }
 
-  const loadUrl = () =>
-    load(value.url, async () => {
-      applyRegistry(await fetchDescriptorSet(value.url), value.url)
-    })
+  const loadUrl = () => load(value.url, fetchDescriptorSet(value.url))
 
-  const loadFile = (file: File) =>
-    load(file.name, async () => {
-      applyRegistry(await readDescriptorSet(file), file.name)
-    })
+  const loadFile = (file: File) => load(file.name, readDescriptorSet(file))
 
   return (
     <Stack spacing={2.5} sx={{ pt: 1 }}>
@@ -284,7 +309,7 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
           />
           <Button
             variant="outlined"
-            onClick={() => void loadUrl()}
+            onClick={loadUrl}
             disabled={loading || value.url.trim() === ''}
             sx={{ mt: 0.25 }}
           >
@@ -309,7 +334,7 @@ export const RpcChannelRequest = ({ value, onChange, urlLocked }: RpcChannelRequ
               const file = e.target.files?.[0]
               // Clear the input so picking the same file again still fires a change.
               e.target.value = ''
-              if (file !== undefined) void loadFile(file)
+              if (file !== undefined) loadFile(file)
             }}
           />
         </Box>

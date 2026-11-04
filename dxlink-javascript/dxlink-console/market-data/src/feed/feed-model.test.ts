@@ -1,7 +1,7 @@
 import type { FeedEventData } from '@dxfeed/dxlink-api'
 import { describe, expect, it } from 'vitest'
 
-import { feedEventKey, feedEventType, feedSubKey } from './feed-view-model'
+import { feedEventKey, feedEventType, feedSubKey, upsertFeedEvents } from './feed-model'
 
 const event = (fields: Record<string, unknown>): FeedEventData => fields as FeedEventData
 
@@ -63,5 +63,30 @@ describe('feedSubKey', () => {
     const dex = feedSubKey({ type: 'Order', symbol: 'AAPL', kind: 'indexed', source: 'DEX' })
 
     expect(ntv).not.toBe(dex)
+  })
+})
+
+describe('upsertFeedEvents', () => {
+  it('keeps one row per key within each type, latest event winning', () => {
+    const first = upsertFeedEvents({}, [
+      event({ eventType: 'Quote', eventSymbol: 'AAPL', bidPrice: 1 }),
+      event({ eventType: 'Trade', eventSymbol: 'AAPL', price: 5 }),
+      event({ eventType: 'Quote', eventSymbol: 'AAPL', bidPrice: 2 }),
+    ])
+    const second = upsertFeedEvents(first, [
+      event({ eventType: 'Quote', eventSymbol: 'MSFT', bidPrice: 3 }),
+    ])
+
+    expect(Object.keys(second)).toEqual(['Quote', 'Trade'])
+    expect(second.Quote?.AAPL).toMatchObject({ bidPrice: 2 })
+    expect(second.Quote?.MSFT).toMatchObject({ bidPrice: 3 })
+    // The type the batch did not touch is shared, not copied.
+    expect(second.Trade).toBe(first.Trade)
+  })
+
+  it('returns the table itself for an empty batch', () => {
+    const table = upsertFeedEvents({}, [event({ eventType: 'Quote', eventSymbol: 'AAPL' })])
+
+    expect(upsertFeedEvents(table, [])).toBe(table)
   })
 })

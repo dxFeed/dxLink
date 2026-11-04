@@ -1,6 +1,6 @@
 import { FeedDataFormat } from '@dxfeed/dxlink-api'
 import type { FeedAcceptConfig, FeedEventFields } from '@dxfeed/dxlink-api'
-import { useVM } from '@dxfeed/dxlink-console-core'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -22,7 +22,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { EVENT_TYPES } from './event-types'
-import type { FeedViewModel } from './feed-view-model'
+import type { FeedModel } from './feed-model'
 import { BROWSABLE_FREE_TEXT } from '../lib/browsable-free-text'
 
 interface EventFieldRow {
@@ -116,9 +116,10 @@ const DefRow = ({ label, value }: { label: string; value: ReactNode }) => (
   </Stack>
 )
 
-/** Requested (FeedAcceptConfig) vs server-applied (FeedConfig) configuration, wired to the feed VM. */
-export const ConfigurationSection = ({ vm }: { vm: FeedViewModel }) => {
-  const applied = useVM(vm, (s) => s.config)
+/** Requested (FeedAcceptConfig) vs server-applied (FeedConfig) configuration, wired to the feed model. */
+export const ConfigurationSection = ({ model }: { model: FeedModel }) => {
+  const applied = useAtomValue(model.config)
+  const configure = useAtomSet(model.configure)
 
   const [aggPeriod, setAggPeriod] = useState('')
   const [dataFormat, setDataFormat] = useState<'' | FeedDataFormat>('')
@@ -130,7 +131,7 @@ export const ConfigurationSection = ({ vm }: { vm: FeedViewModel }) => {
       acceptDataFormat: dataFormat === '' ? undefined : dataFormat,
       acceptEventFields: buildAcceptEventFields(fieldRows),
     }
-    vm.configure(accept)
+    configure(accept)
   }
 
   const appliedTypes = Object.entries(applied.eventFields)

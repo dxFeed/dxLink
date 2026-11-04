@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.8.1",
-  "description": "dxLink protocol debug console \u2014 the app that composes the console packages",
+  "description": "dxLink protocol debug console — the app that composes the console packages",
   "scripts": {
     "dev": "vite",
     "start": "vite",
@@ -21,11 +21,13 @@
     "@dxfeed/dxlink-console-rpc": "workspace:*",
     "@dxscript/dxlink-dxcharts-lite": "2.0.0-SNAPSHOT-20260629-142303",
     "@dxscript/dxlink-dxscript-editor": "2.0.0-SNAPSHOT-20260629-142303",
+    "@effect/atom-react": "^4.0.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@fontsource-variable/inter": "^5.2.8",
     "@mui/icons-material": "^9.0.0",
     "@mui/material": "^9.0.0",
+    "effect": "^4.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.16.0"

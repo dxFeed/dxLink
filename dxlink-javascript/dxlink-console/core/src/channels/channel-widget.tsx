@@ -56,9 +56,14 @@ interface ChannelWidgetProps {
   errors?: readonly TimestampedError[]
   onClearErrors?: () => void
   /**
-   * Fired once when the user closes the channel. The card stays (closed state is
-   * owned here) — use this to release the channel's resources (e.g. close the
-   * underlying dxlink channel).
+   * Whether the channel is closed. The card does not keep this itself: it shows what the
+   * channel's model holds (`useChannelCard` passes it), so a channel closed by any route —
+   * not only this card's button — reads as closed here too.
+   */
+  closed?: boolean
+  /**
+   * Called when the user asks to close the channel; the close button is offered only when
+   * this is given. Close the channel in response, and `closed` follows.
    */
   onClose?: () => void
   defaultExpanded?: boolean
@@ -69,10 +74,9 @@ interface ChannelWidgetProps {
  * Generic collapsible channel card shell (draft / presentational). Every channel
  * kind (feed, dom, indichart) renders its content inside this shell.
  *
- * Closing is a channel-view concern: it does NOT remove the card from the area —
- * the widget owns its own closed state. Closing is terminal (the dxlink channel
- * CLOSED state): the card stays as a header-only record marked "closed" — its
- * content is no longer rendered — and it cannot be reopened.
+ * Closing does NOT remove the card from the area. Closing is terminal (the dxlink
+ * channel CLOSED state): once `closed`, the card stays as a header-only record marked
+ * "closed" — its content is no longer rendered — and it cannot be reopened.
  */
 export const ChannelWidget = ({
   icon,
@@ -83,17 +87,12 @@ export const ChannelWidget = ({
   parameters,
   errors,
   onClearErrors,
+  closed = false,
   onClose,
   defaultExpanded = true,
   children,
 }: ChannelWidgetProps) => {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const [closed, setClosed] = useState(false)
-
-  const handleClose = () => {
-    setClosed(true)
-    onClose?.()
-  }
 
   const subheader =
     channelId != null ? [subtitle, `channel #${channelId}`].filter(Boolean).join(' · ') : subtitle
@@ -150,11 +149,13 @@ export const ChannelWidget = ({
                   <ExpandMoreIcon />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Close channel">
-                <IconButton onClick={handleClose} aria-label="Close channel">
-                  <CloseIcon />
-                </IconButton>
-              </Tooltip>
+              {onClose !== undefined && (
+                <Tooltip title="Close channel">
+                  <IconButton onClick={onClose} aria-label="Close channel">
+                    <CloseIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Stack>
           )
         }

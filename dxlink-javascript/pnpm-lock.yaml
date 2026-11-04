@@ -23,6 +23,9 @@ importers:
       '@types/node':
         specifier: ^24.12.4
         version: 24.13.3
+      effect:
+        specifier: ^4.0.0
+        version: 4.0.0
       eslint:
         specifier: ^10.4.1
         version: 10.8.1
@@ -108,6 +111,9 @@ importers:
       '@dxscript/dxlink-dxscript-editor':
         specifier: 2.0.0-SNAPSHOT-20260629-142303
         version: 2.0.0-SNAPSHOT-20260629-142303(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@effect/atom-react':
+        specifier: ^4.0.0
+        version: 4.0.0(effect@4.0.0)(react@19.2.8)(scheduler@0.27.0)
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
@@ -123,6 +129,9 @@ importers:
       '@mui/material':
         specifier: ^9.0.0
         version: 9.3.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      effect:
+        specifier: ^4.0.0
+        version: 4.0.0
       react:
         specifier: ^19.2.0
         version: 19.2.8
@@ -181,10 +190,10 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.8
-      zustand:
-        specifier: ^5.0.0
-        version: 5.0.14(@types/react@19.2.18)(immer@9.0.21)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
+      '@effect/atom-react':
+        specifier: ^4.0.0
+        version: 4.0.0(effect@4.0.0)(react@19.2.8)(scheduler@0.27.0)
       '@testing-library/jest-dom':
         specifier: ^6.9.0
         version: 6.10.0(@testing-library/dom@10.4.1)
@@ -200,6 +209,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.0
         version: 6.0.5(vite@8.2.1(@types/node@24.13.3)(esbuild@0.27.7))
+      effect:
+        specifier: ^4.0.0
+        version: 4.0.0
       jsdom:
         specifier: ^29.0.0
         version: 29.1.1
@@ -233,9 +245,6 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.8
-      zustand:
-        specifier: ^5.0.0
-        version: 5.0.14(@types/react@19.2.18)(immer@9.0.21)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@dxscript/dxlink-dxcharts-lite':
         specifier: 2.0.0-SNAPSHOT-20260629-142303
@@ -243,6 +252,9 @@ importers:
       '@dxscript/dxlink-dxscript-editor':
         specifier: 2.0.0-SNAPSHOT-20260629-142303
         version: 2.0.0-SNAPSHOT-20260629-142303(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@effect/atom-react':
+        specifier: ^4.0.0
+        version: 4.0.0(effect@4.0.0)(react@19.2.8)(scheduler@0.27.0)
       '@testing-library/jest-dom':
         specifier: ^6.9.0
         version: 6.10.0(@testing-library/dom@10.4.1)
@@ -258,6 +270,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.0
         version: 6.0.5(vite@8.2.1(@types/node@24.13.3)(esbuild@0.27.7))
+      effect:
+        specifier: ^4.0.0
+        version: 4.0.0
       jsdom:
         specifier: ^29.0.0
         version: 29.1.1
@@ -297,10 +312,10 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.8
-      zustand:
-        specifier: ^5.0.0
-        version: 5.0.14(@types/react@19.2.18)(immer@9.0.21)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
+      '@effect/atom-react':
+        specifier: ^4.0.0
+        version: 4.0.0(effect@4.0.0)(react@19.2.8)(scheduler@0.27.0)
       '@testing-library/jest-dom':
         specifier: ^6.9.0
         version: 6.10.0(@testing-library/dom@10.4.1)
@@ -316,6 +331,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.0
         version: 6.0.5(vite@8.2.1(@types/node@24.13.3)(esbuild@0.27.7))
+      effect:
+        specifier: ^4.0.0
+        version: 4.0.0
       jsdom:
         specifier: ^29.0.0
         version: 29.1.1
@@ -358,10 +376,10 @@ importers:
       rxjs:
         specifier: '>=7.0.0'
         version: 7.8.2
-      zustand:
-        specifier: ^5.0.0
-        version: 5.0.14(@types/react@19.2.18)(immer@9.0.21)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
+      '@effect/atom-react':
+        specifier: ^4.0.0
+        version: 4.0.0(effect@4.0.0)(react@19.2.8)(scheduler@0.27.0)
       '@testing-library/jest-dom':
         specifier: ^6.9.0
         version: 6.10.0(@testing-library/dom@10.4.1)
@@ -377,6 +395,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.0
         version: 6.0.5(vite@8.2.1(@types/node@24.13.3)(esbuild@0.27.7))
+      effect:
+        specifier: ^4.0.0
+        version: 4.0.0
       jsdom:
         specifier: ^29.0.0
         version: 29.1.1
@@ -727,6 +748,13 @@ packages:
 
   '@dxscript/js-samples@2.0.0-SNAPSHOT-20260629-142303':
     resolution: {integrity: sha512-15E45yLhQJ05JUpF4ykCaVZ3RrxbnLKuxU7UJarZogClvjLl6pry3pQmSF9/KCNfjtxS+mEP3740H1EZbizT6w==}
+
+  '@effect/atom-react@4.0.0':
+    resolution: {integrity: sha512-VPP2oOjj56iwOpL5aIGbu7Qhb4+1sFNdU16aI5of3JqToqWWX9eJPBfeiPyQ1eTYof1hnNX1auyRiTORSfLT6g==}
+    peerDependencies:
+      effect: ^4.0.0
+      react: '>=19.0.0 <20.0.0'
+      scheduler: '>=0.25.0 <0.28.0'
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -2199,6 +2227,9 @@ packages:
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
+
+  effect@4.0.0:
+    resolution: {integrity: sha512-ooc1TG5t+FfzgYnFz2ff6BBKyZ7EwBRVXC7c4RhQUAD6/TZ2gTXXMeb4WX7a19ozQo4J73/QW+S00YAIresoMQ==}
 
   enquirer@2.4.1:
     resolution: {integrity: sha512-rRqJg/6gd538VHvR3PSrdRBb/1Vy2YfzHqzvbhGIQpDRKIa4FgV/54b5Q1xYSxOOwKvjXweS26E0Q+nAMwp2pQ==}
@@ -3795,24 +3826,6 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zustand@5.0.14:
-    resolution: {integrity: sha512-/8tAspM5LMPr28b3fwLYrtdj77ECpfZviaP75CMTnwO8ISyaE4GDIG/9rDDYq/cH9D2Xw2A2RXglLInmVBQB/g==}
-    engines: {node: '>=12.20.0'}
-    peerDependencies:
-      '@types/react': '>=18.0.0'
-      immer: '>=9.0.6'
-      react: '>=18.0.0'
-      use-sync-external-store: '>=1.2.0'
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-      immer:
-        optional: true
-      react:
-        optional: true
-      use-sync-external-store:
-        optional: true
-
 snapshots:
 
   '@acemir/cssom@0.9.31': {}
@@ -4237,6 +4250,12 @@ snapshots:
       - react-dom
 
   '@dxscript/js-samples@2.0.0-SNAPSHOT-20260629-142303': {}
+
+  '@effect/atom-react@4.0.0(effect@4.0.0)(react@19.2.8)(scheduler@0.27.0)':
+    dependencies:
+      effect: 4.0.0
+      react: 19.2.8
+      scheduler: 0.27.0
 
   '@emnapi/core@1.10.0':
     dependencies:
@@ -5567,6 +5586,8 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       es-errors: 1.3.0
       gopd: 1.2.0
+
+  effect@4.0.0: {}
 
   enquirer@2.4.1:
     dependencies:
@@ -7297,10 +7318,3 @@ snapshots:
   yaml@1.10.3: {}
 
   yocto-queue@0.1.0: {}
-
-  zustand@5.0.14(@types/react@19.2.18)(immer@9.0.21)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8)):
-    optionalDependencies:
-      '@types/react': 19.2.18
-      immer: 9.0.21
-      react: 19.2.8
-      use-sync-external-store: 1.6.0(react@19.2.8)

@@ -8,9 +8,9 @@ import type { ComponentType, ReactNode } from 'react'
  * request into a channel config and then to render the channel. Everything that used to be
  * a four-way switch is a lookup on this descriptor.
  *
- * Plugins reach the connection the same way the channel components always have —
- * `useConnectionVM()` for the view model, `useVM` to read its state. Those two are the
- * whole host API; there is no plugin-specific context.
+ * Plugins reach the connection through `useConnection()` — or `useConnectionClient()` for
+ * the live client a channel model opens its channel on — and read its atoms with
+ * `@effect/atom-react`. That is the whole host API; there is no plugin-specific context.
  */
 export interface ChannelPlugin<Config, Request> {
   /**
