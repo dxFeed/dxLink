@@ -11,11 +11,14 @@ import {
   toJson,
 } from '@bufbuild/protobuf'
 
+import type { DXLinkJsonReadOptions } from './service'
+import { withUnresolvedAny } from './unresolved-any'
+
 /**
  * `dxlink-rpc` sends payloads inside `CHANNEL_DATA` messages and the WebSocket client is
  * JSON-only, so messages travel as canonical protobuf-JSON — the encoding the server's
- * `dxlink-ws-json` subprotocol expects. Binary protobuf and `google.protobuf.Any` payloads are
- * not part of this binding.
+ * `dxlink-ws-json` subprotocol expects. Binary protobuf is not part of this binding;
+ * `google.protobuf.Any` decodes through the registry in the JSON read options.
  */
 
 const describe = (service: DescService, method: DescMethod) => `${service.typeName}/${method.name}`
@@ -40,13 +43,30 @@ export const encodeRequest = (
 }
 
 /**
+ * Read options a service decodes its responses with.
+ *
+ * Unknown fields and enum values are ignored unless the caller asks otherwise, so a server adding
+ * a field or an enum value does not make older clients fail; an unknown enum value reads as the
+ * enum's zero value. With `keepUnresolvedAny`, an `Any` of a type missing from the registry
+ * decodes to an `Any` carrying only its type URL (see `withUnresolvedAny`).
+ */
+export const createJsonReadOptions = ({
+  keepUnresolvedAny = false,
+  ...options
+}: DXLinkJsonReadOptions = {}): Partial<JsonReadOptions> => ({
+  ignoreUnknownFields: true,
+  ...options,
+  registry: keepUnresolvedAny ? withUnresolvedAny(options.registry) : options.registry,
+})
+
+/**
  * Convert a JSON payload received on the channel back to a response message.
  */
 export const decodeResponse = (
   service: DescService,
   method: DescMethod,
   payload: unknown,
-  options?: Partial<JsonReadOptions>
+  options: Partial<JsonReadOptions>
 ): MessageShape<DescMessage> => {
   const schema: DescMessage = method.output
   try {

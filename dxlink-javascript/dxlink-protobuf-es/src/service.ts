@@ -38,11 +38,32 @@ export interface DXLinkServiceOptions {
    */
   jsonWriteOptions?: Partial<JsonWriteOptions>
   /**
-   * Options passed to `fromJson` when decoding responses.
+   * Options passed to `fromJson` when decoding responses, plus {@link
+   * DXLinkJsonReadOptions.keepUnresolvedAny}.
    *
    * Supply a `registry` here when response messages embed `google.protobuf.Any`.
+   * `ignoreUnknownFields` defaults to `true`, so fields and enum values added by the server later
+   * do not fail decoding.
    */
-  jsonReadOptions?: Partial<JsonReadOptions>
+  jsonReadOptions?: DXLinkJsonReadOptions
+}
+
+/**
+ * Options for decoding responses from protobuf-JSON: `fromJson`'s own options, plus how to treat
+ * a `google.protobuf.Any` whose type is not in `registry`.
+ */
+export type DXLinkJsonReadOptions = Partial<JsonReadOptions> & {
+  /**
+   * Decode a response even when it embeds a `google.protobuf.Any` whose type is not in
+   * `registry`: such an `Any` keeps only its `typeUrl`, with an empty `value`, at any depth.
+   * Requires `ignoreUnknownFields` (the default) to skip the payload's fields.
+   *
+   * By default an unresolved `Any` fails the whole response, so a server that starts sending a
+   * new payload type makes every response carrying it unreadable until the client's descriptors
+   * catch up. Enable this when the consumer can treat an unknown `Any` as "unknown" instead.
+   * @default false
+   */
+  keepUnresolvedAny?: boolean
 }
 
 /**

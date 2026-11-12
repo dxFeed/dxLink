@@ -62,6 +62,34 @@ const orders = createDXLinkDynamicService(client, service)
 orders['issueOrder']?.({ accountId: '1' }).subscribe(console.log)
 ```
 
+## `google.protobuf.Any`
+
+Decoding an `Any` needs its type in a registry, passed through `jsonReadOptions`:
+
+```ts
+import { createRegistry } from '@bufbuild/protobuf'
+
+const notifications = createDXLinkService(client, NotificationService, {
+  jsonReadOptions: {
+    registry: createRegistry(file_notification_payloads),
+    keepUnresolvedAny: true,
+  },
+})
+```
+
+By default an `Any` whose type is missing from the registry fails the whole response. With
+`keepUnresolvedAny: true` it decodes to an `Any` that keeps only its `typeUrl` (with an empty
+`value`), at any depth, inside the payload of a resolved `Any` too, so a server sending a payload
+type the client does not know yet leaves the rest of the response readable. Unpack with your own
+registry: `anyUnpack` returns `undefined` for such an `Any`.
+
+## Forward compatibility
+
+Responses are decoded with `ignoreUnknownFields: true` unless `jsonReadOptions` says otherwise, so
+a server that adds a field or an enum value does not break older clients: the field is skipped,
+and an unknown enum value reads as the enum's zero value (it is dropped from a repeated field).
+`keepUnresolvedAny` relies on it to skip the fields of an unknown `Any` payload.
+
 ## Interaction models
 
 | protobuf-es method kind | dxLink model       | Client surface                                |

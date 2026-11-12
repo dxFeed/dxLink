@@ -4,7 +4,7 @@ import type { DXLinkClient } from '@dxfeed/dxlink-core'
 import { DxLinkRpcService } from '@dxfeed/dxlink-rpc'
 import { isObservable, map, type Observable } from 'rxjs'
 
-import { decodeResponse, encodeRequest } from './codec'
+import { createJsonReadOptions, decodeResponse, encodeRequest } from './codec'
 import { DXLinkUnsupportedMethodKindError } from './errors'
 import type {
   DXLinkDynamicServiceClient,
@@ -19,6 +19,7 @@ const bindService = (
   options: DXLinkServiceOptions
 ): DXLinkDynamicServiceClient => {
   const { logLevel, jsonReadOptions, jsonWriteOptions, skipUnsupportedMethods } = options
+  const readOptions = createJsonReadOptions(jsonReadOptions)
 
   // `DxLinkRpcService` fills in its own default log level, so pass the key only when it was set.
   const rpc = new DxLinkRpcService(
@@ -39,7 +40,7 @@ const bindService = (
   // here, while the descriptor is being bound, rather than at call time.
   for (const [localName, method] of Object.entries(service.method)) {
     const encode = (request: unknown) => encodeRequest(service, method, request, jsonWriteOptions)
-    const decode = (payload: unknown) => decodeResponse(service, method, payload, jsonReadOptions)
+    const decode = (payload: unknown) => decodeResponse(service, method, payload, readOptions)
 
     switch (method.methodKind) {
       case 'unary': {

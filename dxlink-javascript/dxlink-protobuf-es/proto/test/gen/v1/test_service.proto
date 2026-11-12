@@ -7,6 +7,8 @@ syntax = "proto3";
 
 package test.gen.v1;
 
+import "google/protobuf/any.proto";
+
 enum Flavour {
   FLAVOUR_UNSPECIFIED = 0;
   FLAVOUR_PLAIN = 1;
@@ -32,6 +34,24 @@ message Pong {
   Flavour flavour = 2;
   repeated Nested nested = 3;
   map<string, string> extra = 4;
+}
+
+// `google.protobuf.Any` in every position a field can take: decoding one needs its type in the
+// registry, and `keepUnresolvedAny` must keep the message decodable when it is not.
+message Envelope {
+  string id = 1;
+  google.protobuf.Any payload = 2;
+  repeated google.protobuf.Any extra = 3;
+  map<string, google.protobuf.Any> attachments = 4;
+  oneof content {
+    google.protobuf.Any boxed = 5;
+    string text = 6;
+  }
+  Envelope inner = 7;
+}
+
+service EnvelopeService {
+  rpc Fetch(Ping) returns (Envelope);
 }
 
 // Every interaction model the dxLink wire can carry.

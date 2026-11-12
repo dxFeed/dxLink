@@ -2,11 +2,12 @@ import { readFileSync } from 'node:fs'
 
 import {
   createFileRegistry,
+  createRegistry,
   type DescService,
   fromBinary,
   type MessageInitShape,
 } from '@bufbuild/protobuf'
-import { FileDescriptorSetSchema } from '@bufbuild/protobuf/wkt'
+import { anyUnpack, FileDescriptorSetSchema } from '@bufbuild/protobuf/wkt'
 import type {
   DXLinkChannel,
   DXLinkChannelMessage,
@@ -20,11 +21,15 @@ import { type Observable, Subject } from 'rxjs'
 import { expect, test } from 'vitest'
 
 import {
+  type Envelope,
+  EnvelopeSchema,
+  EnvelopeService,
   Flavour,
   MixedService,
   NamingService,
   type PingSchema,
   type Pong,
+  PongSchema,
   TestService,
 } from './gen/test/gen/v1/test_service_pb'
 
@@ -300,6 +305,43 @@ test('reports which method failed when a response cannot be decoded', () => {
   sub.unsubscribe()
 })
 
+const fetchPong = (options: Parameters<typeof createDXLinkService>[2], payload: unknown) => {
+  const mock = createMockClient()
+  const service = createDXLinkService(mock.client, TestService, options)
+  const received: Pong[] = []
+  const errors: unknown[] = []
+
+  const sub = service.unary({ value: 'ping' }).subscribe({
+    next: (message) => received.push(message),
+    error: (error) => errors.push(error),
+  })
+  mock.lastChannel.simulateOpen()
+  mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload })
+  sub.unsubscribe()
+
+  return { received, errors }
+}
+
+test('ignores fields and enum values the client does not know by default', () => {
+  const { received, errors } = fetchPong(
+    {},
+    { value: 'pong', addedLater: true, flavour: 'FLAVOUR_ADDED_LATER' }
+  )
+
+  expect(errors).toEqual([])
+  expect(received).toEqual([pong('pong')])
+})
+
+test('rejects unknown fields when the caller turns ignoreUnknownFields off', () => {
+  const { received, errors } = fetchPong(
+    { jsonReadOptions: { ignoreUnknownFields: false } },
+    { value: 'pong', addedLater: true }
+  )
+
+  expect(received).toEqual([])
+  expect(errors).toHaveLength(1)
+})
+
 test('reports which method failed when a request cannot be encoded', () => {
   const mock = createMockClient()
   const service = createDXLinkDynamicService(mock.client, RuntimeTestService)
@@ -443,4 +485,116 @@ test('rejects client-streaming methods declared by generated code', () => {
   expect(
     Object.keys(createDXLinkService(mock.client, MixedService, { skipUnsupportedMethods: true }))
   ).toEqual(['echo'])
+})
+
+// --- google.protobuf.Any ---
+
+const PONG_URL = 'type.googleapis.com/test.gen.v1.Pong'
+const UNKNOWN_URL = 'type.googleapis.com/test.gen.v1.Unknown'
+
+/** An `Envelope` with an `Any` the registry knows and one it does not, in every field position. */
+const envelopePayload = {
+  id: 'env-1',
+  payload: { '@type': UNKNOWN_URL, foo: 'bar' },
+  extra: [
+    { '@type': PONG_URL, value: 'known' },
+    { '@type': UNKNOWN_URL, foo: 'bar' },
+  ],
+  attachments: {
+    known: { '@type': PONG_URL, value: 'known' },
+    unknown: { '@type': UNKNOWN_URL, foo: 'bar' },
+  },
+  boxed: { '@type': UNKNOWN_URL, foo: 'bar' },
+  inner: { id: 'env-2', payload: { '@type': UNKNOWN_URL, foo: 'bar' } },
+}
+
+const fetchEnvelope = (
+  options: Parameters<typeof createDXLinkService>[2],
+  payload: unknown = envelopePayload
+) => {
+  const mock = createMockClient()
+  const service = createDXLinkService(mock.client, EnvelopeService, options)
+  const received: Envelope[] = []
+  const errors: unknown[] = []
+
+  const sub = service.fetch({ value: 'ping' }).subscribe({
+    next: (message) => received.push(message),
+    error: (error) => errors.push(error),
+  })
+  mock.lastChannel.simulateOpen()
+  mock.lastChannel.simulateMessage({ type: 'CHANNEL_DATA', payload })
+  sub.unsubscribe()
+
+  return { received, errors }
+}
+
+test('fails to decode an Any whose type is not in the registry by default', () => {
+  const { received, errors } = fetchEnvelope({
+    jsonReadOptions: { registry: createRegistry(PongSchema) },
+  })
+
+  expect(received).toEqual([])
+  expect(errors).toHaveLength(1)
+})
+
+test('keepUnresolvedAny keeps an unresolved Any as its type URL in every field position', () => {
+  const registry = createRegistry(PongSchema)
+  const { received, errors } = fetchEnvelope({
+    jsonReadOptions: { registry, keepUnresolvedAny: true },
+  })
+
+  expect(errors).toEqual([])
+  const [envelope] = received
+  if (envelope === undefined) throw new Error('No envelope decoded')
+
+  const unresolved = {
+    $typeName: 'google.protobuf.Any',
+    typeUrl: UNKNOWN_URL,
+    value: new Uint8Array(),
+  }
+
+  expect(envelope.id).toBe('env-1')
+  expect(envelope.payload).toEqual(unresolved)
+  expect(envelope.extra[1]).toEqual(unresolved)
+  expect(envelope.attachments['unknown']).toEqual(unresolved)
+  expect(envelope.content).toEqual({ case: 'boxed', value: unresolved })
+  expect(envelope.inner?.payload).toEqual(unresolved)
+
+  // Resolvable values next to the unresolved ones decode as usual.
+  const [known] = envelope.extra
+  expect(known && anyUnpack(known, registry)).toEqual(pong('known'))
+  const knownAttachment = envelope.attachments['known']
+  expect(knownAttachment && anyUnpack(knownAttachment, registry)).toEqual(pong('known'))
+})
+
+test('keepUnresolvedAny works without a registry', () => {
+  const { received, errors } = fetchEnvelope({ jsonReadOptions: { keepUnresolvedAny: true } })
+
+  expect(errors).toEqual([])
+  expect(received[0]?.extra.map((any) => any.typeUrl)).toEqual([PONG_URL, UNKNOWN_URL])
+})
+
+test('keepUnresolvedAny keeps an unresolved Any inside the payload of a resolved Any', () => {
+  const registry = createRegistry(EnvelopeSchema)
+  const { received, errors } = fetchEnvelope(
+    { jsonReadOptions: { registry, keepUnresolvedAny: true } },
+    {
+      id: 'outer',
+      payload: {
+        '@type': `type.googleapis.com/${EnvelopeSchema.typeName}`,
+        id: 'inner',
+        payload: { '@type': UNKNOWN_URL, foo: 'bar' },
+      },
+    }
+  )
+
+  expect(errors).toEqual([])
+  const outerPayload = received[0]?.payload
+  const inner = outerPayload && anyUnpack(outerPayload, EnvelopeSchema)
+  expect(inner?.id).toBe('inner')
+  expect(inner?.payload).toEqual({
+    $typeName: 'google.protobuf.Any',
+    typeUrl: UNKNOWN_URL,
+    value: new Uint8Array(),
+  })
 })

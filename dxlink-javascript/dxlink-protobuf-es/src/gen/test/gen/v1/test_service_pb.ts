@@ -9,13 +9,15 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { Any, AnyJson } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_any } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file test/gen/v1/test_service.proto.
  */
 export const file_test_gen_v1_test_service: GenFile = /*@__PURE__*/
-  fileDesc("Ch50ZXN0L2dlbi92MS90ZXN0X3NlcnZpY2UucHJvdG8SC3Rlc3QuZ2VuLnYxIhcKBk5lc3RlZBINCgVsYWJlbBgBIAEoCSLUAQoEUGluZxINCgV2YWx1ZRgBIAEoCRIWCg5zZW50X2F0X21pbGxpcxgCIAEoAxIlCgdmbGF2b3VyGAMgASgOMhQudGVzdC5nZW4udjEuRmxhdm91chIjCgZuZXN0ZWQYBCADKAsyEy50ZXN0Lmdlbi52MS5OZXN0ZWQSKwoFZXh0cmEYBSADKAsyHC50ZXN0Lmdlbi52MS5QaW5nLkV4dHJhRW50cnkaLAoKRXh0cmFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIrwBCgRQb25nEg0KBXZhbHVlGAEgASgJEiUKB2ZsYXZvdXIYAiABKA4yFC50ZXN0Lmdlbi52MS5GbGF2b3VyEiMKBm5lc3RlZBgDIAMoCzITLnRlc3QuZ2VuLnYxLk5lc3RlZBIrCgVleHRyYRgEIAMoCzIcLnRlc3QuZ2VuLnYxLlBvbmcuRXh0cmFFbnRyeRosCgpFeHRyYUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEqSQoHRmxhdm91chIXChNGTEFWT1VSX1VOU1BFQ0lGSUVEEAASEQoNRkxBVk9VUl9QTEFJThABEhIKDkZMQVZPVVJfU0FMVEVEEAIyrAEKC1Rlc3RTZXJ2aWNlEi0KBVVuYXJ5EhEudGVzdC5nZW4udjEuUGluZxoRLnRlc3QuZ2VuLnYxLlBvbmcSNgoMU2VydmVyU3RyZWFtEhEudGVzdC5nZW4udjEuUGluZxoRLnRlc3QuZ2VuLnYxLlBvbmcwARI2CgpCaWRpU3RyZWFtEhEudGVzdC5nZW4udjEuUGluZxoRLnRlc3QuZ2VuLnYxLlBvbmcoATABMm8KDE1peGVkU2VydmljZRIsCgRFY2hvEhEudGVzdC5nZW4udjEuUGluZxoRLnRlc3QuZ2VuLnYxLlBvbmcSMQoHQ29sbGVjdBIRLnRlc3QuZ2VuLnYxLlBpbmcaES50ZXN0Lmdlbi52MS5Qb25nKAEycwoNTmFtaW5nU2VydmljZRIvCgdSUENQaW5nEhEudGVzdC5nZW4udjEuUGluZxoRLnRlc3QuZ2VuLnYxLlBvbmcSMQoJcGluZ19wb25nEhEudGVzdC5nZW4udjEuUGluZxoRLnRlc3QuZ2VuLnYxLlBvbmdiBnByb3RvMw");
+  fileDesc("Ch50ZXN0L2dlbi92MS90ZXN0X3NlcnZpY2UucHJvdG8SC3Rlc3QuZ2VuLnYxIhcKBk5lc3RlZBINCgVsYWJlbBgBIAEoCSLUAQoEUGluZxINCgV2YWx1ZRgBIAEoCRIWCg5zZW50X2F0X21pbGxpcxgCIAEoAxIlCgdmbGF2b3VyGAMgASgOMhQudGVzdC5nZW4udjEuRmxhdm91chIjCgZuZXN0ZWQYBCADKAsyEy50ZXN0Lmdlbi52MS5OZXN0ZWQSKwoFZXh0cmEYBSADKAsyHC50ZXN0Lmdlbi52MS5QaW5nLkV4dHJhRW50cnkaLAoKRXh0cmFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIrwBCgRQb25nEg0KBXZhbHVlGAEgASgJEiUKB2ZsYXZvdXIYAiABKA4yFC50ZXN0Lmdlbi52MS5GbGF2b3VyEiMKBm5lc3RlZBgDIAMoCzITLnRlc3QuZ2VuLnYxLk5lc3RlZBIrCgVleHRyYRgEIAMoCzIcLnRlc3QuZ2VuLnYxLlBvbmcuRXh0cmFFbnRyeRosCgpFeHRyYUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi0QIKCEVudmVsb3BlEgoKAmlkGAEgASgJEiUKB3BheWxvYWQYAiABKAsyFC5nb29nbGUucHJvdG9idWYuQW55EiMKBWV4dHJhGAMgAygLMhQuZ29vZ2xlLnByb3RvYnVmLkFueRI7CgthdHRhY2htZW50cxgEIAMoCzImLnRlc3QuZ2VuLnYxLkVudmVsb3BlLkF0dGFjaG1lbnRzRW50cnkSJQoFYm94ZWQYBSABKAsyFC5nb29nbGUucHJvdG9idWYuQW55SAASDgoEdGV4dBgGIAEoCUgAEiQKBWlubmVyGAcgASgLMhUudGVzdC5nZW4udjEuRW52ZWxvcGUaSAoQQXR0YWNobWVudHNFbnRyeRILCgNrZXkYASABKAkSIwoFdmFsdWUYAiABKAsyFC5nb29nbGUucHJvdG9idWYuQW55OgI4AUIJCgdjb250ZW50KkkKB0ZsYXZvdXISFwoTRkxBVk9VUl9VTlNQRUNJRklFRBAAEhEKDUZMQVZPVVJfUExBSU4QARISCg5GTEFWT1VSX1NBTFRFRBACMkQKD0VudmVsb3BlU2VydmljZRIxCgVGZXRjaBIRLnRlc3QuZ2VuLnYxLlBpbmcaFS50ZXN0Lmdlbi52MS5FbnZlbG9wZTKsAQoLVGVzdFNlcnZpY2USLQoFVW5hcnkSES50ZXN0Lmdlbi52MS5QaW5nGhEudGVzdC5nZW4udjEuUG9uZxI2CgxTZXJ2ZXJTdHJlYW0SES50ZXN0Lmdlbi52MS5QaW5nGhEudGVzdC5nZW4udjEuUG9uZzABEjYKCkJpZGlTdHJlYW0SES50ZXN0Lmdlbi52MS5QaW5nGhEudGVzdC5nZW4udjEuUG9uZygBMAEybwoMTWl4ZWRTZXJ2aWNlEiwKBEVjaG8SES50ZXN0Lmdlbi52MS5QaW5nGhEudGVzdC5nZW4udjEuUG9uZxIxCgdDb2xsZWN0EhEudGVzdC5nZW4udjEuUGluZxoRLnRlc3QuZ2VuLnYxLlBvbmcoATJzCg1OYW1pbmdTZXJ2aWNlEi8KB1JQQ1BpbmcSES50ZXN0Lmdlbi52MS5QaW5nGhEudGVzdC5nZW4udjEuUG9uZxIxCglwaW5nX3BvbmcSES50ZXN0Lmdlbi52MS5QaW5nGhEudGVzdC5nZW4udjEuUG9uZ2IGcHJvdG8z", [file_google_protobuf_any]);
 
 /**
  * @generated from message test.gen.v1.Nested
@@ -181,6 +183,108 @@ export const PongSchema: GenMessage<Pong, {jsonType: PongJson, validType: PongVa
   messageDesc(file_test_gen_v1_test_service, 2);
 
 /**
+ * `google.protobuf.Any` in every position a field can take: decoding one needs its type in the
+ * registry, and `keepUnresolvedAny` must keep the message decodable when it is not.
+ *
+ * @generated from message test.gen.v1.Envelope
+ */
+export type Envelope = Message<"test.gen.v1.Envelope"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: google.protobuf.Any payload = 2;
+   */
+  payload?: Any | undefined;
+
+  /**
+   * @generated from field: repeated google.protobuf.Any extra = 3;
+   */
+  extra: Any[];
+
+  /**
+   * @generated from field: map<string, google.protobuf.Any> attachments = 4;
+   */
+  attachments: { [key: string]: Any };
+
+  /**
+   * @generated from oneof test.gen.v1.Envelope.content
+   */
+  content: {
+    /**
+     * @generated from field: google.protobuf.Any boxed = 5;
+     */
+    value: Any;
+    case: "boxed";
+  } | {
+    /**
+     * @generated from field: string text = 6;
+     */
+    value: string;
+    case: "text";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from field: test.gen.v1.Envelope inner = 7;
+   */
+  inner?: Envelope | undefined;
+};
+
+/**
+ * `google.protobuf.Any` in every position a field can take: decoding one needs its type in the
+ * registry, and `keepUnresolvedAny` must keep the message decodable when it is not.
+ *
+ * @generated from message test.gen.v1.Envelope
+ */
+export type EnvelopeJson = {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id?: string;
+
+  /**
+   * @generated from field: google.protobuf.Any payload = 2;
+   */
+  payload?: AnyJson;
+
+  /**
+   * @generated from field: repeated google.protobuf.Any extra = 3;
+   */
+  extra?: AnyJson[];
+
+  /**
+   * @generated from field: map<string, google.protobuf.Any> attachments = 4;
+   */
+  attachments?: { [key: string]: AnyJson };
+
+  /**
+   * @generated from field: google.protobuf.Any boxed = 5;
+   */
+  boxed?: AnyJson;
+
+  /**
+   * @generated from field: string text = 6;
+   */
+  text?: string;
+
+  /**
+   * @generated from field: test.gen.v1.Envelope inner = 7;
+   */
+  inner?: EnvelopeJson;
+};
+
+export type EnvelopeValid = Envelope;
+
+/**
+ * Describes the message test.gen.v1.Envelope.
+ * Use `create(EnvelopeSchema)` to create a new message.
+ */
+export const EnvelopeSchema: GenMessage<Envelope, {jsonType: EnvelopeJson, validType: EnvelopeValid}> = /*@__PURE__*/
+  messageDesc(file_test_gen_v1_test_service, 3);
+
+/**
  * @generated from enum test.gen.v1.Flavour
  */
 export enum Flavour {
@@ -210,6 +314,21 @@ export type FlavourJson = "FLAVOUR_UNSPECIFIED" | "FLAVOUR_PLAIN" | "FLAVOUR_SAL
  */
 export const FlavourSchema: GenEnum<Flavour, FlavourJson> = /*@__PURE__*/
   enumDesc(file_test_gen_v1_test_service, 0);
+
+/**
+ * @generated from service test.gen.v1.EnvelopeService
+ */
+export const EnvelopeService: GenService<{
+  /**
+   * @generated from rpc test.gen.v1.EnvelopeService.Fetch
+   */
+  fetch: {
+    methodKind: "unary";
+    input: typeof PingSchema;
+    output: typeof EnvelopeSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_test_gen_v1_test_service, 0);
 
 /**
  * Every interaction model the dxLink wire can carry.
@@ -242,7 +361,7 @@ export const TestService: GenService<{
     output: typeof PongSchema;
   },
 }> = /*@__PURE__*/
-  serviceDesc(file_test_gen_v1_test_service, 0);
+  serviceDesc(file_test_gen_v1_test_service, 1);
 
 /**
  * A service the wire can carry only in part: `Collect` is client-streaming, which dxLink v1.0
@@ -268,7 +387,7 @@ export const MixedService: GenService<{
     output: typeof PongSchema;
   },
 }> = /*@__PURE__*/
-  serviceDesc(file_test_gen_v1_test_service, 1);
+  serviceDesc(file_test_gen_v1_test_service, 2);
 
 /**
  * Method names that do not survive a naive lowercase-the-first-letter: the client is keyed by the
@@ -294,5 +413,5 @@ export const NamingService: GenService<{
     output: typeof PongSchema;
   },
 }> = /*@__PURE__*/
-  serviceDesc(file_test_gen_v1_test_service, 2);
+  serviceDesc(file_test_gen_v1_test_service, 3);
 

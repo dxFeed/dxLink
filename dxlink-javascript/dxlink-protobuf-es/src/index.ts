@@ -6,5 +6,6 @@ export type {
   DxLinkRpcCallOptions,
   DXLinkServiceClient,
   DXLinkServiceMethod,
+  DXLinkJsonReadOptions,
   DXLinkServiceOptions,
 } from './service'
