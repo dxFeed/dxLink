@@ -1,4 +1,4 @@
-import { useVM } from '@dxfeed/dxlink-console-core'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import Autocomplete from '@mui/material/Autocomplete'
@@ -13,8 +13,8 @@ import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 
 import { EVENT_TYPES, EVENT_TYPES_DOC_URL } from './event-types'
-import { feedSubKey } from './feed-view-model'
-import type { FeedSubKind, FeedSubscriptionInput, FeedViewModel } from './feed-view-model'
+import { feedSubKey } from './feed-model'
+import type { FeedModel, FeedSubKind, FeedSubscriptionInput } from './feed-model'
 import { DocLink } from '../components/doc-link'
 import { BROWSABLE_FREE_TEXT } from '../lib/browsable-free-text'
 import {
@@ -39,9 +39,12 @@ const subLabel = (s: FeedSubscriptionInput): string => {
   return s.kind === 'timeSeries' ? `${base} · from ${s.fromTime ?? 0}` : base
 }
 
-/** Subscription form + active-subscription list (add / remove / clear), wired to the feed VM. */
-export const SubscriptionManager = ({ vm }: { vm: FeedViewModel }) => {
-  const subs = useVM(vm, (s) => s.subscriptions)
+/** Subscription form + active-subscription list (add / remove / clear), wired to the feed model. */
+export const SubscriptionManager = ({ model }: { model: FeedModel }) => {
+  const subs = useAtomValue(model.subscriptions)
+  const add = useAtomSet(model.addSubscription)
+  const remove = useAtomSet(model.removeSubscription)
+  const clear = useAtomSet(model.clearSubscriptions)
 
   const [kind, setKind] = useState<FeedSubKind>('regular')
   const [type, setType] = useState('Quote')
@@ -57,7 +60,7 @@ export const SubscriptionManager = ({ vm }: { vm: FeedViewModel }) => {
 
   const addSubscription = () => {
     if (!canAdd) return
-    vm.addSubscription({
+    add({
       type: type.trim(),
       symbol: symbol.trim(),
       kind,
@@ -188,7 +191,7 @@ export const SubscriptionManager = ({ vm }: { vm: FeedViewModel }) => {
           size="small"
           color="inherit"
           startIcon={<DeleteSweepIcon />}
-          onClick={vm.clearSubscriptions}
+          onClick={() => clear()}
           disabled={subs.length === 0}
         >
           Clear all
@@ -200,7 +203,7 @@ export const SubscriptionManager = ({ vm }: { vm: FeedViewModel }) => {
             <Chip
               key={feedSubKey(s)}
               label={subLabel(s)}
-              onDelete={() => vm.removeSubscription(s)}
+              onDelete={() => remove(s)}
               size="small"
               variant="outlined"
               color={s.kind === 'regular' ? 'default' : 'primary'}

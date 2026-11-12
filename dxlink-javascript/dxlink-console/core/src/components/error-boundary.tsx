@@ -17,7 +17,7 @@ interface ErrorBoundaryState {
 /**
  * Contains a render-time failure to one subtree instead of blanking the app.
  *
- * Channel cards are the motivating case: they construct ViewModels (which throw if the
+ * Channel cards are the motivating case: they open a session (which fails if the
  * connection vanished between opening the dialog and mounting) and they host a
  * third-party chart component. Without a boundary either one takes down the whole
  * console, losing every other open channel too.

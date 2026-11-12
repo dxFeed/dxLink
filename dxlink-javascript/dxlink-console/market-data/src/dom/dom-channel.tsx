@@ -1,8 +1,12 @@
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
 import type { DepthOfMarketOrder } from '@dxfeed/dxlink-api'
-import { useVM } from '@dxfeed/dxlink-console-core'
-import { ChannelWidget } from '@dxfeed/dxlink-console-core'
-import { useConnectionVM } from '@dxfeed/dxlink-console-core'
+import {
+  ChannelWidget,
+  useChannelCard,
+  useConnectionClient,
+  useSession,
+} from '@dxfeed/dxlink-console-core'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import ViewColumnIcon from '@mui/icons-material/ViewColumn'
@@ -20,10 +24,10 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
-import { DomViewModel } from './dom-view-model'
-import type { DomSnapshot } from './dom-view-model'
+import { makeDomModel } from './dom-model'
+import type { DomModel, DomSnapshot } from './dom-model'
 import type { DomConfig } from './types'
 
 interface DomChannelProps {
@@ -135,8 +139,9 @@ const Ladder = ({ snapshot }: { snapshot: DomSnapshot }) => {
   )
 }
 
-const ConfigurationSection = ({ vm }: { vm: DomViewModel }) => {
-  const applied = useVM(vm, (s) => s.config)
+const ConfigurationSection = ({ model }: { model: DomModel }) => {
+  const applied = useAtomValue(model.config)
+  const configure = useAtomSet(model.configure)
   const [aggPeriod, setAggPeriod] = useState('')
   const [depthLimit, setDepthLimit] = useState('')
   // What the server actually returns today, so the request starts from reality. Any other
@@ -144,7 +149,7 @@ const ConfigurationSection = ({ vm }: { vm: DomViewModel }) => {
   const [orderFields, setOrderFields] = useState('price, size')
 
   const apply = () =>
-    vm.configure({
+    configure({
       acceptAggregationPeriod: aggPeriod.trim() === '' ? undefined : Number(aggPeriod),
       acceptDepthLimit: depthLimit.trim() === '' ? undefined : Number(depthLimit),
       // Any field name is allowed through, deliberately. The server decides what it
@@ -247,46 +252,33 @@ const DefRow = ({ label, value }: { label: string; value: React.ReactNode }) => 
   </Stack>
 )
 
-/** Live Depth-of-Market channel — wraps a real {@link DomViewModel}. */
+/** Live Depth-of-Market channel — wraps a {@link DomModel}. */
 export const DomChannel = ({ title, config }: DomChannelProps) => {
-  const connectionVM = useConnectionVM()
-  const [vm] = useState(() => {
-    const client = connectionVM.getClient()
-    if (client === null) {
-      throw new Error('DOM channel opened without an active connection')
-    }
-    return new DomViewModel(client, {
+  const client = useConnectionClient()
+  const [model] = useState(() =>
+    makeDomModel(client, {
       symbol: config.symbol,
       sources: parseList(config.source),
       feed: config.feed || undefined,
       space: config.space || undefined,
     })
-  })
-  useEffect(() => {
-    vm.start()
-    return () => vm.stop()
-  }, [vm])
+  )
+  useSession(model.session)
 
-  const channelState = useVM(vm, (s) => s.channelState)
-  const snapshot = useVM(vm, (s) => s.snapshot)
-  const channelId = useVM(vm, (s) => s.channelId)
-  const channelParameters = useVM(vm, (s) => s.channelParameters)
-  const errors = useVM(vm, (s) => s.errors)
+  const channelState = useAtomValue(model.channel.state)
+  const snapshot = useAtomValue(model.snapshot)
+  const card = useChannelCard(model.channel)
 
   return (
     <ChannelWidget
       icon={<ViewColumnIcon />}
       title={title}
       subtitle={`DOM · ${config.symbol || '—'}`}
-      onClose={vm.close}
       status={<DomStatusChip state={channelState} />}
-      channelId={channelId}
-      parameters={channelParameters}
-      errors={errors}
-      onClearErrors={vm.clearErrors}
+      {...card}
     >
       <Stack spacing={2}>
-        <ConfigurationSection vm={vm} />
+        <ConfigurationSection model={model} />
 
         <Box>
           <Stack

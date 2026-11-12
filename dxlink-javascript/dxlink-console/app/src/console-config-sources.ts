@@ -4,6 +4,7 @@ import type {
   ConsoleConfigLock,
   KeepaliveConfig,
 } from '@dxfeed/dxlink-console-core'
+import { Option, Predicate, Schema } from 'effect'
 
 /**
  * One configuration source, as this app reads it.
@@ -26,44 +27,51 @@ const warn = (detail: string): void => {
   console.warn(`Console configuration: ${detail}; falling back to the default.`)
 }
 
-const readString = (value: unknown, field: string): string | undefined => {
-  if (value === undefined) return undefined
-  if (typeof value !== 'string' || value.trim() === '') {
-    warn(`\`${field}\` must be a non-empty string`)
-
-    return undefined
-  }
-
-  return value.trim()
-}
+/** A string a host or a link supplies: trimmed, and blank means absent. */
+const Text = Schema.Trim.check(Schema.isNonEmpty())
 
 /** Keepalive timings are whole seconds; anything else is a mistake worth reporting. */
-const readSeconds = (value: unknown, field: string): number | undefined => {
+const Seconds = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+
+/** An object read field by field — not an array, not null. */
+const Fields = Schema.Record(Schema.String, Schema.Unknown)
+
+const Entries = Schema.Array(Schema.Unknown)
+
+/**
+ * Decode one field of an untrusted source.
+ *
+ * Absent stays absent. A value that does not decode is dropped with a warning, so the layer
+ * below supplies that field instead — one bad value never costs the rest of the profile.
+ */
+const decodeField = <A>(
+  schema: Schema.Decoder<A>,
+  value: unknown,
+  problem: string
+): A | undefined => {
   if (value === undefined) return undefined
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-    warn(`\`${field}\` must be a whole number of seconds`)
+  const decoded = Schema.decodeUnknownOption(schema)(value)
+  if (Option.isNone(decoded)) {
+    warn(problem)
 
     return undefined
   }
 
-  return value
+  return decoded.value
 }
 
 const readKeepalive = (value: unknown): Partial<KeepaliveConfig> | undefined => {
-  if (value === undefined) return undefined
-  if (typeof value !== 'object' || value === null) {
-    warn('`keepalive` must be an object')
-
-    return undefined
-  }
-  const source = value as Record<string, unknown>
+  const source = decodeField(Fields, value, '`keepalive` must be an object')
+  if (source === undefined) return undefined
   const keepalive: Partial<KeepaliveConfig> = {}
-  const interval = readSeconds(source.interval, 'keepalive.interval')
-  const timeout = readSeconds(source.timeout, 'keepalive.timeout')
-  const acceptTimeout = readSeconds(source.acceptTimeout, 'keepalive.acceptTimeout')
-  if (interval !== undefined) keepalive.interval = interval
-  if (timeout !== undefined) keepalive.timeout = timeout
-  if (acceptTimeout !== undefined) keepalive.acceptTimeout = acceptTimeout
+  for (const field of ['interval', 'timeout', 'acceptTimeout'] as const) {
+    const seconds = decodeField(
+      Seconds,
+      source[field],
+      `\`keepalive.${field}\` must be a whole number of seconds`
+    )
+    if (seconds !== undefined) keepalive[field] = seconds
+  }
 
   return Object.keys(keepalive).length === 0 ? undefined : keepalive
 }
@@ -77,14 +85,12 @@ const readKeepalive = (value: unknown): Partial<KeepaliveConfig> | undefined => 
  * can have been meant.
  */
 const readKindList = (values: readonly unknown[], field: string): readonly string[] => {
-  const kinds = values.filter(
-    (value): value is string => typeof value === 'string' && value.trim() !== ''
-  )
+  const kinds = values.flatMap((value) => Option.toArray(Schema.decodeUnknownOption(Text)(value)))
   if (kinds.length !== values.length) {
     warn(`\`${field}\` contains entries that are not channel-kind names`)
   }
 
-  return [...new Set(kinds.map((kind) => kind.trim()))]
+  return [...new Set(kinds)]
 }
 
 /**
@@ -116,46 +122,36 @@ const readLocks = (
  * property a host adds at serve time.
  */
 export const readInjectedConfig = (host: unknown): AppConsoleInput => {
-  const raw =
-    typeof host === 'object' && host !== null
-      ? (host as { __DXLINK_CONFIG__?: unknown }).__DXLINK_CONFIG__
-      : undefined
-  if (raw === undefined) return { core: {} }
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    warn('`window.__DXLINK_CONFIG__` must be an object')
-
-    return { core: {} }
-  }
-  const record = raw as Record<string, unknown>
+  const raw = Predicate.hasProperty(host, '__DXLINK_CONFIG__') ? host.__DXLINK_CONFIG__ : undefined
+  const record = decodeField(Fields, raw, '`window.__DXLINK_CONFIG__` must be an object')
+  if (record === undefined) return { core: {} }
   const core: ConsoleConfigInput = {}
   const input: AppConsoleInput = { core }
 
-  const wsUrl = readString(record.wsUrl, 'wsUrl')
+  const wsUrl = decodeField(Text, record.wsUrl, '`wsUrl` must be a non-empty string')
   if (wsUrl !== undefined) core.wsUrl = wsUrl
 
-  const descriptorSetUrl = readString(record.descriptorSetUrl, 'descriptorSetUrl')
+  const descriptorSetUrl = decodeField(
+    Text,
+    record.descriptorSetUrl,
+    '`descriptorSetUrl` must be a non-empty string'
+  )
   if (descriptorSetUrl !== undefined) input.descriptorSetUrl = descriptorSetUrl
 
   const keepalive = readKeepalive(record.keepalive)
   if (keepalive !== undefined) core.keepalive = keepalive
 
-  if (record.channelKinds !== undefined) {
-    if (Array.isArray(record.channelKinds)) {
-      const kinds = readKindList(record.channelKinds, 'channelKinds')
-      if (kinds.length > 0) core.channelKinds = kinds
-    } else {
-      warn('`channelKinds` must be an array')
-    }
+  const channelKinds = decodeField(Entries, record.channelKinds, '`channelKinds` must be an array')
+  if (channelKinds !== undefined) {
+    const kinds = readKindList(channelKinds, 'channelKinds')
+    if (kinds.length > 0) core.channelKinds = kinds
   }
 
-  if (record.locked !== undefined) {
-    if (Array.isArray(record.locked)) {
-      const locks = readLocks(record.locked)
-      core.locked = locks.core
-      input.descriptorSetUrlLocked = locks.descriptorSetUrl
-    } else {
-      warn('`locked` must be an array')
-    }
+  const locked = decodeField(Entries, record.locked, '`locked` must be an array')
+  if (locked !== undefined) {
+    const locks = readLocks(locked)
+    core.locked = locks.core
+    input.descriptorSetUrlLocked = locks.descriptorSetUrl
   }
 
   return input
@@ -177,13 +173,15 @@ export const readSearchConfig = (search: string): AppConsoleInput => {
   const core: ConsoleConfigInput = {}
   const input: AppConsoleInput = { core }
 
-  const wsUrl = params.get('ws')?.trim()
-  if (wsUrl !== undefined && wsUrl !== '') core.wsUrl = wsUrl
+  // A blank parameter is how a link leaves a field alone, so it is not worth a warning.
+  const text = (name: string) =>
+    Option.getOrUndefined(Schema.decodeUnknownOption(Text)(params.get(name)))
 
-  const descriptorSetUrl = params.get('descriptors')?.trim()
-  if (descriptorSetUrl !== undefined && descriptorSetUrl !== '') {
-    input.descriptorSetUrl = descriptorSetUrl
-  }
+  const wsUrl = text('ws')
+  if (wsUrl !== undefined) core.wsUrl = wsUrl
+
+  const descriptorSetUrl = text('descriptors')
+  if (descriptorSetUrl !== undefined) input.descriptorSetUrl = descriptorSetUrl
 
   const channels = params.get('channels')
   if (channels !== null) {
