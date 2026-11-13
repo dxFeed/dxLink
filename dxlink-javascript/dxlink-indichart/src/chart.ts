@@ -389,7 +389,6 @@ export class DXLinkIndiChart implements DXLinkIndiChartRequester {
   public updateIndicatorsParameters = (
     indicatorsParameters: DXLinkIndiChartIndicatorsParameters
   ) => {
-    console.log('Updating indi params', indicatorsParameters)
     if (this.lastSubscriptionState) {
       this.lastSubscriptionState = {
         ...this.lastSubscriptionState,
