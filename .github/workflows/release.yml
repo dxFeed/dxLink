@@ -67,17 +67,55 @@ jobs:
           npm install -g 'npm@^11.5.1'
           npm --version
 
-      - name: Fail if there is nothing to release
+      - name: Decide whether to version or resume
+        id: mode
+        # With pending changesets this is a new release. Without them, the last release may have
+        # failed after its version bump was pushed: resume it (publish, tag, GitHub Release) if its
+        # tag is still missing, so a half-published release can be finished by running this again.
         run: |
-          if [ -z "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit)" ]; then
-            echo "::error::No pending changesets in .changeset — nothing to release."
+          if [ -n "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            echo "mode=new" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version=$(node -p "require('./dxlink-core/package.json').version")
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "::error::No pending changesets in .changeset and v$version is already tagged — nothing to release."
             exit 1
           fi
+          # Publish and tag exactly what was versioned: later commits must not go out under this version.
+          release_commit=$(git log -1 --format=%H --grep="^chore(release): v$version\$")
+          if [ -z "$release_commit" ]; then
+            echo "::error::v$version is untagged, but its 'chore(release): v$version' commit is not on ${{ github.ref_name }}."
+            exit 1
+          fi
+          git checkout --detach "$release_commit"
+          echo "::notice::No pending changesets; resuming the unfinished release v$version."
+          echo "mode=resume" >> "$GITHUB_OUTPUT"
 
       - name: Install
         run: pnpm install --frozen-lockfile $PNPM_FILTER
 
+      - name: Fail if a package has never been published
+        # Trusted Publishing can only be attached to a package that already exists on npm, so a new
+        # package would fail mid-publish — after the version bump is pushed and other packages are out.
+        run: |
+          missing=$(pnpm ls -r --depth -1 --json $PNPM_FILTER \
+            | node -e '
+              const pkgs = JSON.parse(require("fs").readFileSync(0, "utf8"));
+              for (const p of pkgs) if (!p.private) console.log(p.name);
+            ' \
+            | while read -r name; do
+                if npm view "$name" name 2>&1 | grep -q E404; then echo "$name"; fi
+              done)
+          if [ -n "$missing" ]; then
+            for name in $missing; do
+              echo "::error::$name has never been published to npm. Publish its first version by hand and add this workflow as its trusted publisher."
+            done
+            exit 1
+          fi
+
       - name: Apply changesets
+        if: ${{ steps.mode.outputs.mode == 'new' }}
         run: pnpm changeset version
 
       - name: Read released version
@@ -89,7 +127,7 @@ jobs:
         run: pnpm turbo run build test lint $PNPM_FILTER
 
       - name: Commit and push version bump
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.dry_run && steps.mode.outputs.mode == 'new' }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -99,30 +137,45 @@ jobs:
 
       - name: Publish to npm
         # `pnpm -r exec` walks the workspace in topological order.
+        # Packages already on npm at this version are skipped, so a resumed release only publishes the rest.
         env:
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
         run: pnpm -r $PNPM_FILTER exec bash "$GITHUB_WORKSPACE/.github/scripts/publish-package.sh"
 
-      - name: Tag the release
-        if: ${{ !inputs.dry_run }}
-        run: |
-          git tag 'v${{ steps.version.outputs.version }}'
-          git push origin 'v${{ steps.version.outputs.version }}'
-
       - name: Collect release notes
-        id: notes
         run: |
           pnpm ls -r --depth -1 --json $PNPM_FILTER \
             | node "$GITHUB_WORKSPACE/.github/scripts/release-notes.mjs" '${{ steps.version.outputs.version }}' \
             > "$RUNNER_TEMP/release-notes.md"
           cat "$RUNNER_TEMP/release-notes.md"
 
+      - name: Tag the release
+        # Annotated tag on the release commit, carrying the release notes as its message.
+        if: ${{ !inputs.dry_run }}
+        run: |
+          tag='v${{ steps.version.outputs.version }}'
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "skip $tag — already tagged"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          { echo "$tag"; echo; cat "$RUNNER_TEMP/release-notes.md"; } > "$RUNNER_TEMP/tag-message.md"
+          git tag -a "$tag" --cleanup=verbatim -F "$RUNNER_TEMP/tag-message.md"
+          git push origin "$tag"
+
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create 'v${{ steps.version.outputs.version }}' \
-            --title 'v${{ steps.version.outputs.version }}' \
+          tag='v${{ steps.version.outputs.version }}'
+          if gh release view "$tag" --repo '${{ github.repository }}' >/dev/null 2>&1; then
+            echo "skip GitHub Release $tag — already exists"
+            exit 0
+          fi
+          gh release create "$tag" \
+            --verify-tag \
+            --title "$tag" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
             --repo '${{ github.repository }}'
