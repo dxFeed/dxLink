@@ -116,6 +116,10 @@ jobs:
 
       - name: Apply changesets
         if: ${{ steps.mode.outputs.mode == 'new' }}
+        # The changelog generator (.changeset/changelog.mjs) looks up each changeset's pull request
+        # and author through the GitHub API.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm changeset version
 
       - name: Read released version

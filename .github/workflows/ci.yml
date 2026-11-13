@@ -64,3 +64,6 @@ jobs:
 
       - name: Test
         run: pnpm turbo run test $PNPM_FILTER
+
+      - name: Test release scripts
+        run: node --test "$GITHUB_WORKSPACE/.github/scripts/release-notes.test.mjs"
