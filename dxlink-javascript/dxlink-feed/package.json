@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-feed",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": false,
   "sideEffects": false,
   "description": "dxLink FEED provides access to the real-time and historical data of dxFeed",

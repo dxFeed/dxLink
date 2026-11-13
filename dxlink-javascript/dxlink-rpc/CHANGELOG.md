@@ -1,5 +1,18 @@
 # @dxfeed/dxlink-rpc
 
+## 0.10.0
+
+### Minor Changes
+
+- 2aa0f0c: Modernize build tooling and packaging. Packages are now bundled with tsup (replacing microbundle) and ship dual ESM/CJS builds exposed through a conditional `exports` map (`import`/`require` with matching type declarations). This packaging change carries no API change of its own, and the standard entry points (`main`, `module`, `types`, `exports`) resolve as before.
+
+### Patch Changes
+
+- Updated dependencies [2aa0f0c]
+- Updated dependencies [29774d4]
+- Updated dependencies [04ce473]
+  - @dxfeed/dxlink-core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.8.1",
-  "description": "dxLink protocol debug console \u2014 the app that composes the console packages",
+  "description": "dxLink protocol debug console — the app that composes the console packages",
   "scripts": {
     "dev": "vite",
     "start": "vite",

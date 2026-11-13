@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-protobuf-es",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": false,
   "sideEffects": false,
   "description": "Binds protobuf-es service descriptors to the dxLink RPC transport, producing typed rxjs clients",

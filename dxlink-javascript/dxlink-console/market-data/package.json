@@ -1,6 +1,6 @@
 {
   "name": "@dxfeed/dxlink-console-market-data",
-  "version": "0.8.1",
+  "version": "0.10.0",
   "private": false,
   "sideEffects": false,
   "description": "dxLink console market-data channels: FEED and DOM",
