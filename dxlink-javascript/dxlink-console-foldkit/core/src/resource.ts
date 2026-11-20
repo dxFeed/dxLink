@@ -1,0 +1,57 @@
+import { Effect, Option, Schema } from 'effect'
+import { ManagedResource } from 'foldkit'
+
+import { DXLinkLogLevel, DXLinkWebSocketClient } from '@dxfeed/dxlink-api'
+
+import { DxLinkSession } from './client'
+import { Message } from './message'
+import { ClientParams, type Model, Session } from './model'
+
+const ClientRequirements = Schema.Struct({
+  sessionId: Schema.Finite,
+  params: ClientParams,
+})
+type ClientRequirements = typeof ClientRequirements.Type
+
+const sessionToMaybeRequirements = (session: Session): Option.Option<ClientRequirements> =>
+  Session.match(session, {
+    Idle: () => Option.none(),
+    Opening: ({ sessionId, params }) => Option.some({ sessionId, params }),
+    Open: ({ sessionId, params }) => Option.some({ sessionId, params }),
+  })
+
+/**
+ * The client exists exactly while the Model holds a session.
+ *
+ * A debug console deliberately limits reconnection to one attempt and logs at DEBUG: what
+ * the protocol does is the thing being looked at.
+ */
+export const managedResources = ManagedResource.make<Model, Message>()((entry) => ({
+  client: entry(Schema.Option(ClientRequirements), {
+    resource: DxLinkSession,
+    modelToMaybeRequirements: (model) => sessionToMaybeRequirements(model.session),
+    acquire: ({ sessionId, params }) =>
+      Effect.try({
+        try: () => {
+          const client = new DXLinkWebSocketClient({
+            keepaliveInterval: params.keepaliveInterval,
+            keepaliveTimeout: params.keepaliveTimeout,
+            acceptKeepaliveTimeout: params.acceptKeepaliveTimeout,
+            logLevel: DXLinkLogLevel.DEBUG,
+            maxReconnectAttempts: 1,
+          })
+          client.connect(params.url)
+
+          return { sessionId, client }
+        },
+        catch: (error) => (error instanceof Error ? error.message : 'Failed to create client'),
+      }),
+    release: ({ client }) =>
+      Effect.sync(() => {
+        client.close()
+      }),
+    onAcquired: ({ sessionId }) => Message.AcquiredClient({ sessionId }),
+    onReleased: () => Message.ReleasedClient(),
+    onAcquireError: (error) => Message.FailedAcquireClient({ reason: String(error) }),
+  }),
+}))

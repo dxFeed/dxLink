@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["-C", "dxlink-javascript", "--filter", "@dxfeed/dxlink-debug-console", "dev"],
       "port": 4280
+    },
+    {
+      "name": "debug-console-foldkit",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "dxlink-javascript", "--filter", "@dxfeed/dxlink-debug-console-foldkit", "dev"],
+      "port": 4281
     }
   ]
 }

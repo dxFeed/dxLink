@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "extends": ["./node_modules/@effect/tsgo/oxlint-presets/recommended.json"],
+  "categories": {
+    "correctness": "off"
+  },
+  "rules": {
+    "effecttsgo/unstable-api-usage": "off",
+    "effecttsgo/global-date": "warn",
+    "effecttsgo/global-date-in-effect": "warn",
+    "effecttsgo/global-fetch": "warn",
+    "effecttsgo/global-fetch-in-effect": "warn"
+  }
+}

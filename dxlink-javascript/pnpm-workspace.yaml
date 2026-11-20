@@ -9,6 +9,8 @@ packages:
   - dxlink-protobuf-es
   # The console is an umbrella: core + the channel packages + the app that composes them.
   - dxlink-console/*
+  # The Foldkit console mirrors that umbrella: core + the channel packages + the app.
+  - dxlink-console-foldkit/*
 # esbuild and unrs-resolver are native modules that need their install scripts.
 # The other flagged packages (protobufjs, @scarf/scarf) don't, so skip them.
 onlyBuiltDependencies:

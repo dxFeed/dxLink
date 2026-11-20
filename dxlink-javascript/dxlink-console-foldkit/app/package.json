@@ -1,0 +1,46 @@
+{
+  "name": "@dxfeed/dxlink-debug-console-foldkit",
+  "version": "0.10.0",
+  "private": true,
+  "type": "module",
+  "description": "dxLink protocol debug console on Foldkit — the app that composes the console packages",
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "oxlint src && effect-tsgo patch --no-typescript --oxlint && oxlint --config .oxlintrc.effect.json --deny-warnings src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@effect/platform-browser": "4.1.0",
+    "@foldkit/ui": "0.170.0",
+    "effect": "4.1.0",
+    "foldkit": "0.170.0",
+    "@dxfeed/dxlink-api": "workspace:*",
+    "@dxfeed/dxlink-console-foldkit-core": "workspace:*",
+    "@dxfeed/dxlink-console-foldkit-market-data": "workspace:*",
+    "@dxfeed/dxlink-console-foldkit-rpc": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "0.50.0",
+    "@foldkit/oxlint-plugin": "0.15.4",
+    "happy-dom": "^20.14.5",
+    "oxlint": "1.85.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2",
+    "@foldkit/devtools": "0.170.0",
+    "@foldkit/vite-plugin": "0.29.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.1"
+  },
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dxFeed/dxLink.git"
+  }
+}

@@ -1,0 +1,680 @@
+import { Array, Option, Record, pipe } from 'effect'
+import type { Html, HtmlBuilder } from 'foldkit/html'
+
+import { Kit } from '@dxfeed/dxlink-console-foldkit-core'
+import { Tabs } from '@foldkit/ui'
+
+import {
+  CANDLE_SYMBOLS_DOC_URL,
+  EPOCH_MILLIS_DOC_URL,
+  FEED_ORDER_SOURCES,
+  ORDER_SOURCES_DOC_URL,
+} from '../../../lib/orderSources'
+import { EventTypes, Feed } from '../../domain'
+import {
+  ICON_COPY,
+  ICON_PAUSE,
+  ICON_PLAY,
+  ICON_PLUS,
+  ICON_SWEEP,
+  docLink,
+  segmentedRadioGroup,
+  withHelp,
+} from '../../viewKit'
+import { Message } from '../message'
+import {
+  type ConfigurationForm,
+  type DataFormatChoice,
+  DataFormatListbox,
+  EventTypeTabs,
+  type Model,
+  SubscriptionKindRadioGroup,
+  type SubscriptionsState,
+  SuggestionCombobox,
+} from '../model'
+import { activeEventType, displayedEvents, formToSubscription, rowsOf } from '../update'
+
+/**
+ * How many rows of one event type are drawn. The table is plain HTML with no virtualization,
+ * so a broad subscription is cut off here; every row is still counted, kept and copied.
+ */
+export const MAX_RENDERED_ROWS = 500
+
+const SUBSCRIPTION_KINDS: ReadonlyArray<Feed.SubscriptionKind> = [
+  'Regular',
+  'Indexed',
+  'TimeSeries',
+]
+
+const SUBSCRIPTION_KIND_LABELS: Readonly<Record<Feed.SubscriptionKind, string>> = {
+  Regular: 'Regular',
+  Indexed: 'Indexed',
+  TimeSeries: 'Time series',
+}
+
+const DATA_FORMAT_OPTIONS: ReadonlyArray<Kit.ListboxOption<DataFormatChoice>> = [
+  { value: '', label: 'Server default' },
+  { value: 'FULL', label: 'FULL' },
+  { value: 'COMPACT', label: 'COMPACT' },
+]
+
+const definitionRow = (label: string, value: string, h: HtmlBuilder<Message>): Html =>
+  h.div(
+    [h.Class('flex items-baseline justify-between gap-2 text-xs')],
+    [
+      h.span([h.Class(Kit.MUTED_TEXT_CLASS)], [label]),
+      h.span([h.Class('text-right font-semibold')], [value]),
+    ]
+  )
+
+const eventFieldsEditor = (
+  model: Model,
+  configuration: ConfigurationForm,
+  h: HtmlBuilder<Message>
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-2')],
+    [
+      ...Array.map(configuration.rows, (row) =>
+        h.keyed('div')(
+          globalThis.String(row.id),
+          [h.Class('flex items-end gap-2')],
+          [
+            h.div(
+              [h.Class('w-44 shrink-0')],
+              [
+                Kit.comboboxField(
+                  {
+                    id: row.typeCombobox.id,
+                    label: 'Event type',
+                    inputValue: row.typeCombobox.inputValue,
+                    suggestions: EventTypes.EVENT_TYPES,
+                    toSubmodel: (viewInputs) =>
+                      h.submodel({
+                        slotId: row.typeCombobox.id,
+                        model: row.typeCombobox,
+                        view: SuggestionCombobox.view,
+                        viewInputs,
+                        toParentMessage: (message) =>
+                          Message.GotFieldRowTypeComboboxMessage({ rowId: row.id, message }),
+                      }),
+                  },
+                  h
+                ),
+              ]
+            ),
+            h.div(
+              [h.Class('min-w-0 grow')],
+              [
+                Kit.textField(
+                  {
+                    id: `feed-${model.channelId}-row-${row.id}-fields`,
+                    label: 'Fields (comma-separated)',
+                    value: row.fields,
+                    onInput: (value) => Message.UpdatedFieldRowFields({ rowId: row.id, value }),
+                  },
+                  h
+                ),
+              ]
+            ),
+            Kit.iconButton(
+              {
+                label: 'Remove',
+                iconPath: ICON_SWEEP,
+                onClick: Message.ClickedRemoveFieldRow({ rowId: row.id }),
+              },
+              h
+            ),
+          ]
+        )
+      ),
+      h.div(
+        [],
+        [
+          Kit.button(
+            {
+              label: 'Add event type',
+              iconPath: ICON_PLUS,
+              variant: 'Ghost',
+              size: 'Small',
+              onClick: Message.ClickedAddFieldRow(),
+            },
+            h
+          ),
+        ]
+      ),
+    ]
+  )
+
+/** Requested configuration beside the one the server actually applied. */
+const configurationSection = (
+  model: Model,
+  state: SubscriptionsState,
+  h: HtmlBuilder<Message>
+): Html => {
+  const { configuration, applied } = state
+  const appliedTypes = Record.toEntries(applied.eventFields)
+
+  return Kit.accordion(
+    {
+      id: `feed-${model.channelId}-configuration`,
+      title: 'Configuration',
+      isOpen: state.isConfigurationOpen,
+      onToggle: (isOpen) => Message.ToggledConfiguration({ isOpen }),
+      content: h.div(
+        [h.Class('grid grid-cols-1 gap-5 md:grid-cols-2')],
+        [
+          h.div(
+            [h.Class('flex flex-col gap-4')],
+            [
+              h.h4([h.Class('text-sm font-semibold')], ['Requested']),
+              h.div(
+                [h.Class('grid grid-cols-1 gap-4 sm:grid-cols-2')],
+                [
+                  Kit.textField(
+                    {
+                      id: `feed-${model.channelId}-aggregation-period`,
+                      label: 'Aggregation period, s',
+                      type: 'number',
+                      value: configuration.aggregationPeriod,
+                      onInput: (value) => Message.UpdatedAggregationPeriod({ value }),
+                      helperText: '0 = none · empty = server default',
+                    },
+                    h
+                  ),
+                  Kit.listboxField(
+                    {
+                      id: configuration.dataFormatListbox.id,
+                      label: 'Data format',
+                      options: DATA_FORMAT_OPTIONS,
+                      maybeValue: Option.some(configuration.dataFormat),
+                      helperText: 'empty = server default',
+                      toSubmodel: (viewInputs) =>
+                        h.submodel({
+                          slotId: configuration.dataFormatListbox.id,
+                          model: configuration.dataFormatListbox,
+                          view: DataFormatListbox.view,
+                          viewInputs,
+                          toParentMessage: (message) =>
+                            Message.GotDataFormatListboxMessage({ message }),
+                        }),
+                    },
+                    h
+                  ),
+                ]
+              ),
+              h.div(
+                [h.Class('flex flex-col gap-2')],
+                [
+                  h.span([h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)], ['Accept event fields']),
+                  eventFieldsEditor(model, configuration, h),
+                ]
+              ),
+              h.div(
+                [],
+                [
+                  Kit.button(
+                    {
+                      label: 'Apply configuration',
+                      iconPath: ICON_PLAY,
+                      variant: 'Primary',
+                      onClick: Message.ClickedApplyConfiguration(),
+                    },
+                    h
+                  ),
+                ]
+              ),
+            ]
+          ),
+          h.div(
+            [h.Class('flex flex-col gap-4')],
+            [
+              h.h4([h.Class('text-sm font-semibold')], ['Applied by server']),
+              h.div(
+                [h.Class('flex flex-col gap-1.5')],
+                [
+                  definitionRow(
+                    'Aggregation period',
+                    Option.match(applied.maybeAggregationPeriod, {
+                      onNone: () => 'default (server-defined)',
+                      onSome: (period) => `${period} s`,
+                    }),
+                    h
+                  ),
+                  definitionRow('Data format', applied.dataFormat, h),
+                ]
+              ),
+              h.div(
+                [h.Class('flex flex-col gap-1.5')],
+                [
+                  h.span([h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)], ['Event fields']),
+                  Array.match(appliedTypes, {
+                    onEmpty: () =>
+                      h.p([h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)], ['None reported yet.']),
+                    onNonEmpty: (types) =>
+                      h.div(
+                        [h.Class('flex flex-col gap-1.5')],
+                        Array.map(types, ([type, fields]) =>
+                          h.keyed('div')(
+                            type,
+                            [],
+                            [
+                              h.span([h.Class('text-xs font-semibold')], [type]),
+                              h.ul(
+                                [h.Class('mt-1 flex flex-wrap gap-1')],
+                                Array.map(fields, (field) =>
+                                  h.keyed('li')(field, [], [Kit.chip(field, 'Neutral', h)])
+                                )
+                              ),
+                            ]
+                          )
+                        )
+                      ),
+                  }),
+                ]
+              ),
+              h.p(
+                [h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)],
+                ['What the server actually applied — may differ from the request.']
+              ),
+            ]
+          ),
+        ]
+      ),
+    },
+    h
+  )
+}
+
+const subscriptionChip = (subscription: Feed.FeedSubscription, h: HtmlBuilder<Message>): Html =>
+  h.span(
+    [
+      h.Class(
+        subscription._tag === 'Regular'
+          ? 'inline-flex h-6 items-center gap-1 rounded-full border border-zinc-300 pr-1 pl-2.5 text-xs font-medium dark:border-zinc-700'
+          : 'inline-flex h-6 items-center gap-1 rounded-full border border-sky-500 pr-1 pl-2.5 text-xs font-medium text-sky-700 dark:text-sky-300'
+      ),
+    ],
+    [
+      Feed.subscriptionLabel(subscription),
+      h.button(
+        [
+          h.Type('button'),
+          h.AriaLabel(`Remove ${Feed.subscriptionLabel(subscription)}`),
+          h.OnClick(
+            Message.ClickedRemoveSubscription({
+              key: Feed.subscriptionKey(subscription),
+            })
+          ),
+          h.Class(
+            'inline-flex size-4 items-center justify-center rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700'
+          ),
+        ],
+        [Kit.icon(Kit.ICON_CLOSE, h, 'size-3')]
+      ),
+    ]
+  )
+
+/** Subscription form and the active subscriptions: add, remove, clear. */
+const subscriptionSection = (
+  model: Model,
+  state: SubscriptionsState,
+  h: HtmlBuilder<Message>
+): Html => {
+  const { form, subscriptions } = state
+  const hasExtraField = form.kind !== 'Regular'
+
+  return h.div(
+    [h.Class('flex flex-col gap-3')],
+    [
+      h.h4([h.Class('text-sm font-semibold')], ['Subscription']),
+      h.div(
+        [],
+        [
+          // NOTE: the channel uses the AUTO contract, which accepts all three shapes.
+          h.submodel({
+            slotId: state.subscriptionKindRadioGroup.id,
+            model: state.subscriptionKindRadioGroup,
+            view: SubscriptionKindRadioGroup.view,
+            viewInputs: {
+              options: SUBSCRIPTION_KINDS,
+              selectedValue: Option.some(form.kind),
+              ariaLabel: 'Subscription kind',
+              orientation: 'Horizontal',
+              toView: segmentedRadioGroup(SUBSCRIPTION_KIND_LABELS, h),
+            },
+            toParentMessage: (message) => Message.GotSubscriptionKindRadioGroupMessage({ message }),
+          }),
+        ]
+      ),
+      h.form(
+        [
+          h.OnSubmit(Message.SubmittedSubscription()),
+          h.Class(
+            hasExtraField
+              ? 'grid grid-cols-1 items-start gap-3 md:grid-cols-[repeat(3,1fr)_auto]'
+              : 'grid grid-cols-1 items-start gap-3 md:grid-cols-[repeat(2,1fr)_auto]'
+          ),
+        ],
+        [
+          Kit.comboboxField(
+            {
+              id: form.typeCombobox.id,
+              label: 'Event type',
+              inputValue: form.typeCombobox.inputValue,
+              suggestions: EventTypes.EVENT_TYPES,
+              helper: [
+                'Event types on ',
+                docLink(EventTypes.EVENT_TYPES_DOC_URL, 'kb.dxfeed.com', h),
+              ],
+              toSubmodel: (viewInputs) =>
+                h.submodel({
+                  slotId: form.typeCombobox.id,
+                  model: form.typeCombobox,
+                  view: SuggestionCombobox.view,
+                  viewInputs,
+                  toParentMessage: (message) =>
+                    Message.GotSubscriptionTypeComboboxMessage({ message }),
+                }),
+            },
+            h
+          ),
+          withHelp(
+            Kit.textField(
+              {
+                id: `feed-${model.channelId}-symbol`,
+                label: 'Symbol',
+                value: form.symbol,
+                onInput: (value) => Message.UpdatedSubscriptionSymbol({ value }),
+              },
+              h
+            ),
+            form.kind === 'TimeSeries'
+              ? [docLink(CANDLE_SYMBOLS_DOC_URL, 'Candle symbol', h), ', e.g. AAPL{=d}']
+              : ['Market symbol, e.g. AAPL'],
+            h
+          ),
+          form.kind === 'Indexed'
+            ? Kit.comboboxField(
+                {
+                  id: form.sourceCombobox.id,
+                  label: 'Order source',
+                  inputValue: form.sourceCombobox.inputValue,
+                  suggestions: FEED_ORDER_SOURCES,
+                  helper: ['Order sources on ', docLink(ORDER_SOURCES_DOC_URL, 'kb.dxfeed.com', h)],
+                  toSubmodel: (viewInputs) =>
+                    h.submodel({
+                      slotId: form.sourceCombobox.id,
+                      model: form.sourceCombobox,
+                      view: SuggestionCombobox.view,
+                      viewInputs,
+                      toParentMessage: (message) =>
+                        Message.GotSubscriptionSourceComboboxMessage({ message }),
+                    }),
+                },
+                h
+              )
+            : h.empty,
+          form.kind === 'TimeSeries'
+            ? withHelp(
+                Kit.textField(
+                  {
+                    id: `feed-${model.channelId}-from-time`,
+                    label: 'From time',
+                    value: form.fromTime,
+                    onInput: (value) => Message.UpdatedSubscriptionFromTime({ value }),
+                  },
+                  h
+                ),
+                [docLink(EPOCH_MILLIS_DOC_URL, 'Unix ms', h), ', or 0 for full history'],
+                h
+              )
+            : h.empty,
+          h.div(
+            [h.Class('md:pt-5')],
+            [
+              Kit.button(
+                {
+                  label: 'Add',
+                  type: 'submit',
+                  iconPath: ICON_PLUS,
+                  variant: 'Primary',
+                  isDisabled: Option.isNone(formToSubscription(form)),
+                },
+                h
+              ),
+            ]
+          ),
+        ]
+      ),
+      h.div(
+        [h.Class('mt-1 flex items-center justify-between gap-2')],
+        [
+          h.span(
+            [h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)],
+            [`Active subscriptions (${subscriptions.length})`]
+          ),
+          Kit.button(
+            {
+              label: 'Clear all',
+              iconPath: ICON_SWEEP,
+              variant: 'Ghost',
+              size: 'Small',
+              isDisabled: Array.isReadonlyArrayEmpty(subscriptions),
+              onClick: Message.ClickedClearSubscriptions(),
+            },
+            h
+          ),
+        ]
+      ),
+      Array.match(subscriptions, {
+        onEmpty: () =>
+          h.p([h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)], ['No active subscriptions.']),
+        onNonEmpty: (active: ReadonlyArray<Feed.FeedSubscription>) =>
+          h.ul(
+            [h.Class('flex flex-wrap gap-1')],
+            Array.map(active, (subscription) =>
+              h.keyed('li')(
+                Feed.subscriptionKey(subscription),
+                [],
+                [subscriptionChip(subscription, h)]
+              )
+            )
+          ),
+      }),
+    ]
+  )
+}
+
+/** Received events: one tab per event type, one row per symbol and source. */
+export const eventsSection = (state: SubscriptionsState, h: HtmlBuilder<Message>): Html => {
+  const events = displayedEvents(state)
+  const isPaused = state.table._tag === 'Paused'
+
+  const pauseButton = Kit.iconButton(
+    {
+      label: isPaused ? 'Resume' : 'Pause',
+      iconPath: isPaused ? ICON_PLAY : ICON_PAUSE,
+      onClick: Message.ClickedTogglePause(),
+    },
+    h
+  )
+
+  return Option.match(activeEventType(state), {
+    onNone: () =>
+      h.div(
+        [h.Class('flex flex-col gap-1')],
+        [
+          h.h4([h.Class('text-sm font-semibold')], ['Events']),
+          // NOTE: a paused table with nothing to show still offers Resume: events received
+          // while it is paused stay out of sight, so without it the table could not leave
+          // the pause.
+          isPaused
+            ? h.div(
+                [h.Class('flex items-center justify-between gap-2')],
+                [
+                  h.p(
+                    [h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)],
+                    ['Paused. Events received meanwhile are shown when the table resumes.']
+                  ),
+                  pauseButton,
+                ]
+              )
+            : h.p(
+                [h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)],
+                ['No events received yet. Add a subscription to start receiving data.']
+              ),
+        ]
+      ),
+    onSome: (active) => {
+      const rows = rowsOf(events, active)
+      const rendered = Array.take(rows, MAX_RENDERED_ROWS)
+      const columns = Feed.buildColumns(
+        Array.map(rows, (row) => row.event),
+        Option.getOrElse(Record.get(state.applied.eventFields, active), () => [])
+      )
+
+      const tabsView = ({ tablist, tabs, activeIndex }: Tabs.RenderInfo<string>): Html =>
+        h.div(
+          [h.Class('flex flex-col gap-2')],
+          [
+            h.div(
+              [h.Class('flex items-center justify-between gap-2')],
+              [
+                h.div(
+                  [...tablist, h.Class('flex min-w-0 grow gap-1 overflow-x-auto')],
+                  Array.map(tabs, (tab) =>
+                    h.keyed('button')(
+                      tab.value,
+                      [
+                        ...tab.tab,
+                        h.Class(
+                          'shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium data-[selected]:border-sky-600 data-[selected]:font-semibold data-[selected]:text-sky-700 dark:data-[selected]:border-sky-400 dark:data-[selected]:text-sky-300 not-data-[selected]:text-zinc-600 not-data-[selected]:hover:text-zinc-900 dark:not-data-[selected]:text-zinc-400 dark:not-data-[selected]:hover:text-zinc-100'
+                        ),
+                      ],
+                      [`${tab.value} (${rowsOf(events, tab.value).length})`]
+                    )
+                  )
+                ),
+                h.div(
+                  [h.Class('flex shrink-0 gap-1')],
+                  [
+                    pauseButton,
+                    Kit.iconButton(
+                      {
+                        label: 'Clear',
+                        iconPath: ICON_SWEEP,
+                        onClick: Message.ClickedClearEvents(),
+                      },
+                      h
+                    ),
+                    Kit.iconButton(
+                      {
+                        label: 'Copy as JSON',
+                        iconPath: ICON_COPY,
+                        onClick: Message.ClickedCopyEvents(),
+                      },
+                      h
+                    ),
+                  ]
+                ),
+              ]
+            ),
+            ...Array.map(
+              Array.filter(tabs, (tab) => tab.index === activeIndex),
+              (tab) =>
+                h.div(
+                  [
+                    ...tab.panel,
+                    h.Class(`h-72 overflow-auto rounded-md border ${Kit.DIVIDER_CLASS}`),
+                  ],
+                  [
+                    h.table(
+                      [h.Class('w-full border-collapse text-left text-xs')],
+                      [
+                        h.thead(
+                          [h.Class('sticky top-0 bg-zinc-100 dark:bg-zinc-800')],
+                          [
+                            h.tr(
+                              [],
+                              Array.map(columns, (column) =>
+                                h.keyed('th')(
+                                  column,
+                                  [
+                                    h.Scope('col'),
+                                    h.Class('px-2 py-1.5 font-semibold whitespace-nowrap'),
+                                  ],
+                                  [column]
+                                )
+                              )
+                            ),
+                          ]
+                        ),
+                        h.tbody(
+                          [],
+                          Array.map(rendered, ({ key, event }) =>
+                            h.keyed('tr')(
+                              key,
+                              [
+                                h.Class(
+                                  `border-t ${Kit.DIVIDER_CLASS} hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
+                                ),
+                              ],
+                              Array.map(columns, (column) =>
+                                h.keyed('td')(
+                                  column,
+                                  [h.Class('px-2 py-1 font-mono whitespace-nowrap')],
+                                  [Feed.formatCell(event[column])]
+                                )
+                              )
+                            )
+                          )
+                        ),
+                      ]
+                    ),
+                  ]
+                )
+            ),
+            rows.length > MAX_RENDERED_ROWS
+              ? h.p(
+                  [h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)],
+                  [
+                    `Showing the first ${MAX_RENDERED_ROWS} of ${rows.length} rows; Copy as JSON includes all of them.`,
+                  ]
+                )
+              : h.empty,
+          ]
+        )
+
+      return h.submodel({
+        slotId: state.eventTypeTabs.id,
+        model: state.eventTypeTabs,
+        view: EventTypeTabs.view,
+        viewInputs: {
+          tabs: Record.keys(events),
+          selectedValue: active,
+          ariaLabel: 'Event types',
+          toView: tabsView,
+        },
+        toParentMessage: (message) => Message.GotEventTypeTabsMessage({ message }),
+      })
+    },
+  })
+}
+
+export const subscriptionsView = (
+  model: Model,
+  state: SubscriptionsState,
+  h: HtmlBuilder<Message>
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-4')],
+    pipe(
+      [
+        configurationSection(model, state, h),
+        subscriptionSection(model, state, h),
+        eventsSection(state, h),
+      ],
+      Array.intersperse(h.hr([h.Class(Kit.DIVIDER_CLASS)]))
+    )
+  )
