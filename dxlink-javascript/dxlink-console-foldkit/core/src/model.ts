@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
 
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
-import { Dialog } from '@foldkit/ui'
+import { Dialog, Popover } from '@foldkit/ui'
 
 import * as ErasedChannel from './channel/erasedChannel'
 import * as ErasedRequest from './channel/erasedRequest'
@@ -89,7 +89,11 @@ export type ConnectionForm = typeof ConnectionForm.Type
  * closed card has no expansion to remember. A collapsed card keeps its body, hidden.
  */
 export const ChannelCard = defineTaggedUnion({
-  Open: { isExpanded: Schema.Boolean, isErrorListOpen: Schema.Boolean },
+  Open: {
+    isExpanded: Schema.Boolean,
+    /** The card's error list. Its id is derived from the card's id, so it is unique on the page. */
+    errorPopover: Popover.Model,
+  },
   Closed: {},
 })
 export type ChannelCard = typeof ChannelCard.Type
@@ -116,8 +120,8 @@ export const Model = Schema.Struct({
   session: Session,
   lastSessionId: Schema.Finite,
   errorLog: ErrorLog,
-  /** Whether the connection's error list is disclosed. */
-  isErrorListOpen: Schema.Boolean,
+  /** The connection's error list. */
+  errorPopover: Popover.Model,
   authToken: Schema.Redacted(Schema.String),
   channels: Schema.Array(ChannelEntry),
   nextChannelId: Schema.Finite,

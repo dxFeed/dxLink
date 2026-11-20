@@ -1,6 +1,9 @@
 import { Array, Option, Predicate, Schema, pipe } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
 
+import type { Kit } from '@dxfeed/dxlink-console-foldkit-core'
+import { Listbox } from '@foldkit/ui'
+
 import { Summary } from '../domain'
 
 const REQUEST_TAG = 'RpcRequest'
@@ -21,6 +24,26 @@ export const Validation = defineTaggedUnion({
 })
 export type Validation = typeof Validation.Type
 
+/**
+ * The Listbox every picker of the form is drawn with. The service picker, the method picker
+ * and the enum fields all select one name out of a list of names.
+ */
+export const NameListbox = Listbox.create<Kit.ListboxOption, string>()
+
+const SERVICE_LISTBOX_ID = 'dxlink-rpc-service'
+const METHOD_LISTBOX_ID = 'dxlink-rpc-method'
+
+/** The DOM id of the generated control of the request field with this key. */
+export const controlId = (key: string): string => `dxlink-rpc-request-field-${key}`
+
+/** The open/closed state of the picker of one enum field of the request. */
+export const EnumListbox = Schema.Struct({
+  /** The `key` of the `Summary.RequestField` the picker edits. */
+  fieldId: Schema.String,
+  listbox: Listbox.Model,
+})
+export type EnumListbox = typeof EnumListbox.Type
+
 /** The request being written for the selected method. */
 export const RequestDraft = Schema.Struct({
   /** ECMAScript name of the method. */
@@ -28,8 +51,43 @@ export const RequestDraft = Schema.Struct({
   /** The request message being edited, as protobuf-JSON. */
   json: Schema.String,
   validation: Validation,
+  /** One per enum field of the method's request message, in field order. */
+  enumListboxes: Schema.Array(EnumListbox),
 })
 export type RequestDraft = typeof RequestDraft.Type
+
+/** The draft a method starts with: its request template, unchecked, every picker closed. */
+export const draftOf = (method: Summary.MethodSummary): RequestDraft => ({
+  methodName: method.localName,
+  json: method.requestTemplate,
+  validation: Validation.Pending(),
+  enumListboxes: Array.getSomes(
+    Array.map(method.fields, (field) =>
+      field._tag === 'Enum'
+        ? Option.some({ fieldId: field.key, listbox: Listbox.init({ id: controlId(field.key) }) })
+        : Option.none()
+    )
+  ),
+})
+
+const parseJson = Option.liftThrowable((text: string): unknown => JSON.parse(text))
+
+/** The request as a JSON object, or `None` while the text is not one. */
+export const parseRequestObject = (
+  json: string
+): Option.Option<Readonly<Record<string, unknown>>> =>
+  pipe(
+    parseJson(json),
+    Option.filter(Predicate.isObject),
+    Option.filter((value) => !Array.isArray(value))
+  )
+
+/** The request text with one field of the request object set to `value`. */
+export const writeRequestField = (
+  request: Readonly<Record<string, unknown>>,
+  jsonName: string,
+  value: unknown
+): string => JSON.stringify({ ...request, [jsonName]: value }, null, 2)
 
 export const Selection = Schema.Struct({
   /** Fully qualified name of the selected service. */
@@ -68,6 +126,8 @@ export const Model = Schema.Struct({
   url: Schema.String,
   load: Load,
   maybeDefinitions: Schema.Option(Definitions),
+  serviceListbox: Listbox.Model,
+  methodListbox: Listbox.Model,
 })
 export type Model = typeof Model.Type
 
@@ -79,6 +139,8 @@ export const emptyModel = (url: string): Model => ({
   url,
   load: Load.Idle(),
   maybeDefinitions: Option.none(),
+  serviceListbox: Listbox.init({ id: SERVICE_LISTBOX_ID }),
+  methodListbox: Listbox.init({ id: METHOD_LISTBOX_ID }),
 })
 
 /** What a channel is opened with: the call, named, and what the card shows about it. */

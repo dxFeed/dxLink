@@ -117,7 +117,10 @@ knows nothing about FEED, DOM or RPC; each service is a `ChannelPlugin`
 
 The card — header, error center, collapse and close — belongs to core and is the same for every
 kind; a plugin's view is the body alone. What the user did with a card is one union,
-`Open { isExpanded } | Closed`: closing is terminal, and the card stays as a record.
+`Open { isExpanded, errorPopover } | Closed`: closing is terminal, and the card stays as a
+record. The error center is a Foldkit UI `Popover` at both scopes — the connection's state is
+`Model.errorPopover`, a card's is its own `errorPopover`, with an id derived from the card's —
+so the list is anchored to its button and portaled out of whatever would clip it.
 
 **Erasure is checked, not assumed.** The registry stores plugins without their types, so every
 value that crosses the boundary is `unknown`: a channel's Model, a request, a Message.
@@ -197,6 +200,12 @@ root element carries the class, and the console — which sets none itself — o
 The app keeps the user's choice (System / Light / Dark) in `localStorage`, reads it and the OS
 preference as Flags before the first render, and follows later OS changes through a
 Subscription.
+
+Floating panels — the error list, and the option lists of `Kit.listboxField` and
+`Kit.comboboxField` — are portaled by Foldkit UI: into the enclosing `<dialog>` when there is
+one, otherwise into a `foldkit-portal-root` element that is a child of `<body>`. Outside a
+dialog they are therefore not descendants of the app's root element, and take the dark palette
+only when the `dark` class is on an ancestor of that portal root.
 
 `core/src/kit.ts` holds the palette and every shared control, so core and the channel packages
 read as one surface. The console packages are consumed as source, so `styles.css` names their

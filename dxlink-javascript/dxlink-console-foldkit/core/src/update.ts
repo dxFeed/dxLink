@@ -3,11 +3,17 @@ import { Command, Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
-import { Dialog } from '@foldkit/ui'
+import { Dialog, Popover } from '@foldkit/ui'
 
 import type { RegisteredChannelPlugin } from './channel/plugin'
 import type { DxLinkClientService } from './client'
-import { ReconnectClient, ScrollToChannel, SetAuthToken, StampAcquireFailure } from './command'
+import {
+  ReconnectClient,
+  ScrollToChannel,
+  SetAuthToken,
+  StampAcquireFailure,
+  channelElementId,
+} from './command'
 import type { ConsoleConfig } from './domain/config'
 import { clearErrors, emptyErrorLog, prependError } from './domain/error'
 import { Message } from './message'
@@ -23,6 +29,12 @@ import {
 } from './model'
 
 export const REQUEST_DIALOG_ID = 'dxlink-channel-request'
+
+export const CONNECTION_ERROR_POPOVER_ID = 'dxlink-connection-errors'
+
+/** The id of one card's error list, unique on the page because the card's id is. */
+export const channelErrorPopoverId = (channelId: string): string =>
+  `${channelElementId(channelId)}-errors`
 
 const DIGITS_ONLY = /[^0-9]/g
 
@@ -83,6 +95,83 @@ const findChannel = (model: Model, channelId: string): Option.Option<ChannelEntr
 const writeChannel = (model: Model, nextChannel: ChannelEntry): Model =>
   modifyFields(model, {
     channels: Array.map((channel) => (channel.id === nextChannel.id ? nextChannel : channel)),
+  })
+
+const foldErrorPopoverOutMessage = Popover.OutMessage.match<Update.Step<Model, Message>>({
+  Opened: () => (model) => ({ model }),
+  Closed: () => (model) => ({ model }),
+})
+
+const readConnectionErrorPopover = (model: Model) => Option.some(model.errorPopover)
+const writeConnectionErrorPopover = (model: Model, nextErrorPopover: Popover.Model): Model =>
+  modifyFields(model, { errorPopover: () => nextErrorPopover })
+const toConnectionErrorPopoverMessage = (message: Popover.Message): Message =>
+  Message.GotConnectionErrorPopoverMessage({ message })
+
+const foldConnectionErrorPopover = Update.foldChild({
+  update: Popover.update,
+  read: readConnectionErrorPopover,
+  write: writeConnectionErrorPopover,
+  toParentMessage: toConnectionErrorPopoverMessage,
+  foldOutMessage: foldErrorPopoverOutMessage,
+})
+
+const foldConnectionErrorPopoverClose = Update.foldChildStep({
+  update: Popover.close,
+  read: readConnectionErrorPopover,
+  write: writeConnectionErrorPopover,
+  toParentMessage: toConnectionErrorPopoverMessage,
+  foldOutMessage: foldErrorPopoverOutMessage,
+})
+
+/** Only an open card has an error list: a closed card, or no card at all, reads as `None`. */
+const readChannelErrorPopover = (model: Model, channelId: string): Option.Option<Popover.Model> =>
+  Option.flatMap(findChannel(model, channelId), (channel) =>
+    ChannelCard.match(channel.card, {
+      Open: ({ errorPopover }) => Option.some(errorPopover),
+      Closed: () => Option.none(),
+    })
+  )
+
+const writeChannelErrorPopover = (
+  model: Model,
+  channelId: string,
+  nextErrorPopover: Popover.Model
+): Model =>
+  modifyFields(model, {
+    channels: Array.map((channel) =>
+      channel.id === channelId
+        ? modifyFields(channel, {
+            card: (card) =>
+              ChannelCard.match(card, {
+                Open: ({ isExpanded }) =>
+                  ChannelCard.Open({ isExpanded, errorPopover: nextErrorPopover }),
+                Closed: () => card,
+              }),
+          })
+        : channel
+    ),
+  })
+
+const toChannelErrorPopoverMessage = (channelId: string, message: Popover.Message): Message =>
+  Message.GotChannelErrorPopoverMessage({ channelId, message })
+
+const foldChannelErrorPopover = Update.foldChildAt({
+  update: Popover.update,
+  readAt: readChannelErrorPopover,
+  writeAt: writeChannelErrorPopover,
+  toParentMessage: toChannelErrorPopoverMessage,
+  foldOutMessage: () => foldErrorPopoverOutMessage,
+})
+
+const foldChannelErrorPopoverClose = (channelId: string) =>
+  Update.foldChildStep({
+    update: Popover.close,
+    read: (model: Model) => readChannelErrorPopover(model, channelId),
+    write: (model: Model, nextErrorPopover: Popover.Model) =>
+      writeChannelErrorPopover(model, channelId, nextErrorPopover),
+    toParentMessage: (message: Popover.Message) => toChannelErrorPopoverMessage(channelId, message),
+    foldOutMessage: foldErrorPopoverOutMessage,
   })
 
 const toChannelMessage =
@@ -172,7 +261,7 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
         session: Session.Idle(),
         lastSessionId: 0,
         errorLog: emptyErrorLog(),
-        isErrorListOpen: false,
+        errorPopover: Popover.init({ id: CONNECTION_ERROR_POPOVER_ID }),
         authToken: Redacted.make(''),
         channels: [],
         nextChannelId: 1,
@@ -201,15 +290,14 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
       ClickedConnect: () => {
         const sessionId = model.lastSessionId + 1
 
-        return {
-          model: modifyFields(model, {
+        return foldConnectionErrorPopoverClose(
+          modifyFields(model, {
             session: () => Session.Opening({ sessionId, params: toClientParams(model.form) }),
             lastSessionId: () => sessionId,
             errorLog: () => emptyErrorLog(),
-            isErrorListOpen: () => false,
             channels: () => [],
-          }),
-        }
+          })
+        )
       },
 
       ClickedReconnect: () => ({ model, commands: [ReconnectClient()] }),
@@ -291,9 +379,11 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
         }),
       }),
 
-      ClickedClearConnectionErrors: () => ({
-        model: modifyFields(model, { errorLog: clearErrors, isErrorListOpen: () => false }),
-      }),
+      ClickedClearConnectionErrors: () =>
+        foldConnectionErrorPopoverClose(modifyFields(model, { errorLog: clearErrors })),
+
+      GotConnectionErrorPopoverMessage: ({ message: popoverMessage }) =>
+        foldConnectionErrorPopover(model, popoverMessage),
 
       SucceededReconnectClient: () => ({ model }),
 
@@ -373,7 +463,10 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
                   channels: Array.append({
                     id: channelId,
                     kind: plugin.kind,
-                    card: ChannelCard.Open({ isExpanded: true, isErrorListOpen: false }),
+                    card: ChannelCard.Open({
+                      isExpanded: true,
+                      errorPopover: Popover.init({ id: channelErrorPopoverId(channelId) }),
+                    }),
                     model: channelInit.model,
                   }),
                   nextChannelId: (nextChannelId) => nextChannelId + 1,
@@ -427,8 +520,8 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
               ? modifyFields(channel, {
                   card: (card) =>
                     ChannelCard.match(card, {
-                      Open: ({ isExpanded, isErrorListOpen }) =>
-                        ChannelCard.Open({ isExpanded: !isExpanded, isErrorListOpen }),
+                      Open: ({ isExpanded, errorPopover }) =>
+                        ChannelCard.Open({ isExpanded: !isExpanded, errorPopover }),
                       Closed: () => card,
                     }),
                 })
@@ -445,42 +538,25 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
         }),
       }),
 
-      ToggledChannelErrorList: ({ channelId, isOpen }) => ({
-        model: modifyFields(model, {
-          channels: Array.map((channel) =>
-            channel.id === channelId
-              ? modifyFields(channel, {
-                  card: (card) =>
-                    ChannelCard.match(card, {
-                      Open: ({ isExpanded }) =>
-                        ChannelCard.Open({ isExpanded, isErrorListOpen: isOpen }),
-                      Closed: () => card,
-                    }),
-                })
-              : channel
-          ),
-        }),
-      }),
+      GotChannelErrorPopoverMessage: ({ channelId, message: popoverMessage }) =>
+        foldChannelErrorPopover(model, channelId, popoverMessage),
 
-      ToggledConnectionErrorList: ({ isOpen }) => ({
-        model: modifyFields(model, { isErrorListOpen: () => isOpen }),
-      }),
-
-      ClickedClearChannelErrors: ({ channelId }) => ({
-        model: modifyFields(model, {
-          channels: Array.map((channel) =>
-            channel.id === channelId
-              ? modifyFields(channel, {
-                  model: (channelModel) =>
-                    Option.match(findPlugin(plugins, channel.kind), {
-                      onNone: () => channelModel,
-                      onSome: (plugin) => plugin.clearErrors(channelModel),
-                    }),
-                })
-              : channel
-          ),
-        }),
-      }),
+      ClickedClearChannelErrors: ({ channelId }) =>
+        foldChannelErrorPopoverClose(channelId)(
+          modifyFields(model, {
+            channels: Array.map((channel) =>
+              channel.id === channelId
+                ? modifyFields(channel, {
+                    model: (channelModel) =>
+                      Option.match(findPlugin(plugins, channel.kind), {
+                        onNone: () => channelModel,
+                        onSome: (plugin) => plugin.clearErrors(channelModel),
+                      }),
+                  })
+                : channel
+            ),
+          })
+        ),
 
       CompletedScrollToChannel: () => ({ model }),
     })

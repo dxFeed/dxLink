@@ -45,10 +45,6 @@ export const channelCard = <Services>(
     Open: (card) => card.isExpanded,
     Closed: () => false,
   })
-  const isErrorListOpen = ChannelCard.match(channel.card, {
-    Open: (card) => card.isErrorListOpen,
-    Closed: () => false,
-  })
 
   return h.section(
     [
@@ -82,18 +78,18 @@ export const channelCard = <Services>(
                 : h.p([h.Class(`truncate text-sm ${Kit.MUTED_TEXT_CLASS}`)], [subheader]),
             ]
           ),
-          isClosed
-            ? Kit.chip('closed', 'Neutral', h)
-            : h.div(
+          ChannelCard.match(channel.card, {
+            Closed: () => Kit.chip('closed', 'Neutral', h),
+            Open: ({ errorPopover }) =>
+              h.div(
                 [h.Class('flex items-center gap-1')],
                 [
                   errorCenter(
                     {
-                      id: `${channelElementId(channel.id)}-errors`,
+                      popover: errorPopover,
+                      toPopoverMessage: (message) =>
+                        Message.GotChannelErrorPopoverMessage({ channelId: channel.id, message }),
                       errors: summary.errors,
-                      isOpen: isErrorListOpen,
-                      onToggle: (isOpen) =>
-                        Message.ToggledChannelErrorList({ channelId: channel.id, isOpen }),
                       onClear: Message.ClickedClearChannelErrors({
                         channelId: channel.id,
                       }),
@@ -131,6 +127,7 @@ export const channelCard = <Services>(
                   ),
                 ]
               ),
+          }),
         ]
       ),
       isClosed

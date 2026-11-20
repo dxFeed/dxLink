@@ -24,10 +24,13 @@ import {
 import { Message } from '../message'
 import {
   type ConfigurationForm,
+  type DataFormatChoice,
+  DataFormatListbox,
   EventTypeTabs,
   type Model,
   SubscriptionKindRadioGroup,
   type SubscriptionsState,
+  SuggestionCombobox,
 } from '../model'
 import { activeEventType, displayedEvents, formToSubscription, rowsOf } from '../update'
 
@@ -49,6 +52,12 @@ const SUBSCRIPTION_KIND_LABELS: Readonly<Record<Feed.SubscriptionKind, string>> 
   TimeSeries: 'Time series',
 }
 
+const DATA_FORMAT_OPTIONS: ReadonlyArray<Kit.ListboxOption<DataFormatChoice>> = [
+  { value: '', label: 'Server default' },
+  { value: 'FULL', label: 'FULL' },
+  { value: 'COMPACT', label: 'COMPACT' },
+]
+
 const definitionRow = (label: string, value: string, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex items-baseline justify-between gap-2 text-xs')],
@@ -62,13 +71,10 @@ const eventFieldsEditor = (
   model: Model,
   configuration: ConfigurationForm,
   h: HtmlBuilder<Message>
-): Html => {
-  const typesListId = `feed-${model.channelId}-field-types`
-
-  return h.div(
+): Html =>
+  h.div(
     [h.Class('flex flex-col gap-2')],
     [
-      Kit.suggestions(typesListId, EventTypes.EVENT_TYPES, h),
       ...Array.map(configuration.rows, (row) =>
         h.keyed('div')(
           globalThis.String(row.id),
@@ -77,13 +83,21 @@ const eventFieldsEditor = (
             h.div(
               [h.Class('w-44 shrink-0')],
               [
-                Kit.textField(
+                Kit.comboboxField(
                   {
-                    id: `feed-${model.channelId}-row-${row.id}-type`,
+                    id: row.typeCombobox.id,
                     label: 'Event type',
-                    value: row.type,
-                    listId: typesListId,
-                    onInput: (value) => Message.UpdatedFieldRowType({ rowId: row.id, value }),
+                    inputValue: row.typeCombobox.inputValue,
+                    suggestions: EventTypes.EVENT_TYPES,
+                    toSubmodel: (viewInputs) =>
+                      h.submodel({
+                        slotId: row.typeCombobox.id,
+                        model: row.typeCombobox,
+                        view: SuggestionCombobox.view,
+                        viewInputs,
+                        toParentMessage: (message) =>
+                          Message.GotFieldRowTypeComboboxMessage({ rowId: row.id, message }),
+                      }),
                   },
                   h
                 ),
@@ -131,7 +145,6 @@ const eventFieldsEditor = (
       ),
     ]
   )
-}
 
 /** Requested configuration beside the one the server actually applied. */
 const configurationSection = (
@@ -169,18 +182,22 @@ const configurationSection = (
                     },
                     h
                   ),
-                  Kit.selectField(
+                  Kit.listboxField(
                     {
-                      id: `feed-${model.channelId}-data-format`,
+                      id: configuration.dataFormatListbox.id,
                       label: 'Data format',
-                      value: configuration.dataFormat,
-                      options: [
-                        { value: '', label: 'Server default' },
-                        { value: 'FULL', label: 'FULL' },
-                        { value: 'COMPACT', label: 'COMPACT' },
-                      ],
-                      onChange: (value) => Message.SelectedDataFormat({ value }),
+                      options: DATA_FORMAT_OPTIONS,
+                      maybeValue: Option.some(configuration.dataFormat),
                       helperText: 'empty = server default',
+                      toSubmodel: (viewInputs) =>
+                        h.submodel({
+                          slotId: configuration.dataFormatListbox.id,
+                          model: configuration.dataFormatListbox,
+                          view: DataFormatListbox.view,
+                          viewInputs,
+                          toParentMessage: (message) =>
+                            Message.GotDataFormatListboxMessage({ message }),
+                        }),
                     },
                     h
                   ),
@@ -305,8 +322,6 @@ const subscriptionSection = (
   h: HtmlBuilder<Message>
 ): Html => {
   const { form, subscriptions } = state
-  const typesListId = `feed-${model.channelId}-types`
-  const sourcesListId = `feed-${model.channelId}-sources`
   const hasExtraField = form.kind !== 'Regular'
 
   return h.div(
@@ -332,8 +347,6 @@ const subscriptionSection = (
           }),
         ]
       ),
-      Kit.suggestions(typesListId, EventTypes.EVENT_TYPES, h),
-      Kit.suggestions(sourcesListId, FEED_ORDER_SOURCES, h),
       h.form(
         [
           h.OnSubmit(Message.SubmittedSubscription()),
@@ -344,18 +357,26 @@ const subscriptionSection = (
           ),
         ],
         [
-          withHelp(
-            Kit.textField(
-              {
-                id: `feed-${model.channelId}-type`,
-                label: 'Event type',
-                value: form.type,
-                listId: typesListId,
-                onInput: (value) => Message.UpdatedSubscriptionType({ value }),
-              },
-              h
-            ),
-            ['Event types on ', docLink(EventTypes.EVENT_TYPES_DOC_URL, 'kb.dxfeed.com', h)],
+          Kit.comboboxField(
+            {
+              id: form.typeCombobox.id,
+              label: 'Event type',
+              inputValue: form.typeCombobox.inputValue,
+              suggestions: EventTypes.EVENT_TYPES,
+              helper: [
+                'Event types on ',
+                docLink(EventTypes.EVENT_TYPES_DOC_URL, 'kb.dxfeed.com', h),
+              ],
+              toSubmodel: (viewInputs) =>
+                h.submodel({
+                  slotId: form.typeCombobox.id,
+                  model: form.typeCombobox,
+                  view: SuggestionCombobox.view,
+                  viewInputs,
+                  toParentMessage: (message) =>
+                    Message.GotSubscriptionTypeComboboxMessage({ message }),
+                }),
+            },
             h
           ),
           withHelp(
@@ -374,18 +395,23 @@ const subscriptionSection = (
             h
           ),
           form.kind === 'Indexed'
-            ? withHelp(
-                Kit.textField(
-                  {
-                    id: `feed-${model.channelId}-source`,
-                    label: 'Order source',
-                    value: form.source,
-                    listId: sourcesListId,
-                    onInput: (value) => Message.UpdatedSubscriptionSource({ value }),
-                  },
-                  h
-                ),
-                ['Order sources on ', docLink(ORDER_SOURCES_DOC_URL, 'kb.dxfeed.com', h)],
+            ? Kit.comboboxField(
+                {
+                  id: form.sourceCombobox.id,
+                  label: 'Order source',
+                  inputValue: form.sourceCombobox.inputValue,
+                  suggestions: FEED_ORDER_SOURCES,
+                  helper: ['Order sources on ', docLink(ORDER_SOURCES_DOC_URL, 'kb.dxfeed.com', h)],
+                  toSubmodel: (viewInputs) =>
+                    h.submodel({
+                      slotId: form.sourceCombobox.id,
+                      model: form.sourceCombobox,
+                      view: SuggestionCombobox.view,
+                      viewInputs,
+                      toParentMessage: (message) =>
+                        Message.GotSubscriptionSourceComboboxMessage({ message }),
+                    }),
+                },
                 h
               )
             : h.empty,

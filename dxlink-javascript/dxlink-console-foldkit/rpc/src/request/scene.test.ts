@@ -1,9 +1,11 @@
 import { Option } from 'effect'
 import {
   Command,
-  change,
+  Mount,
+  all,
   click,
   expect,
+  expectAll,
   given,
   label,
   role,
@@ -12,6 +14,8 @@ import {
   type,
 } from 'foldkit/scene'
 import { describe, test } from 'vitest'
+
+import { Listbox } from '@foldkit/ui'
 
 import { Descriptors, Summary } from '../domain'
 import { binaryDescriptorSet } from '../domain/descriptors.fixture'
@@ -76,11 +80,28 @@ const loadedModel = (() => {
 const orderModel = (() => {
   const selected = update(
     loadedModel,
-    Message.SelectedService({ typeName: 'demo.v1.OrderService' })
+    Message.GotServiceListboxMessage({
+      message: Listbox.Message.SelectedItem({ item: 'demo.v1.OrderService' }),
+    })
   ).model
 
   return update(selected, valid(order, ORDER_TEMPLATE)).model
 })()
+
+const serviceTrigger = role('button', { name: 'Service' })
+const methodTrigger = role('button', { name: 'Method' })
+const sideTrigger = role('button', { name: 'side' })
+
+/** What a Listbox asks for once its button is clicked and its list is on screen. */
+const listOpened = [
+  Command.resolve(Listbox.FocusItems, Listbox.Message.CompletedFocusItems()),
+  Mount.resolveAll(
+    [Listbox.AnchorListbox, Listbox.Message.CompletedAnchorListbox()],
+    [Listbox.PortalListboxBackdrop, Listbox.Message.CompletedPortalListboxBackdrop()]
+  ),
+]
+
+const focusReturned = Listbox.Message.CompletedFocusButton()
 
 describe('service definitions', () => {
   test('with nothing loaded the form offers only to load definitions', () => {
@@ -90,8 +111,8 @@ describe('service definitions', () => {
       expect(label('Descriptor set URL')).toHaveValue('/proto/docs'),
       expect(role('button', { name: 'Load' })).toBeEnabled(),
       expect(role('button', { name: 'Load from file' })).toBeEnabled(),
-      expect(label('Service')).toBeAbsent(),
-      expect(label('Method')).toBeAbsent(),
+      expect(serviceTrigger).toBeAbsent(),
+      expect(methodTrigger).toBeAbsent(),
       expect(label('Request JSON')).toBeAbsent()
     )
   })
@@ -136,9 +157,11 @@ describe('service definitions', () => {
       Command.expectExact(ValidateRequest({ ...account, json: ACCOUNT_TEMPLATE })),
       Command.resolve(ValidateRequest, valid(account, ACCOUNT_TEMPLATE)),
       expect(text('2 services from /proto/docs')).toExist(),
-      expect(label('Service')).toHaveValue('demo.v1.AccountService'),
-      expect(label('Method')).toHaveValue('get'),
+      expect(serviceTrigger).toHaveText('demo.v1.AccountService'),
+      expect(methodTrigger).toHaveText('Get — REQUEST_RESPONSE'),
       expect(text('One request, one response.')).toExist(),
+      expect(methodTrigger).toHaveAccessibleDescription('One request, one response.'),
+      expect(role('listbox')).toBeAbsent(),
       expect(label('id')).toHaveValue(''),
       expect(label('Request JSON')).toHaveValue(ACCOUNT_TEMPLATE),
       expect(role('alert')).toBeAbsent()
@@ -155,27 +178,54 @@ describe('service definitions', () => {
         Message.FailedLoadDescriptors({ source: '/proto/docs', reason: 'HTTP 404' })
       ),
       expect(role('alert')).toHaveText('Could not load definitions from /proto/docs: HTTP 404'),
-      expect(label('Service')).toHaveValue('demo.v1.AccountService')
+      expect(serviceTrigger).toHaveText('demo.v1.AccountService')
     )
   })
 })
 
 describe('picking a call', () => {
+  test('the service list offers every loaded service and marks the selected one', () => {
+    scene(
+      { update, view },
+      given(loadedModel),
+      click(serviceTrigger),
+      ...listOpened,
+      expectAll(all.role('option')).toHaveCount(2),
+      expect(role('option', { name: 'demo.v1.AccountService' })).toHaveAttr('data-selected'),
+      expect(role('option', { name: 'demo.v1.OrderService' })).not.toHaveAttr('data-selected')
+    )
+  })
+
   test('selecting a service shows its methods and a control per editable field', () => {
     scene(
       { update, view },
       given(loadedModel),
-      change(label('Service'), 'demo.v1.OrderService'),
-      Command.expectExact(ValidateRequest({ ...order, json: ORDER_TEMPLATE })),
-      Command.resolve(ValidateRequest, valid(order, ORDER_TEMPLATE)),
-      expect(label('Method')).toHaveValue('issue'),
-      expect(role('option', { name: 'Issue — REQUEST_RESPONSE' })).toBeEnabled(),
+      click(serviceTrigger),
+      ...listOpened,
+      click(role('option', { name: 'demo.v1.OrderService' })),
+      Command.expectExact(
+        Listbox.FocusButton({ id: 'dxlink-rpc-service' }),
+        ValidateRequest({ ...order, json: ORDER_TEMPLATE })
+      ),
+      Command.resolveAll(
+        [Listbox.FocusButton, focusReturned],
+        [ValidateRequest, valid(order, ORDER_TEMPLATE)]
+      ),
+      Mount.expectEnded(Listbox.AnchorListbox, Listbox.PortalListboxBackdrop),
+      expect(role('listbox')).toBeAbsent(),
+      expect(serviceTrigger).toHaveText('demo.v1.OrderService'),
+      expect(methodTrigger).toHaveText('Issue — REQUEST_RESPONSE'),
       expect(label('symbol')).toHaveValue(''),
       expect(label('quantity')).toHaveValue('0'),
       expect(text('64-bit — sent as a string')).toExist(),
       expect(role('checkbox', { name: 'live' })).not.toBeChecked(),
       expect(label('price')).toHaveValue('0'),
-      expect(label('side')).toHaveValue('BUY'),
+      expect(sideTrigger).toHaveText('BUY'),
+      expect(sideTrigger).toHaveAccessibleDescription('demo.v1.Side'),
+      click(sideTrigger),
+      ...listOpened,
+      expectAll(all.role('option')).toHaveCount(2),
+      expect(role('option', { name: 'BUY' })).toHaveAttr('data-selected'),
       expect(role('option', { name: 'SELL' })).toExist()
     )
   })
@@ -184,8 +234,21 @@ describe('picking a call', () => {
     scene(
       { update, view },
       given(orderModel),
-      expect(role('option', { name: 'Collect — STREAM_RESPONSE' })).toBeDisabled(),
-      expect(role('option', { name: 'Trade — STREAM_STREAM' })).toBeEnabled()
+      click(methodTrigger),
+      ...listOpened,
+      expectAll(all.role('option')).toHaveCount(3),
+      expect(role('option', { name: 'Collect — STREAM_RESPONSE' })).toHaveAttr(
+        'aria-disabled',
+        'true'
+      ),
+      expect(role('option', { name: 'Issue — REQUEST_RESPONSE' })).not.toHaveAttr(
+        'aria-disabled',
+        'true'
+      ),
+      expect(role('option', { name: 'Trade — STREAM_STREAM' })).not.toHaveAttr(
+        'aria-disabled',
+        'true'
+      )
     )
   })
 
@@ -193,9 +256,15 @@ describe('picking a call', () => {
     scene(
       { update, view },
       given(orderModel),
-      change(label('Method'), 'trade'),
-      Command.resolve(ValidateRequest, valid({ ...order, methodName: 'trade' }, ORDER_TEMPLATE)),
-      expect(label('Method')).toHaveValue('trade'),
+      click(methodTrigger),
+      ...listOpened,
+      click(role('option', { name: 'Trade — STREAM_STREAM' })),
+      Command.resolveAll(
+        [Listbox.FocusButton, focusReturned],
+        [ValidateRequest, valid({ ...order, methodName: 'trade' }, ORDER_TEMPLATE)]
+      ),
+      Mount.expectEnded(Listbox.AnchorListbox, Listbox.PortalListboxBackdrop),
+      expect(methodTrigger).toHaveText('Trade — STREAM_STREAM'),
       expect(text('A stream of requests, a stream of responses.')).toExist()
     )
   })
@@ -217,6 +286,34 @@ describe('writing the request', () => {
       Command.resolve(ValidateRequest, valid(order, edited)),
       expect(label('Request JSON')).toHaveValue(edited),
       expect(label('symbol')).toHaveValue('AAPL')
+    )
+  })
+
+  test('picking an enum value writes its name into the request JSON', () => {
+    const edited = JSON.stringify(
+      { symbol: '', quantity: '0', live: false, price: 0, side: 'SELL' },
+      null,
+      2
+    )
+
+    scene(
+      { update, view },
+      given(orderModel),
+      click(sideTrigger),
+      ...listOpened,
+      click(role('option', { name: 'SELL' })),
+      Command.expectExact(
+        Listbox.FocusButton({ id: 'dxlink-rpc-request-field-5' }),
+        ValidateRequest({ ...order, json: edited })
+      ),
+      Command.resolveAll(
+        [Listbox.FocusButton, focusReturned],
+        [ValidateRequest, valid(order, edited)]
+      ),
+      Mount.expectEnded(Listbox.AnchorListbox, Listbox.PortalListboxBackdrop),
+      expect(role('listbox')).toBeAbsent(),
+      expect(label('Request JSON')).toHaveValue(edited),
+      expect(sideTrigger).toHaveText('SELL')
     )
   })
 
@@ -259,6 +356,8 @@ describe('writing the request', () => {
         })
       ),
       expect(label('id')).toBeAbsent(),
+      expect(serviceTrigger).toExist(),
+      expect(methodTrigger).toExist(),
       expect(text('Fields are editable again once the request below is a JSON object.')).toExist(),
       expect(role('alert')).toHaveText('Invalid JSON: unexpected end of input')
     )

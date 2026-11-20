@@ -3,10 +3,12 @@ import { Submodel } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { defineChannelPlugin } from './channel/plugin'
+import { ErrorLog, clearErrors, emptyErrorLog } from './domain/error'
 
 /**
  * A channel service with no dxLink behind it: its request is one text field and its channel
  * echoes that text. It stands in for a real plugin wherever the console itself is under test.
+ * Nothing reports into its error log: a test that needs channel errors puts them in the Model.
  */
 const EchoRequest = Schema.Struct({ text: Schema.String })
 type EchoRequest = typeof EchoRequest.Type
@@ -15,6 +17,7 @@ const EchoChannel = Schema.Struct({
   channelId: Schema.String,
   text: Schema.String,
   isClosed: Schema.Boolean,
+  errorLog: ErrorLog,
 })
 type EchoChannel = typeof EchoChannel.Type
 
@@ -48,7 +51,7 @@ export const echoPlugin = defineChannelPlugin<
   },
   channel: {
     init: ({ channelId, config }) => ({
-      model: { channelId, text: config, isClosed: false },
+      model: { channelId, text: config, isClosed: false, errorLog: emptyErrorLog() },
     }),
     update: (channel, echoMessage) => ({
       model: { ...channel, text: echoMessage.value },
@@ -59,11 +62,11 @@ export const echoPlugin = defineChannelPlugin<
       maybeStatus: Option.none(),
       maybeChannelId: Option.none(),
       parameters: {},
-      errors: [],
+      errors: channel.errorLog.errors,
     }),
     close: (channel) => ({ ...channel, isClosed: true }),
     connect: () => Effect.void,
-    clearErrors: (channel) => channel,
+    clearErrors: (channel) => ({ ...channel, errorLog: clearErrors(channel.errorLog) }),
     Model: EchoChannel,
     Message: EchoMessage,
     isModel: Schema.is(EchoChannel),

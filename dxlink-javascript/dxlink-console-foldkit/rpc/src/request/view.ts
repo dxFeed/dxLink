@@ -1,4 +1,4 @@
-import { Array, Option, Predicate, String, pipe } from 'effect'
+import { Array, Option, Predicate, String } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
@@ -8,58 +8,64 @@ import { Summary } from '../domain'
 import { Message } from './message'
 import {
   type Definitions,
+  type EnumListbox,
   Load,
   type Model,
+  NameListbox,
   type RequestDraft,
   type RequestOptions,
   Validation,
+  controlId,
+  parseRequestObject,
   selectedCallOf,
   selectedServiceOf,
+  writeRequestField,
 } from './model'
-
-const parseJson = Option.liftThrowable((text: string): unknown => JSON.parse(text))
-
-/** The request as a JSON object, or `None` while the text is not one. */
-const parseJsonObject = (json: string): Option.Option<Readonly<Record<string, unknown>>> =>
-  pipe(
-    parseJson(json),
-    Option.filter(Predicate.isObject),
-    Option.filter((value) => !Array.isArray(value))
-  )
 
 const withField = (
   request: Readonly<Record<string, unknown>>,
   jsonName: string,
   value: unknown
-): Message =>
-  Message.UpdatedRequestJson({
-    value: JSON.stringify({ ...request, [jsonName]: value }, null, 2),
-  })
-
-const fieldId = (key: string): string => `dxlink-rpc-request-field-${key}`
+): Message => Message.UpdatedRequestJson({ value: writeRequestField(request, jsonName, value) })
 
 const fieldControl = (
   field: Summary.RequestField,
   request: Readonly<Record<string, unknown>>,
+  enumListboxes: ReadonlyArray<EnumListbox>,
   h: HtmlBuilder<Message>
 ): Html => {
   const current = request[field.jsonName]
 
   return Summary.RequestField.match(field, {
-    Enum: ({ key, name, jsonName, typeName, valueNames }) =>
-      Kit.selectField(
+    Enum: ({ key, name, typeName, valueNames }) =>
+      Option.match(
+        Array.findFirst(enumListboxes, (entry) => entry.fieldId === key),
         {
-          id: fieldId(key),
-          label: name,
-          value: Predicate.isString(current) ? current : '',
-          options: Array.map(valueNames, (valueName) => ({
-            value: valueName,
-            label: valueName,
-          })),
-          onChange: (value) => withField(request, jsonName, value),
-          helperText: typeName,
-        },
-        h
+          onNone: () => h.empty,
+          onSome: ({ fieldId, listbox }) =>
+            Kit.listboxField(
+              {
+                id: listbox.id,
+                label: name,
+                options: Array.map(valueNames, (valueName) => ({
+                  value: valueName,
+                  label: valueName,
+                })),
+                maybeValue: Option.liftPredicate(current, Predicate.isString),
+                helperText: typeName,
+                toSubmodel: (viewInputs) =>
+                  h.submodel({
+                    slotId: listbox.id,
+                    model: listbox,
+                    view: NameListbox.view,
+                    viewInputs,
+                    toParentMessage: (message) =>
+                      Message.GotEnumListboxMessage({ fieldId, message }),
+                  }),
+              },
+              h
+            ),
+        }
       ),
     Bool: ({ key, name, jsonName }) =>
       h.div(
@@ -67,7 +73,7 @@ const fieldControl = (
         [
           Kit.checkbox(
             {
-              id: fieldId(key),
+              id: controlId(key),
               label: name,
               isChecked: current === true,
               onToggle: (isChecked) => withField(request, jsonName, isChecked),
@@ -79,7 +85,7 @@ const fieldControl = (
     Text: ({ key, name, jsonName, maybeHelp }) =>
       Kit.textField(
         {
-          id: fieldId(key),
+          id: controlId(key),
           label: name,
           value: Predicate.isString(current) ? current : '',
           onInput: (value) => withField(request, jsonName, value),
@@ -93,7 +99,7 @@ const fieldControl = (
     Number: ({ key, name, jsonName }) =>
       Kit.textField(
         {
-          id: fieldId(key),
+          id: controlId(key),
           label: name,
           type: 'number',
           value: Predicate.isNumber(current) ? globalThis.String(current) : '',
@@ -114,23 +120,27 @@ const fieldControl = (
  */
 const requestFields = (
   method: Summary.MethodSummary,
-  json: string,
+  request: RequestDraft,
   h: HtmlBuilder<Message>
 ): Html =>
   Array.match(method.fields, {
     onEmpty: () => h.empty,
     onNonEmpty: (fields) =>
-      Option.match(parseJsonObject(json), {
+      Option.match(parseRequestObject(request.json), {
         onNone: () =>
           h.p(
             [h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)],
             ['Fields are editable again once the request below is a JSON object.']
           ),
-        onSome: (request) =>
+        onSome: (requestObject) =>
           h.div(
             [h.Class('grid grid-cols-1 gap-4 sm:grid-cols-2')],
             Array.map(fields, (field) =>
-              h.keyed('div')(field.key, [h.Class('min-w-0')], [fieldControl(field, request, h)])
+              h.keyed('div')(
+                field.key,
+                [h.Class('min-w-0')],
+                [fieldControl(field, requestObject, request.enumListboxes, h)]
+              )
             )
           ),
       }),
@@ -220,7 +230,7 @@ const methodView = (
     [h.Class('flex flex-col gap-3')],
     [
       Kit.sectionLabel(`Request · ${method.inputTypeName}`, h),
-      requestFields(method, request.json, h),
+      requestFields(method, request, h),
       Kit.textArea(
         {
           id: 'dxlink-rpc-request-json',
@@ -239,59 +249,64 @@ const methodView = (
     ]
   )
 
-const NO_METHOD_VALUE = ''
-
-const pickersView = (definitions: Definitions, h: HtmlBuilder<Message>): ReadonlyArray<Html> => {
+const pickersView = (
+  model: Model,
+  definitions: Definitions,
+  h: HtmlBuilder<Message>
+): ReadonlyArray<Html> => {
   const maybeService = selectedServiceOf(definitions)
   const maybeCall = selectedCallOf(definitions)
 
   return [
-    Kit.selectField(
+    Kit.listboxField(
       {
-        id: 'dxlink-rpc-service',
+        id: model.serviceListbox.id,
         label: 'Service',
-        value: Option.match(maybeService, {
-          onNone: () => '',
-          onSome: (service) => service.typeName,
-        }),
         options: Array.map(definitions.services, (service) => ({
           value: service.typeName,
           label: service.typeName,
         })),
-        onChange: (typeName) => Message.SelectedService({ typeName }),
+        maybeValue: Option.map(maybeService, (service) => service.typeName),
         isDisabled: Array.isReadonlyArrayEmpty(definitions.services),
         ...(Array.isReadonlyArrayEmpty(definitions.services)
           ? { helperText: 'The descriptor set declares no services.' }
           : {}),
+        toSubmodel: (viewInputs) =>
+          h.submodel({
+            slotId: model.serviceListbox.id,
+            model: model.serviceListbox,
+            view: NameListbox.view,
+            viewInputs,
+            toParentMessage: (message) => Message.GotServiceListboxMessage({ message }),
+          }),
       },
       h
     ),
     Option.match(maybeService, {
       onNone: () => h.empty,
       onSome: (service) =>
-        Kit.selectField(
+        Kit.listboxField(
           {
-            id: 'dxlink-rpc-method',
+            id: model.methodListbox.id,
             label: 'Method',
-            value: Option.match(maybeCall, {
-              onNone: () => NO_METHOD_VALUE,
-              onSome: ({ method }) => method.localName,
-            }),
-            options: [
-              ...(Option.isNone(maybeCall)
-                ? [{ value: NO_METHOD_VALUE, label: '', isDisabled: true }]
-                : []),
-              ...Array.map(service.methods, (method) => ({
-                value: method.localName,
-                label: `${method.name} — ${method.modelLabel}`,
-                isDisabled: !method.isSupported,
-              })),
-            ],
-            onChange: (localName) => Message.SelectedMethod({ localName }),
+            options: Array.map(service.methods, (method) => ({
+              value: method.localName,
+              label: `${method.name} — ${method.modelLabel}`,
+              isDisabled: !method.isSupported,
+            })),
+            maybeValue: Option.map(maybeCall, ({ method }) => method.localName),
             ...Option.match(maybeCall, {
               onNone: () => ({}),
               onSome: ({ method }) => ({ helperText: method.modelDescription }),
             }),
+            toSubmodel: (viewInputs) =>
+              h.submodel({
+                slotId: model.methodListbox.id,
+                model: model.methodListbox,
+                view: NameListbox.view,
+                viewInputs,
+                toParentMessage: (message) => Message.GotMethodListboxMessage({ message }),
+              }),
           },
           h
         ),
@@ -319,7 +334,7 @@ export const makeView = (options: RequestOptions) =>
         definitionsView(model, options.isUrlLocked, h),
         ...Option.match(model.maybeDefinitions, {
           onNone: () => [],
-          onSome: (definitions) => pickersView(definitions, h),
+          onSome: (definitions) => pickersView(model, definitions, h),
         }),
       ]
     )

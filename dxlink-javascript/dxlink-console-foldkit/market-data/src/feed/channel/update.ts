@@ -1,15 +1,16 @@
-import { Array, Match, Option, Record, Schema, pipe } from 'effect'
+import { Array, Match, Option, Record, pipe } from 'effect'
 import { Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
 import {
+  Kit,
   type ReportedError,
   clearErrors as clearErrorLog,
   emptyErrorLog,
   prependError,
 } from '@dxfeed/dxlink-console-foldkit-core'
-import { RadioGroup, Tabs } from '@foldkit/ui'
+import { Combobox, Listbox, RadioGroup, Tabs } from '@foldkit/ui'
 
 import { Feed } from '../domain'
 import type { FeedServices } from '../live/service'
@@ -27,7 +28,9 @@ import {
   type ChannelLink,
   type ChartState,
   type ConfigurationForm,
-  DataFormatChoice,
+  type ConfigurationRow,
+  type DataFormatChoice,
+  DataFormatListbox,
   EventTypeTabs,
   EventsTable,
   Lifecycle,
@@ -36,6 +39,7 @@ import {
   type SubscriptionForm,
   SubscriptionKindRadioGroup,
   type SubscriptionsState,
+  SuggestionCombobox,
   View,
 } from './model'
 
@@ -49,13 +53,35 @@ const toNumber = (draft: string): number => {
 
 type UpdateReturn = Update.Return<Model, Message, FeedServices>
 
+/** A row of the accept-event-fields editor whose event type reads `type`. */
+const configurationRow = (
+  channelId: string,
+  id: number,
+  type: string,
+  fields: string
+): ConfigurationRow => ({
+  id,
+  typeCombobox: Kit.withComboboxText(
+    Combobox.init({ id: `feed-${channelId}-row-${id}-type` }),
+    type
+  ),
+  fields,
+})
+
 const initialSubscriptionsState = (channelId: string): SubscriptionsState => ({
-  form: { kind: 'Regular', type: 'Quote', symbol: '', source: '', fromTime: '0' },
+  form: {
+    kind: 'Regular',
+    typeCombobox: Kit.withComboboxText(Combobox.init({ id: `feed-${channelId}-type` }), 'Quote'),
+    symbol: '',
+    sourceCombobox: Combobox.init({ id: `feed-${channelId}-source` }),
+    fromTime: '0',
+  },
   subscriptionKindRadioGroup: RadioGroup.init({ id: `feed-${channelId}-subscription-kind` }),
   configuration: {
     aggregationPeriod: '',
     dataFormat: '',
-    rows: [{ id: 1, type: 'Quote', fields: 'bidPrice, askPrice, bidSize, askSize' }],
+    dataFormatListbox: Listbox.init({ id: `feed-${channelId}-data-format` }),
+    rows: [configurationRow(channelId, 1, 'Quote', 'bidPrice, askPrice, bidSize, askSize')],
     nextRowId: 2,
   },
   subscriptions: [],
@@ -189,9 +215,9 @@ const mapActiveCandles = (
 export const formToSubscription = (
   form: SubscriptionForm
 ): Option.Option<Feed.FeedSubscription> => {
-  const type = form.type.trim()
+  const type = form.typeCombobox.inputValue.trim()
   const symbol = form.symbol.trim()
-  const source = form.source.trim()
+  const source = form.sourceCombobox.inputValue.trim()
   if (type === '' || symbol === '') {
     return Option.none()
   }
@@ -244,8 +270,6 @@ export const rowsOf = (
     })
   )
 
-const isDataFormatChoice = Schema.is(DataFormatChoice)
-
 // SUBMODELS
 
 const foldSubscriptionKindRadioGroupOutMessage = RadioGroup.OutMessage.match<
@@ -293,6 +317,78 @@ const foldEventTypeTabs = Update.foldChild({
     ),
   toParentMessage: (message) => Message.GotEventTypeTabsMessage({ message }),
   foldOutMessage: foldEventTypeTabsOutMessage,
+})
+
+// NOTE: a suggestion field keeps its text in its own Combobox, so picking a suggestion and
+// clearing the field leave nothing to store here.
+const foldSuggestionComboboxOutMessage = Combobox.OutMessage.match<Update.Step<Model, Message>>({
+  Selected: () => (model) => ({ model }),
+  ClearedSelection: () => (model) => ({ model }),
+})
+
+const foldSubscriptionTypeCombobox = Update.foldChild({
+  update: SuggestionCombobox.update,
+  read: (model: Model) => Option.map(maybeSubscriptions(model), (state) => state.form.typeCombobox),
+  write: (model, nextTypeCombobox) =>
+    mapForm(model, (form) => modifyFields(form, { typeCombobox: () => nextTypeCombobox })),
+  toParentMessage: (message) => Message.GotSubscriptionTypeComboboxMessage({ message }),
+  foldOutMessage: foldSuggestionComboboxOutMessage,
+})
+
+const foldSubscriptionSourceCombobox = Update.foldChild({
+  update: SuggestionCombobox.update,
+  read: (model: Model) =>
+    Option.map(maybeSubscriptions(model), (state) => state.form.sourceCombobox),
+  write: (model, nextSourceCombobox) =>
+    mapForm(model, (form) => modifyFields(form, { sourceCombobox: () => nextSourceCombobox })),
+  toParentMessage: (message) => Message.GotSubscriptionSourceComboboxMessage({ message }),
+  foldOutMessage: foldSuggestionComboboxOutMessage,
+})
+
+/** Folds the event-type Combobox of the configuration row `rowId` names; a removed row has none. */
+const foldFieldRowTypeCombobox = Update.foldChildAt({
+  update: SuggestionCombobox.update,
+  readAt: (model: Model, rowId: number) =>
+    pipe(
+      maybeSubscriptions(model),
+      Option.flatMap((state) =>
+        Array.findFirst(state.configuration.rows, (row) => row.id === rowId)
+      ),
+      Option.map((row) => row.typeCombobox)
+    ),
+  writeAt: (model, rowId, nextTypeCombobox) =>
+    mapConfiguration(model, (configuration) =>
+      modifyFields(configuration, {
+        rows: Array.map((row) =>
+          row.id === rowId ? modifyFields(row, { typeCombobox: () => nextTypeCombobox }) : row
+        ),
+      })
+    ),
+  toParentMessage: (rowId, message) => Message.GotFieldRowTypeComboboxMessage({ rowId, message }),
+  foldOutMessage: () => foldSuggestionComboboxOutMessage,
+})
+
+const foldDataFormatListbox = Update.foldChild({
+  update: DataFormatListbox.update,
+  read: (model: Model) =>
+    Option.map(maybeSubscriptions(model), (state) => state.configuration.dataFormatListbox),
+  write: (model, nextDataFormatListbox) =>
+    mapConfiguration(model, (configuration) =>
+      modifyFields(configuration, { dataFormatListbox: () => nextDataFormatListbox })
+    ),
+  toParentMessage: (message) => Message.GotDataFormatListboxMessage({ message }),
+  foldOutMessage: Listbox.OutMessage.match<
+    Update.Step<Model, Message>,
+    Listbox.OutMessage<DataFormatChoice>
+  >({
+    Selected:
+      ({ value }) =>
+      (model) => ({
+        model: mapConfiguration(model, (configuration) =>
+          modifyFields(configuration, { dataFormat: () => value })
+        ),
+      }),
+  }),
 })
 
 // UPDATE
@@ -344,20 +440,16 @@ export const update = (model: Model, message: Message) =>
     GotSubscriptionKindRadioGroupMessage: ({ message }) =>
       whenOpened(model, () => foldSubscriptionKindRadioGroup(model, message)),
 
-    UpdatedSubscriptionType: ({ value }) =>
-      whenOpened(model, () => ({
-        model: mapForm(model, (form) => modifyFields(form, { type: () => value })),
-      })),
+    GotSubscriptionTypeComboboxMessage: ({ message }) =>
+      whenOpened(model, () => foldSubscriptionTypeCombobox(model, message)),
 
     UpdatedSubscriptionSymbol: ({ value }) =>
       whenOpened(model, () => ({
         model: mapForm(model, (form) => modifyFields(form, { symbol: () => value })),
       })),
 
-    UpdatedSubscriptionSource: ({ value }) =>
-      whenOpened(model, () => ({
-        model: mapForm(model, (form) => modifyFields(form, { source: () => value })),
-      })),
+    GotSubscriptionSourceComboboxMessage: ({ message }) =>
+      whenOpened(model, () => foldSubscriptionSourceCombobox(model, message)),
 
     UpdatedSubscriptionFromTime: ({ value }) =>
       whenOpened(model, () => ({
@@ -453,25 +545,11 @@ export const update = (model: Model, message: Message) =>
         ),
       })),
 
-    SelectedDataFormat: ({ value }) =>
-      whenOpened(model, () => ({
-        model: mapConfiguration(model, (configuration) =>
-          modifyFields(configuration, {
-            dataFormat: (dataFormat) => (isDataFormatChoice(value) ? value : dataFormat),
-          })
-        ),
-      })),
+    GotDataFormatListboxMessage: ({ message }) =>
+      whenOpened(model, () => foldDataFormatListbox(model, message)),
 
-    UpdatedFieldRowType: ({ rowId, value }) =>
-      whenOpened(model, () => ({
-        model: mapConfiguration(model, (configuration) =>
-          modifyFields(configuration, {
-            rows: Array.map((row) =>
-              row.id === rowId ? modifyFields(row, { type: () => value }) : row
-            ),
-          })
-        ),
-      })),
+    GotFieldRowTypeComboboxMessage: ({ rowId, message }) =>
+      whenOpened(model, () => foldFieldRowTypeCombobox(model, rowId, message)),
 
     UpdatedFieldRowFields: ({ rowId, value }) =>
       whenOpened(model, () => ({
@@ -497,11 +575,7 @@ export const update = (model: Model, message: Message) =>
       whenOpened(model, () => ({
         model: mapConfiguration(model, (configuration) =>
           modifyFields(configuration, {
-            rows: Array.append({
-              id: configuration.nextRowId,
-              type: '',
-              fields: '',
-            }),
+            rows: Array.append(configurationRow(model.channelId, configuration.nextRowId, '', '')),
             nextRowId: (nextRowId) => nextRowId + 1,
           })
         ),
@@ -518,7 +592,11 @@ export const update = (model: Model, message: Message) =>
                 channelId: model.channelId,
                 aggregationPeriod: configuration.aggregationPeriod,
                 dataFormat: configuration.dataFormat,
-                rows: configuration.rows,
+                rows: Array.map(configuration.rows, (row) => ({
+                  id: row.id,
+                  type: row.typeCombobox.inputValue,
+                  fields: row.fields,
+                })),
               }),
             ],
           }),

@@ -2,8 +2,8 @@ import { Predicate, Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
-import { ErrorLog } from '@dxfeed/dxlink-console-foldkit-core'
-import { RadioGroup, Tabs } from '@foldkit/ui'
+import { ErrorLog, type Kit } from '@dxfeed/dxlink-console-foldkit-core'
+import { Combobox, Listbox, RadioGroup, Tabs } from '@foldkit/ui'
 
 import { Feed } from '../domain'
 
@@ -19,12 +19,15 @@ export const AppliedConfig = Schema.Struct({
 })
 export type AppliedConfig = typeof AppliedConfig.Type
 
-/** The subscription form, as typed. */
+/**
+ * The subscription form, as typed. The event type and the order source are free text with
+ * suggestions: each is the `inputValue` of its Combobox.
+ */
 export const SubscriptionForm = Schema.Struct({
   kind: Feed.SubscriptionKind,
-  type: Schema.String,
+  typeCombobox: Combobox.Model,
   symbol: Schema.String,
-  source: Schema.String,
+  sourceCombobox: Combobox.Model,
   fromTime: Schema.String,
 })
 export type SubscriptionForm = typeof SubscriptionForm.Type
@@ -32,11 +35,24 @@ export type SubscriptionForm = typeof SubscriptionForm.Type
 export const DataFormatChoice = Schema.Literals(['', 'FULL', 'COMPACT'])
 export type DataFormatChoice = typeof DataFormatChoice.Type
 
+/**
+ * One row of the accept-event-fields editor, as typed. `id` is its identity in the keyed list
+ * and the key of its Combobox, whose `inputValue` is the row's event type.
+ */
+export const ConfigurationRow = Schema.Struct({
+  id: Schema.Finite,
+  typeCombobox: Combobox.Model,
+  fields: Schema.String,
+})
+export type ConfigurationRow = typeof ConfigurationRow.Type
+
 /** The requested configuration, as typed. Empty values mean "server default". */
 export const ConfigurationForm = Schema.Struct({
   aggregationPeriod: Schema.String,
   dataFormat: DataFormatChoice,
-  rows: Schema.Array(Feed.EventFieldRow),
+  /** Open and focus state of the control that chooses `dataFormat`. */
+  dataFormatListbox: Listbox.Model,
+  rows: Schema.Array(ConfigurationRow),
   nextRowId: Schema.Finite,
 })
 export type ConfigurationForm = typeof ConfigurationForm.Type
@@ -71,6 +87,15 @@ export type SubscriptionsState = typeof SubscriptionsState.Type
 
 /** The control that chooses the kind of subscription the form adds. */
 export const SubscriptionKindRadioGroup = RadioGroup.create<Feed.SubscriptionKind>()
+
+/** The control that chooses the requested data format. */
+export const DataFormatListbox = Listbox.create<
+  Kit.ListboxOption<DataFormatChoice>,
+  DataFormatChoice
+>()
+
+/** A free-text field that suggests values: an event type or an order source. */
+export const SuggestionCombobox = Combobox.create<string>()
 
 /** The tabs of the events table, one per event type that has rows. */
 export const EventTypeTabs = Tabs.create<string>()

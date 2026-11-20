@@ -5,5 +5,9 @@
 @source '../../market-data/src';
 @source '../../rpc/src';
 
-/* The page owns light/dark: a `dark` class on an ancestor selects the dark palette. */
-@custom-variant dark (&:where(.dark, .dark *));
+/*
+ * The page owns light/dark: a `dark` class on an ancestor selects the dark palette. Floating
+ * panels (lists, popovers) are portaled out of the app's root into Foldkit's portal root, so
+ * that root follows the class wherever on the page it is set.
+ */
+@custom-variant dark (&:where(.dark, .dark *, :root:has(.dark) #foldkit-portal-root, :root:has(.dark) #foldkit-portal-root *));

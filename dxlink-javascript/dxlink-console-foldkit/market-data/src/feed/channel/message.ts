@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { ReportedError } from '@dxfeed/dxlink-console-foldkit-core'
-import { RadioGroup, Tabs } from '@foldkit/ui'
+import { Combobox, Listbox, RadioGroup, Tabs } from '@foldkit/ui'
 
 import { Feed } from '../domain'
 import { AppliedConfig, ChannelState } from './model'
@@ -18,9 +18,9 @@ export const Message = defineMessageUnion({
   ReportedChannelError: { error: ReportedError },
 
   GotSubscriptionKindRadioGroupMessage: { message: RadioGroup.Message },
-  UpdatedSubscriptionType: { value: Schema.String },
+  GotSubscriptionTypeComboboxMessage: { message: Combobox.Message },
   UpdatedSubscriptionSymbol: { value: Schema.String },
-  UpdatedSubscriptionSource: { value: Schema.String },
+  GotSubscriptionSourceComboboxMessage: { message: Combobox.Message },
   UpdatedSubscriptionFromTime: { value: Schema.String },
   SubmittedSubscription: {},
   ClickedRemoveSubscription: { key: Schema.String },
@@ -34,8 +34,8 @@ export const Message = defineMessageUnion({
 
   ToggledConfiguration: { isOpen: Schema.Boolean },
   UpdatedAggregationPeriod: { value: Schema.String },
-  SelectedDataFormat: { value: Schema.String },
-  UpdatedFieldRowType: { rowId: Schema.Finite, value: Schema.String },
+  GotDataFormatListboxMessage: { message: Listbox.Message },
+  GotFieldRowTypeComboboxMessage: { rowId: Schema.Finite, message: Combobox.Message },
   UpdatedFieldRowFields: { rowId: Schema.Finite, value: Schema.String },
   ClickedRemoveFieldRow: { rowId: Schema.Finite },
   ClickedAddFieldRow: {},

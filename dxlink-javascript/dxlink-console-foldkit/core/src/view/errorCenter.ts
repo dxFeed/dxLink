@@ -1,17 +1,17 @@
 import { Array } from 'effect'
-import type { Attribute, Html, HtmlBuilder } from 'foldkit/html'
+import type { ChildAttribute, Html, HtmlBuilder } from 'foldkit/html'
 
-import { Disclosure } from '@foldkit/ui'
+import { Popover } from '@foldkit/ui'
 
 import { MAX_ERRORS, type TimestampedError } from '../domain/error'
 import * as Kit from '../kit'
 
 export type ErrorCenterConfig<Message> = Readonly<{
-  /** Unique on the page: it ties the button to the list it discloses. */
-  id: string
+  /** The list's own state. Its id must be unique on the page: the panel is anchored by it. */
+  popover: Popover.Model
+  toPopoverMessage: (message: Popover.Message) => Message
   errors: ReadonlyArray<TimestampedError>
-  isOpen: boolean
-  onToggle: (isOpen: boolean) => Message
+  /** Expected to close the list as well as empty it: the button goes away with the last error. */
   onClear: Message
   /** The scope these errors belong to, named in the heading. */
   scope: string
@@ -19,13 +19,23 @@ export type ErrorCenterConfig<Message> = Readonly<{
 }>
 
 /**
- * A button that discloses a list of protocol errors, newest first.
+ * Where the list sits against its button: below it, right edges aligned, flipping above when
+ * there is no room below and never closer than `padding` to the viewport edge.
+ */
+const ERROR_LIST_ANCHOR: Popover.AnchorConfig = { placement: 'bottom-end', gap: 8, padding: 8 }
+
+/**
+ * A button that opens a floating list of protocol errors, newest first.
  *
  * Used at both scopes: the connection panel passes the connection's errors, and each channel
  * card passes its own. Renders nothing when there is nothing to report.
  *
  * The count is the label: "1 error" reads as a sentence where a bare badge needs the button
  * to explain it.
+ *
+ * The list is portaled out of the element it is rendered in, so no card or panel can clip it,
+ * and it follows its button while the page scrolls. It therefore inherits nothing from the
+ * console's own root: the text colour is set on the panel itself.
  */
 export const errorCenter = <Message>(
   config: ErrorCenterConfig<Message>,
@@ -34,43 +44,44 @@ export const errorCenter = <Message>(
   Array.match(config.errors, {
     onEmpty: () => h.empty,
     onNonEmpty: (errors) =>
-      Disclosure.view(
-        {
-          id: config.id,
-          isOpen: config.isOpen,
-          onToggle: config.onToggle,
-          toView: (attributes) =>
+      h.submodel({
+        slotId: config.popover.id,
+        model: config.popover,
+        view: Popover.view,
+        viewInputs: {
+          anchor: ERROR_LIST_ANCHOR,
+          toView: ({ button, panel, backdrop, isVisible }) =>
             h.div(
               [h.Class('relative')],
               [
                 h.button(
-                  [...attributes.button, h.Class(Kit.buttonClass('Danger', config.size))],
+                  [...button, h.Class(Kit.buttonClass('Danger', config.size))],
                   [
                     Kit.icon(Kit.ICON_ERROR, h),
                     `${errors.length} error${errors.length === 1 ? '' : 's'}`,
                   ]
                 ),
-                config.isOpen ? errorList(config, errors, attributes.panel, h) : h.empty,
+                ...(isVisible
+                  ? [
+                      h.div([...backdrop, h.Class(Kit.FLOATING_BACKDROP_CLASS)]),
+                      errorList(config, errors, panel, h),
+                    ]
+                  : []),
               ]
             ),
         },
-        h
-      ),
+        toParentMessage: config.toPopoverMessage,
+      }),
   })
 
 const errorList = <Message>(
   config: ErrorCenterConfig<Message>,
   errors: Array.NonEmptyReadonlyArray<TimestampedError>,
-  panel: ReadonlyArray<Attribute<Message>>,
+  panel: ReadonlyArray<ChildAttribute>,
   h: HtmlBuilder<Message>
 ): Html =>
   h.div(
-    [
-      ...panel,
-      h.Class(
-        `absolute right-0 z-20 mt-2 w-[420px] max-w-[90vw] text-left ${Kit.CARD_CLASS} shadow-lg`
-      ),
-    ],
+    [...panel, h.Class(`w-[420px] max-w-[90vw] text-left ${Kit.FLOATING_PANEL_CLASS}`)],
     [
       h.div(
         [h.Class('flex items-center justify-between gap-4 px-4 py-2')],

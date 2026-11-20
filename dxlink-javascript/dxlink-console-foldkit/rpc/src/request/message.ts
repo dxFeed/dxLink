@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
+import { Listbox } from '@foldkit/ui'
+
 import { Summary } from '../domain'
 
 /** A request text together with the method it was checked against. */
@@ -22,8 +24,10 @@ export const Message = defineMessageUnion({
   },
   FailedLoadDescriptors: { source: Schema.String, reason: Schema.String },
   CancelledLoadDescriptorFile: {},
-  SelectedService: { typeName: Schema.String },
-  SelectedMethod: { localName: Schema.String },
+  GotServiceListboxMessage: { message: Listbox.Message },
+  GotMethodListboxMessage: { message: Listbox.Message },
+  /** From the picker of the enum field of the request with this key. */
+  GotEnumListboxMessage: { fieldId: Schema.String, message: Listbox.Message },
   UpdatedRequestJson: { value: Schema.String },
   SucceededValidateRequest: {
     ...checkedRequestFields,

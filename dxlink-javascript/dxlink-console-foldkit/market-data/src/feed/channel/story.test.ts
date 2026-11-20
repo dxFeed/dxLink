@@ -3,7 +3,7 @@ import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
-import { RadioGroup, Tabs } from '@foldkit/ui'
+import { Combobox, Listbox, RadioGroup, Tabs } from '@foldkit/ui'
 
 import {
   AddSubscription,
@@ -67,11 +67,27 @@ const selectSubscriptionKind = (kind: Feed.SubscriptionKind) => [
   Command.resolve(RadioGroup.FocusOption, RadioGroup.Message.CompletedFocusOption()),
 ]
 
+/** The form's event-type field reporting that `value` was typed into it. */
+const typeSubscriptionType = (value: string) =>
+  message(
+    Message.GotSubscriptionTypeComboboxMessage({
+      message: Combobox.Message.UpdatedInputValue({ value }),
+    })
+  )
+
+/** The form's order-source field reporting that `value` was typed into it. */
+const typeSubscriptionSource = (value: string) =>
+  message(
+    Message.GotSubscriptionSourceComboboxMessage({
+      message: Combobox.Message.UpdatedInputValue({ value }),
+    })
+  )
+
 const submitOrder = (source: string) => [
   ...selectSubscriptionKind('Indexed'),
-  message(Message.UpdatedSubscriptionType({ value: 'Order' })),
+  typeSubscriptionType('Order'),
   message(Message.UpdatedSubscriptionSymbol({ value: ' AAPL ' })),
-  message(Message.UpdatedSubscriptionSource({ value: source })),
+  typeSubscriptionSource(source),
   message(Message.SubmittedSubscription()),
 ]
 
@@ -329,7 +345,7 @@ describe('subscriptions', () => {
     story(
       update,
       given(subscriptionsModel),
-      message(Message.UpdatedSubscriptionSource({ value: 'NTV' })),
+      typeSubscriptionSource('NTV'),
       message(Message.UpdatedSubscriptionFromTime({ value: '5' })),
       message(Message.UpdatedSubscriptionSymbol({ value: 'AAPL' })),
       message(Message.SubmittedSubscription()),
@@ -359,7 +375,7 @@ describe('subscriptions', () => {
       update,
       given(subscriptionsModel),
       ...selectSubscriptionKind('TimeSeries'),
-      message(Message.UpdatedSubscriptionType({ value: 'DailyCandle' })),
+      typeSubscriptionType('DailyCandle'),
       message(Message.UpdatedSubscriptionSymbol({ value: 'AAPL{=d}' })),
       message(Message.UpdatedSubscriptionFromTime({ value: '12ab3' })),
       message(Message.SubmittedSubscription()),
@@ -465,7 +481,11 @@ describe('subscriptions', () => {
       update,
       given(subscriptionsModel),
       message(Message.UpdatedAggregationPeriod({ value: '5' })),
-      message(Message.SelectedDataFormat({ value: 'COMPACT' })),
+      message(
+        Message.GotDataFormatListboxMessage({
+          message: Listbox.Message.SelectedItem({ item: 'COMPACT' }),
+        })
+      ),
       message(Message.ClickedApplyConfiguration()),
       Command.expectExact(
         ConfigureFeed({

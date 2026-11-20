@@ -19,10 +19,11 @@ import {
 import { describe, test } from 'vitest'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
-import { RadioGroup, Tabs } from '@foldkit/ui'
+import { Combobox, Listbox, RadioGroup, Tabs } from '@foldkit/ui'
 
 import {
   AddSubscription,
+  ConfigureFeed,
   CopyEvents,
   MountChart,
   RemoveSubscription,
@@ -71,6 +72,38 @@ const resolveFocusOption = Command.resolve(
   RadioGroup.Message.CompletedFocusOption()
 )
 
+const suggestionButton: readonly [typeof Combobox.AttachComboboxPreventBlur, Combobox.Message] = [
+  Combobox.AttachComboboxPreventBlur,
+  Combobox.Message.CompletedAttachComboboxPreventBlur(),
+]
+
+/**
+ * Every suggestion field renders a toggle button that carries a Mount of its own. An opened
+ * subscriptions channel shows two from its first frame: the form's event type and the event
+ * type of the configuration's first row.
+ */
+const acknowledgeSuggestionButtons = Mount.resolveAll(suggestionButton, suggestionButton)
+
+/** One more suggestion field appeared: the order source, or the event type of an added row. */
+const acknowledgeSuggestionButton = Mount.resolve(...suggestionButton)
+
+const resolveSuggestionsOpened = Mount.resolveAll(
+  [Combobox.AnchorCombobox, Combobox.Message.CompletedAnchorCombobox()],
+  [Combobox.PortalComboboxBackdrop, Combobox.Message.CompletedPortalComboboxBackdrop()]
+)
+
+const resolveSuggestionPicked = Command.resolve(
+  Combobox.FocusInput,
+  Combobox.Message.CompletedFocusInput()
+)
+
+// NOTE: built per use: an `expectEnded` step consumes its matchers when it runs, so one step
+// shared between scenes acknowledges nothing the second time.
+const expectSuggestionsEnded = () =>
+  Mount.expectEnded(Combobox.AnchorCombobox, Combobox.PortalComboboxBackdrop)
+
+const rowEventType = (index: number) => nth(all.label('Event type'), index)
+
 const resolveFocusTab = Command.resolve(Tabs.FocusTab, Tabs.Message.CompletedFocusTab())
 
 const trade = (price: number) => ({ eventType: 'Trade', eventSymbol: 'AAPL', price })
@@ -116,8 +149,10 @@ describe('a channel that is not opened', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100)] })),
       Subscription.emit(Message.ChangedChannelState({ channelState: DXLinkChannelState.CLOSED })),
+      Mount.expectEnded(Combobox.AttachComboboxPreventBlur, Combobox.AttachComboboxPreventBlur),
       expect(role('note')).toHaveText('The channel is closed and accepts no further input.'),
       expect(label('Symbol')).toBeAbsent(),
       expect(role('tab', { name: 'Quote (1)' })).toExist(),
@@ -131,6 +166,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       expect(role('button', { name: 'Configuration', expanded: false })).toExist(),
       click(role('button', { name: 'Configuration' })),
       expect(role('button', { name: 'Configuration', expanded: true })).toExist(),
@@ -143,6 +179,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       expect(text('Active subscriptions (0)')).toExist(),
       expect(text('No active subscriptions.')).toExist(),
       expect(role('button', { name: 'Add' })).toBeDisabled(),
@@ -165,6 +202,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       type(label('Symbol'), 'AAPL'),
       click(role('button', { name: 'Add' })),
       Command.resolve(
@@ -183,12 +221,15 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       expect(label('Order source')).toBeAbsent(),
       click(role('radio', { name: 'Indexed' })),
       resolveFocusOption,
+      acknowledgeSuggestionButton,
       type(label('Symbol'), 'AAPL'),
       expect(role('button', { name: 'Add' })).toBeDisabled(),
       type(label('Order source'), 'NTV'),
+      resolveSuggestionsOpened,
       click(role('button', { name: 'Add' })),
       Command.expectExact(AddSubscription({ channelId: '1', subscription: fromSource('NTV') })),
       Command.resolve(
@@ -213,10 +254,207 @@ describe('subscriptions view', () => {
     )
   })
 
+  test('the event type is free text that starts as Quote and suggests the known types', () => {
+    const eventType = rowEventType(1)
+    const trade = Feed.FeedSubscription.Regular({ type: 'Trade', symbol: 'AAPL' })
+
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
+      expect(eventType).toHaveValue('Quote'),
+      expect(eventType).toHaveAccessibleDescription('Event types on kb.dxfeed.com'),
+      expect(role('link', { name: 'kb.dxfeed.com' })).toExist(),
+      expect(role('listbox')).toBeAbsent(),
+      type(eventType, 'tra'),
+      resolveSuggestionsOpened,
+      expect(role('option', { name: 'Trade' })).toExist(),
+      expect(role('option', { name: 'Quote' })).toBeAbsent(),
+      click(role('option', { name: 'Trade' })),
+      resolveSuggestionPicked,
+      expectSuggestionsEnded(),
+      expect(role('listbox')).toBeAbsent(),
+      expect(eventType).toHaveValue('Trade'),
+      type(label('Symbol'), 'AAPL'),
+      click(role('button', { name: 'Add' })),
+      Command.expectExact(AddSubscription({ channelId: '1', subscription: trade })),
+      Command.resolve(AddSubscription, Message.SucceededAddSubscription({ subscription: trade })),
+      expect(eventType).toHaveValue('Trade'),
+      expect(label('Symbol')).toHaveValue('AAPL')
+    )
+  })
+
+  test('an event type the list does not name is subscribed as typed', () => {
+    const dailyCandle = Feed.FeedSubscription.Regular({ type: 'DailyCandle', symbol: 'AAPL' })
+
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
+      type(rowEventType(1), 'DailyCandle'),
+      expect(role('listbox')).toBeAbsent(),
+      expect(rowEventType(1)).toHaveValue('DailyCandle'),
+      type(label('Symbol'), 'AAPL'),
+      click(role('button', { name: 'Add' })),
+      Command.expectExact(AddSubscription({ channelId: '1', subscription: dailyCandle })),
+      Command.resolve(
+        AddSubscription,
+        Message.SucceededAddSubscription({ subscription: dailyCandle })
+      ),
+      expect(role('listitem')).toContainText('DailyCandle:AAPL')
+    )
+  })
+
+  test('a lower-case order source stays as typed, and the field keeps it after the add', () => {
+    const fromLowerCaseSource = Feed.FeedSubscription.Indexed({
+      type: 'Quote',
+      symbol: 'AAPL',
+      source: 'ntv',
+    })
+
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
+      click(role('radio', { name: 'Indexed' })),
+      resolveFocusOption,
+      acknowledgeSuggestionButton,
+      expect(label('Order source')).toHaveValue(''),
+      expect(label('Order source')).toHaveAccessibleDescription('Order sources on kb.dxfeed.com'),
+      type(label('Symbol'), 'AAPL'),
+      type(label('Order source'), 'ntv'),
+      resolveSuggestionsOpened,
+      expect(label('Order source')).toHaveValue('ntv'),
+      click(role('button', { name: 'Add' })),
+      Command.expectExact(AddSubscription({ channelId: '1', subscription: fromLowerCaseSource })),
+      Command.resolve(
+        AddSubscription,
+        Message.SucceededAddSubscription({ subscription: fromLowerCaseSource })
+      ),
+      expect(label('Order source')).toHaveValue('ntv'),
+      expect(role('button', { name: 'Remove Quote#ntv:AAPL' })).toExist()
+    )
+  })
+
+  test('an order source can be picked from the suggestions', () => {
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
+      click(role('radio', { name: 'Indexed' })),
+      resolveFocusOption,
+      acknowledgeSuggestionButton,
+      type(label('Order source'), 'glb'),
+      resolveSuggestionsOpened,
+      expectAll(all.role('option')).toHaveCount(3),
+      click(role('option', { name: 'glbx' })),
+      resolveSuggestionPicked,
+      expectSuggestionsEnded(),
+      expect(label('Order source')).toHaveValue('glbx')
+    )
+  })
+
+  test('Enter keeps a typed order source rather than taking a suggestion', () => {
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
+      click(role('radio', { name: 'Indexed' })),
+      resolveFocusOption,
+      acknowledgeSuggestionButton,
+      type(label('Order source'), 'ntv'),
+      resolveSuggestionsOpened,
+      expect(nth(all.role('option'), 0)).toHaveText('ntv'),
+      keydown(label('Order source'), 'Enter'),
+      // NOTE: Enter clicks the first item, which is the typed text itself.
+      Command.expectExact(Combobox.ClickItem({ id: 'feed-1-source', index: 0 })),
+      Command.resolve(Combobox.ClickItem, Combobox.Message.CompletedClickItem()),
+      expect(label('Order source')).toHaveValue('ntv')
+    )
+  })
+
+  test('the data format is chosen from a list and sent with the configuration', () => {
+    const dataFormat = role('button', { name: 'Data format' })
+
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
+      expect(dataFormat).toHaveText('Server default'),
+      expect(dataFormat).toHaveAccessibleDescription('empty = server default'),
+      click(dataFormat),
+      Command.resolve(Listbox.FocusItems, Listbox.Message.CompletedFocusItems()),
+      Mount.resolveAll(
+        [Listbox.AnchorListbox, Listbox.Message.CompletedAnchorListbox()],
+        [Listbox.PortalListboxBackdrop, Listbox.Message.CompletedPortalListboxBackdrop()]
+      ),
+      expectAll(all.role('option')).toHaveCount(3),
+      expect(role('option', { name: 'Server default' })).toHaveAttr('data-selected'),
+      click(role('option', { name: 'COMPACT' })),
+      Command.resolve(Listbox.FocusButton, Listbox.Message.CompletedFocusButton()),
+      Mount.expectEnded(Listbox.AnchorListbox, Listbox.PortalListboxBackdrop),
+      expect(role('listbox')).toBeAbsent(),
+      expect(dataFormat).toHaveText('COMPACT'),
+      click(role('button', { name: 'Apply configuration' })),
+      Command.expectExact(
+        ConfigureFeed({
+          channelId: '1',
+          aggregationPeriod: '',
+          dataFormat: 'COMPACT',
+          rows: [{ id: 1, type: 'Quote', fields: 'bidPrice, askPrice, bidSize, askSize' }],
+        })
+      ),
+      Command.resolve(ConfigureFeed, Message.SucceededConfigureFeed())
+    )
+  })
+
+  test('each configuration row keeps an event type of its own', () => {
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
+      expectAll(all.label('Event type')).toHaveCount(2),
+      expect(rowEventType(0)).toHaveValue('Quote'),
+      click(role('button', { name: 'Add event type' })),
+      acknowledgeSuggestionButton,
+      expectAll(all.label('Event type')).toHaveCount(3),
+      expect(rowEventType(1)).toHaveValue(''),
+      type(rowEventType(1), 'cand'),
+      resolveSuggestionsOpened,
+      click(role('option', { name: 'Candle' })),
+      resolveSuggestionPicked,
+      expectSuggestionsEnded(),
+      expect(rowEventType(1)).toHaveValue('Candle'),
+      expect(rowEventType(0)).toHaveValue('Quote'),
+      type(rowEventType(0), 'MyEvent'),
+      expect(rowEventType(0)).toHaveValue('MyEvent'),
+      expect(rowEventType(1)).toHaveValue('Candle'),
+      type(nth(all.label('Fields (comma-separated)'), 1), 'open, close'),
+      click(role('button', { name: 'Apply configuration' })),
+      Command.expectExact(
+        ConfigureFeed({
+          channelId: '1',
+          aggregationPeriod: '',
+          dataFormat: '',
+          rows: [
+            { id: 1, type: 'MyEvent', fields: 'bidPrice, askPrice, bidSize, askSize' },
+            { id: 2, type: 'Candle', fields: 'open, close' },
+          ],
+        })
+      ),
+      Command.resolve(ConfigureFeed, Message.SucceededConfigureFeed()),
+      click(nth(all.role('button', { name: 'Remove' }), 0)),
+      Mount.expectEnded(Combobox.AttachComboboxPreventBlur),
+      expectAll(all.label('Event type')).toHaveCount(2),
+      expect(rowEventType(0)).toHaveValue('Candle')
+    )
+  })
+
   test('events render as columns in the field order the server negotiated', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       expect(text('No events received yet. Add a subscription to start receiving data.')).toExist(),
       Subscription.emit(
         Message.ChangedAppliedConfig({
@@ -244,6 +482,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       expect(role('radio', { name: 'Regular', checked: true })).toExist(),
       click(role('radio', { name: 'Time series' })),
       Command.expectExact(RadioGroup.FocusOption({ id: 'feed-1-subscription-kind', index: 2 })),
@@ -253,6 +492,7 @@ describe('subscriptions view', () => {
       expect(label('From time')).toExist(),
       keydown(role('radio', { name: 'Time series' }), 'ArrowLeft'),
       resolveFocusOption,
+      acknowledgeSuggestionButton,
       expect(role('radio', { name: 'Indexed', checked: true })).toExist(),
       expect(label('Order source')).toExist(),
       expect(label('From time')).toBeAbsent()
@@ -263,6 +503,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100), trade(55)] })),
       expectAll(all.role('tab')).toHaveCount(2),
       expect(nth(all.role('tab'), 0)).toHaveText('Quote (1)'),
@@ -285,6 +526,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100), trade(55)] })),
       keydown(role('tab', { name: 'Quote (1)' }), 'ArrowRight'),
       Command.expectExact(Tabs.FocusTab({ id: 'feed-1-event-types', index: 1 })),
@@ -302,6 +544,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100), trade(55)] })),
       click(role('tab', { name: 'Trade (1)' })),
       resolveFocusTab,
@@ -319,6 +562,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100)] })),
       click(role('button', { name: 'Pause' })),
       expect(role('button', { name: 'Resume' })).toExist(),
@@ -335,6 +579,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100)] })),
       click(role('button', { name: 'Pause' })),
       click(role('button', { name: 'Clear' })),
@@ -353,6 +598,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100)] })),
       click(role('button', { name: 'Clear' })),
       expect(text('No events received yet. Add a subscription to start receiving data.')).toExist()
@@ -363,6 +609,7 @@ describe('subscriptions view', () => {
     scene(
       { update, view },
       given(subscriptionsModel),
+      acknowledgeSuggestionButtons,
       Subscription.emit(Message.ReceivedEvents({ events: [quote(100)] })),
       click(role('button', { name: 'Copy as JSON' })),
       Command.expectExact(CopyEvents({ text: JSON.stringify([quote(100)], null, 2) })),

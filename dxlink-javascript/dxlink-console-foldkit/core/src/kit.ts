@@ -1,7 +1,8 @@
-import { Array, Match, Option } from 'effect'
-import type { Attribute, Html, HtmlBuilder } from 'foldkit/html'
+import { Array, Match, Option, String } from 'effect'
+import { type Attribute, type Html, type HtmlBuilder, childAttributes } from 'foldkit/html'
+import { modifyFields } from 'foldkit/struct'
 
-import { Button, Checkbox, Disclosure, Input, Select, Textarea } from '@foldkit/ui'
+import { Button, Checkbox, Combobox, Disclosure, Input, Listbox, Textarea } from '@foldkit/ui'
 
 import type { Tone } from './channel/plugin'
 
@@ -29,6 +30,40 @@ const FIELD_CLASS =
 const LABEL_CLASS = 'text-xs font-medium text-zinc-600 dark:text-zinc-400'
 
 const HELPER_CLASS = 'text-xs text-zinc-500 dark:text-zinc-400'
+
+/**
+ * The surface of a panel that floats over the page: a Popover panel, or the option list of a
+ * Listbox or Combobox.
+ *
+ * Such a panel is portaled out of the element it is rendered in — into the enclosing `<dialog>`
+ * when there is one, otherwise into a child of `<body>` — so it inherits nothing from the
+ * console's root. Everything it needs to read as part of the console is here: its own text
+ * colour and size, and a `z-index` above the page's sticky chrome. Outside a dialog it takes
+ * the dark palette only when the `dark` class is on `<body>` or `<html>`.
+ */
+export const FLOATING_PANEL_CLASS =
+  'z-50 rounded-xl border border-zinc-200 bg-white text-sm text-zinc-900 shadow-lg focus:outline-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100'
+
+/**
+ * The invisible layer under an open floating panel that turns a click anywhere else into
+ * "close". It must be rendered inside a positioned wrapper that also holds the trigger, so
+ * the trigger stays above it.
+ */
+export const FLOATING_BACKDROP_CLASS = 'fixed inset-0 z-0'
+
+/** Below the trigger, left edges aligned, flipping above when there is no room below. */
+const FLOATING_LIST_ANCHOR: Listbox.AnchorConfig = {
+  placement: 'bottom-start',
+  gap: 4,
+  padding: 8,
+}
+
+const FLOATING_LIST_CLASS = `w-(--button-width) min-w-40 overflow-hidden ${FLOATING_PANEL_CLASS}`
+
+const FLOATING_LIST_SCROLL_CLASS = 'max-h-60 overflow-y-auto py-1'
+
+const FLOATING_OPTION_CLASS =
+  'group flex cursor-pointer items-center gap-2 px-3 py-1.5 select-none data-[active]:bg-zinc-100 data-[selected]:font-semibold data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 dark:data-[active]:bg-zinc-800'
 
 export type ButtonVariant = 'Primary' | 'Outline' | 'Ghost' | 'Danger'
 
@@ -83,6 +118,7 @@ export const icon = <Message>(path: string, h: HtmlBuilder<Message>, className =
 
 export const ICON_CHEVRON_DOWN = 'm19.5 8.25-7.5 7.5-7.5-7.5'
 export const ICON_CLOSE = 'M6 18 18 6M6 6l12 12'
+export const ICON_CHECK = 'm4.5 12.75 6 6 9-13.5'
 export const ICON_ERROR =
   'M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z'
 
@@ -171,8 +207,6 @@ export type TextFieldConfig<Message> = Readonly<{
   isDisabled?: boolean
   isInvalid?: boolean
   isMonospace?: boolean
-  /** The id of a `datalist` offering suggestions; the field stays free text. */
-  listId?: string
 }>
 
 export const textField = <Message>(
@@ -194,7 +228,6 @@ export const textField = <Message>(
           h.label([...attributes.label, h.Class(LABEL_CLASS)], [config.label]),
           h.input([
             ...attributes.input,
-            ...(config.listId === undefined ? [] : [h.List(config.listId)]),
             h.Autocomplete('off'),
             h.Class(config.isMonospace === true ? `${FIELD_CLASS} font-mono` : FIELD_CLASS),
           ]),
@@ -268,56 +301,242 @@ export const textArea = <Message>(
     h
   )
 
-export type SelectOption = Readonly<{
-  value: string
+/** One option of a floating list: a check mark that shows only on the selected one, and its label. */
+const floatingOption = <Message>(label: string, h: HtmlBuilder<Message>): Html =>
+  h.span(
+    [h.Class('flex min-w-0 items-center gap-2')],
+    [
+      icon(
+        ICON_CHECK,
+        h,
+        'invisible size-4 text-sky-600 group-data-[selected]:visible dark:text-sky-400'
+      ),
+      h.span([h.Class('truncate')], [label]),
+    ]
+  )
+
+export type ListboxOption<Value extends string = string> = Readonly<{
+  value: Value
   label: string
   isDisabled?: boolean
 }>
 
-export const selectField = <Message>(
+/**
+ * What `listboxField` hands to `toSubmodel`: the `viewInputs` of a single-select Listbox
+ * created as `Listbox.create<ListboxOption<Value>, Value>()`.
+ */
+export type ListboxFieldViewInputs<Value extends string> = Listbox.BaseViewInputsCommon<
+  ListboxOption<Value>
+> &
+  Readonly<{
+    maybeSelectedValue: Option.Option<Value>
+    itemToValue: (option: ListboxOption<Value>) => Value
+  }>
+
+/**
+ * A labelled single-select drawn with Foldkit UI's Listbox: a button that reads like a text
+ * field and opens a floating list of options anchored under it.
+ *
+ * The caller owns the Submodel, and this only lays it out. The caller's Model holds:
+ *  - a `Listbox.Model`, built with `Listbox.init({ id })` where `id` is unique on the page
+ *    (derive it from the channel id inside a channel card) and is the `id` passed here;
+ *  - the selected value itself, in a field of its own, written when the Listbox's `Selected`
+ *    OutMessage is folded. The Listbox keeps no selection.
+ *
+ * The caller also declares `Listbox.create<ListboxOption<Value>, Value>()` once at module
+ * scope, wraps `Listbox.Message` in a `Got…Message`, folds it with `Update.foldChild`, and
+ * in `toSubmodel` passes the given `viewInputs` to `h.submodel` unchanged.
+ *
+ * The list is portaled: into the enclosing `<dialog>` when there is one, otherwise to the
+ * document body. It is therefore never clipped by a scrolling ancestor.
+ */
+export const listboxField = <Message, Value extends string>(
   config: Readonly<{
+    /** The id the caller's `Listbox.Model` was initialised with. */
     id: string
     label: string
-    value: string
-    options: ReadonlyArray<SelectOption>
-    onChange: (value: string) => Message
+    options: ReadonlyArray<ListboxOption<Value>>
+    maybeValue: Option.Option<Value>
+    /** Shown on the button while nothing is selected. */
+    placeholder?: string
     helperText?: string
     isDisabled?: boolean
+    toSubmodel: (viewInputs: ListboxFieldViewInputs<Value>) => Html
   }>,
   h: HtmlBuilder<Message>
-): Html =>
-  Select.view(
-    {
-      id: config.id,
-      value: config.value,
-      onChange: config.onChange,
+): Html => {
+  const helperId = `${config.id}-description`
+  const maybeSelectedLabel = Option.flatMap(config.maybeValue, (value) =>
+    Option.map(
+      Array.findFirst(config.options, (option) => option.value === value),
+      (option) => option.label
+    )
+  )
+
+  return fieldShell(
+    h.label([h.For(Listbox.buttonId(config.id)), h.Class(LABEL_CLASS)], [config.label]),
+    config.toSubmodel({
+      items: config.options,
+      maybeSelectedValue: config.maybeValue,
+      itemToValue: (option) => option.value,
+      itemToSearchText: (option) => option.label,
+      isItemDisabled: (option) => option.isDisabled ?? false,
+      itemToConfig: (option) => ({
+        className: FLOATING_OPTION_CLASS,
+        content: floatingOption(option.label, h),
+      }),
+      buttonContent: h.span(
+        [h.Class('flex w-full items-center justify-between gap-2')],
+        [
+          Option.match(maybeSelectedLabel, {
+            onNone: () =>
+              h.span([h.Class(`truncate ${MUTED_TEXT_CLASS}`)], [config.placeholder ?? '']),
+            onSome: (selectedLabel) => h.span([h.Class('truncate')], [selectedLabel]),
+          }),
+          icon(
+            ICON_CHEVRON_DOWN,
+            h,
+            'size-4 text-zinc-500 transition-transform group-data-[open]:rotate-180'
+          ),
+        ]
+      ),
+      buttonClassName: `group cursor-pointer text-left ${FIELD_CLASS}`,
+      ...(config.helperText === undefined
+        ? {}
+        : { buttonAttributes: childAttributes([h.AriaDescribedBy(helperId)]) }),
+      itemsClassName: FLOATING_LIST_CLASS,
+      itemsScrollClassName: FLOATING_LIST_SCROLL_CLASS,
+      backdropClassName: FLOATING_BACKDROP_CLASS,
+      className: 'relative',
+      anchor: FLOATING_LIST_ANCHOR,
       isDisabled: config.isDisabled ?? false,
-      hasDescription: config.helperText !== undefined,
-      toView: (attributes) =>
-        fieldShell(
-          h.label([...attributes.label, h.Class(LABEL_CLASS)], [config.label]),
-          h.select(
-            [...attributes.select, h.Class(FIELD_CLASS)],
-            Array.map(config.options, (option) =>
-              h.keyed('option')(
-                option.value,
-                [
-                  h.Value(option.value),
-                  h.Selected(option.value === config.value),
-                  h.Disabled(option.isDisabled ?? false),
-                ],
-                [option.label]
-              )
-            )
-          ),
-          Option.map(Option.fromNullishOr(config.helperText), (helperText) =>
-            h.p([...attributes.description, h.Class(HELPER_CLASS)], [helperText])
-          ),
-          h
-        ),
-    },
+    }),
+    Option.map(Option.fromNullishOr(config.helperText), (helperText) =>
+      h.p([h.Id(helperId), h.Class(HELPER_CLASS)], [helperText])
+    ),
     h
   )
+}
+
+/**
+ * The items a free-text field offers for what is typed in it.
+ *
+ * What is typed always comes first, followed by the suggestions that contain it, ignoring
+ * case. The first item is the one Enter commits, so committing never replaces the typed text
+ * with a suggestion the user did not choose. While the field holds exactly one of the
+ * suggestions, every other suggestion follows it, so reopening the list after a pick shows the
+ * alternatives again. An empty field offers every suggestion, and text that no suggestion
+ * contains offers nothing, so no list opens for it.
+ */
+export const filterSuggestions = (
+  suggestions: ReadonlyArray<string>,
+  text: string
+): ReadonlyArray<string> => {
+  const query = String.toLowerCase(text.trim())
+
+  if (query === '') {
+    return suggestions
+  }
+  const others = Array.filter(suggestions, (suggestion) => suggestion !== text)
+  const offered = Array.contains(suggestions, text)
+    ? others
+    : Array.filter(others, (suggestion) => String.toLowerCase(suggestion).includes(query))
+
+  return Array.match(offered, {
+    onEmpty: () => [],
+    onNonEmpty: (matches) => Array.prepend(matches, text),
+  })
+}
+
+/** A Combobox Model whose input holds `text`, for seeding or resetting a `comboboxField`. */
+export const withComboboxText = (combobox: Combobox.Model, text: string): Combobox.Model =>
+  modifyFields(combobox, { inputValue: () => text })
+
+/**
+ * A labelled free-text input drawn with Foldkit UI's Combobox: typing filters a floating list
+ * of suggestions anchored under the input, and picking one writes it into the input. The
+ * field stays free text — a value that is not among the suggestions is kept as typed.
+ *
+ * The caller owns the Submodel, and this only lays it out. The caller's Model holds a
+ * `Combobox.Model`, built with `Combobox.init({ id })` where `id` is unique on the page
+ * (derive it from the channel id inside a channel card) and is the `id` passed here. That
+ * Model is also where the text lives: read it as `combobox.inputValue` and pass it here as
+ * `inputValue`; write it with `withComboboxText`. No second field for the text is needed.
+ *
+ * The caller also declares `Combobox.create<string>()` once at module scope, wraps
+ * `Combobox.Message` in a `Got…Message`, folds it with `Update.foldChild` (both OutMessages
+ * can be folded to no change, since the text is already in the Combobox's Model), and in
+ * `toSubmodel` passes the given `viewInputs` to `h.submodel` unchanged.
+ *
+ * The list is portaled: into the enclosing `<dialog>` when there is one, otherwise to the
+ * document body. It is therefore never clipped by a scrolling ancestor.
+ */
+export const comboboxField = <Message>(
+  config: Readonly<{
+    /** The id the caller's `Combobox.Model` was initialised with. */
+    id: string
+    label: string
+    /** The caller's `Combobox.Model`'s `inputValue`. */
+    inputValue: string
+    /** Everything the field can suggest; this narrows it to what matches the text. */
+    suggestions: ReadonlyArray<string>
+    placeholder?: string
+    /** A help line under the input. Html, so it can carry a link. */
+    helper?: ReadonlyArray<Html | string>
+    isDisabled?: boolean
+    isInvalid?: boolean
+    isMonospace?: boolean
+    toSubmodel: (viewInputs: Combobox.ViewInputs<string>) => Html
+  }>,
+  h: HtmlBuilder<Message>
+): Html => {
+  const helperId = `${config.id}-description`
+  const isDisabled = config.isDisabled ?? false
+
+  return fieldShell(
+    h.label([h.For(Combobox.inputId(config.id)), h.Class(LABEL_CLASS)], [config.label]),
+    config.toSubmodel({
+      items: filterSuggestions(config.suggestions, config.inputValue),
+      maybeSelectedValue: Option.liftPredicate(config.inputValue, (text) =>
+        Array.contains(config.suggestions, text)
+      ),
+      restingInputValue: config.inputValue,
+      itemToValue: (suggestion) => suggestion,
+      itemToDisplayText: (suggestion) => suggestion,
+      itemToConfig: (suggestion) => ({
+        className: FLOATING_OPTION_CLASS,
+        content: floatingOption(suggestion, h),
+      }),
+      inputClassName:
+        config.isMonospace === true ? `pr-9 font-mono ${FIELD_CLASS}` : `pr-9 ${FIELD_CLASS}`,
+      inputAttributes: childAttributes([
+        ...(isDisabled ? [h.Disabled(true)] : []),
+        ...(config.helper === undefined ? [] : [h.AriaDescribedBy(helperId)]),
+      ]),
+      ...(config.placeholder === undefined ? {} : { inputPlaceholder: config.placeholder }),
+      inputWrapperClassName: 'relative',
+      ...(Array.isReadonlyArrayNonEmpty(config.suggestions)
+        ? {
+            buttonContent: icon(ICON_CHEVRON_DOWN, h),
+            buttonClassName:
+              'absolute inset-y-0 right-0 flex cursor-pointer items-center px-2.5 text-zinc-500 hover:text-zinc-900 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 dark:hover:text-zinc-100',
+            buttonAttributes: childAttributes([h.AriaLabel(`${config.label} suggestions`)]),
+          }
+        : {}),
+      itemsClassName: FLOATING_LIST_CLASS,
+      itemsScrollClassName: FLOATING_LIST_SCROLL_CLASS,
+      backdropClassName: FLOATING_BACKDROP_CLASS,
+      className: 'relative',
+      anchor: FLOATING_LIST_ANCHOR,
+      isDisabled,
+      isInvalid: config.isInvalid ?? false,
+    }),
+    Option.map(Option.fromNullishOr(config.helper), (helper) =>
+      h.p([h.Id(helperId), h.Class(HELPER_CLASS)], helper)
+    ),
+    h
+  )
+}
 
 export const checkbox = <Message>(
   config: Readonly<{
@@ -346,7 +565,7 @@ export const checkbox = <Message>(
                   'flex size-4 shrink-0 items-center justify-center rounded border border-zinc-400 text-white data-[checked]:border-sky-600 data-[checked]:bg-sky-600 data-[disabled]:opacity-50 dark:border-zinc-600'
                 ),
               ],
-              config.isChecked ? [icon('m4.5 12.75 6 6 9-13.5', h, 'size-3')] : []
+              config.isChecked ? [icon(ICON_CHECK, h, 'size-3')] : []
             ),
             h.label(
               [...attributes.label, h.Class('cursor-pointer text-sm select-none')],
@@ -356,17 +575,6 @@ export const checkbox = <Message>(
         ),
     },
     h
-  )
-
-/** A list of suggestions for a free-text field; pair it with `textField`'s `listId`. */
-export const suggestions = <Message>(
-  id: string,
-  values: ReadonlyArray<string>,
-  h: HtmlBuilder<Message>
-): Html =>
-  h.datalist(
-    [h.Id(id)],
-    Array.map(values, (value) => h.keyed('option')(value, [h.Value(value)]))
   )
 
 const toneClass = (tone: Tone): string =>

@@ -3,13 +3,14 @@ import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
+import { Popover } from '@foldkit/ui'
 
 import { ReconnectClient, ScrollToChannel, SetAuthToken, StampAcquireFailure } from './command'
 import { builtinConsoleConfig } from './domain/config'
 import { emptyErrorLog } from './domain/error'
 import { Message } from './message'
 import { ChannelCard, type Model, Session } from './model'
-import { makeUpdate } from './update'
+import { channelErrorPopoverId, makeUpdate } from './update'
 
 import { makeConsole } from './console'
 import { EchoMessage, echoPlugin } from './echoPlugin.fixture'
@@ -94,6 +95,31 @@ describe('connection', () => {
           })
         )
         expect(next.errorLog).toEqual(emptyErrorLog())
+      })
+    )
+  })
+
+  test('clearing the connection errors closes their list', () => {
+    story(
+      update,
+      given({
+        ...initialModel,
+        errorLog: {
+          errors: [{ id: 1, type: 'TIMEOUT', message: 'late', time: '10:00' }],
+          nextId: 2,
+        },
+      }),
+      message(
+        Message.GotConnectionErrorPopoverMessage({ message: Popover.Message.ClickedButton() })
+      ),
+      model((next) => {
+        expect(next.errorPopover.isOpen).toBe(true)
+      }),
+      message(Message.ClickedClearConnectionErrors()),
+      Command.resolve(Popover.FocusButton, Popover.Message.CompletedFocusButton()),
+      model((next) => {
+        expect(next.errorPopover.isOpen).toBe(false)
+        expect(next.errorLog).toEqual({ errors: [], nextId: 2 })
       })
     )
   })
@@ -227,7 +253,7 @@ describe('model schema', () => {
             id: '1',
             kind: 'echo',
             card: ChannelCard.Closed(),
-            model: { channelId: '1', text: 'hello', isClosed: true },
+            model: { channelId: '1', text: 'hello', isClosed: true, errorLog: emptyErrorLog() },
           },
         ],
       })
@@ -317,7 +343,7 @@ describe('channels', () => {
             id: '1',
             kind: 'echo',
             card: ChannelCard.Closed(),
-            model: { channelId: '1', text: 'world', isClosed: true },
+            model: { channelId: '1', text: 'world', isClosed: true, errorLog: emptyErrorLog() },
           },
         ])
       })
@@ -334,13 +360,59 @@ describe('channels', () => {
       message(Message.ClickedToggleChannel({ channelId: '1' })),
       model((next) => {
         expect(next.channels[0]?.card).toEqual(
-          ChannelCard.Open({ isExpanded: false, isErrorListOpen: false })
+          ChannelCard.Open({
+            isExpanded: false,
+            errorPopover: Popover.init({ id: channelErrorPopoverId('1') }),
+          })
         )
       }),
       message(Message.ClickedCloseChannel({ channelId: '1' })),
       message(Message.ClickedToggleChannel({ channelId: '1' })),
       model((next) => {
         expect(next.channels[0]?.card).toEqual(ChannelCard.Closed())
+      })
+    )
+  })
+
+  test('each card owns its error list, and clearing the errors closes it', () => {
+    const openErrorList = (channelId: string) =>
+      Message.GotChannelErrorPopoverMessage({
+        channelId,
+        message: Popover.Message.ClickedButton(),
+      })
+
+    story(
+      update,
+      given({ ...authorizedModel, maybeRequestKind: Option.some('echo') }),
+      message(requestMessage('hello')),
+      message(Message.ClickedOpenChannel()),
+      Command.resolve(ScrollToChannel, Message.CompletedScrollToChannel()),
+      message(Message.ClickedOpenChannel()),
+      Command.resolve(ScrollToChannel, Message.CompletedScrollToChannel()),
+      message(openErrorList('2')),
+      message(openErrorList('missing')),
+      model((next) => {
+        expect(
+          next.channels.map((channel) =>
+            ChannelCard.match(channel.card, {
+              Open: ({ errorPopover }) => [errorPopover.id, errorPopover.isOpen],
+              Closed: () => [],
+            })
+          )
+        ).toEqual([
+          ['dxlink-channel-1-errors', false],
+          ['dxlink-channel-2-errors', true],
+        ])
+      }),
+      message(Message.ClickedClearChannelErrors({ channelId: '2' })),
+      Command.resolve(Popover.FocusButton, Popover.Message.CompletedFocusButton()),
+      model((next) => {
+        expect(next.channels[1]?.card).toEqual(
+          ChannelCard.Open({
+            isExpanded: true,
+            errorPopover: Popover.init({ id: channelErrorPopoverId('2') }),
+          })
+        )
       })
     )
   })
@@ -358,6 +430,7 @@ describe('channels', () => {
           channelId: '1',
           text: 'hello',
           isClosed: false,
+          errorLog: emptyErrorLog(),
         })
       })
     )

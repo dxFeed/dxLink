@@ -2,6 +2,8 @@ import { Option } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
+import { Listbox } from '@foldkit/ui'
+
 import { Descriptors, Summary } from '../domain'
 import { binaryDescriptorSet } from '../domain/descriptors.fixture'
 import {
@@ -40,6 +42,21 @@ const loaded = Message.SucceededLoadDescriptors({
   source: '/proto/docs',
   services,
 })
+
+/** What the service picker reports when the option of this service is picked. */
+const pickedService = (typeName: string) =>
+  Message.GotServiceListboxMessage({ message: Listbox.Message.SelectedItem({ item: typeName }) })
+
+/** What the method picker reports when the option of this method is picked. */
+const pickedMethod = (localName: string) =>
+  Message.GotMethodListboxMessage({ message: Listbox.Message.SelectedItem({ item: localName }) })
+
+/** What the picker of an enum field reports when the option of this value is picked. */
+const pickedEnumValue = (fieldId: string, valueName: string) =>
+  Message.GotEnumListboxMessage({
+    fieldId,
+    message: Listbox.Message.SelectedItem({ item: valueName }),
+  })
 
 /** The request as the Model holds it, named the way a validation names what it checked. */
 const checkedOf = (current: Model) => {
@@ -197,7 +214,7 @@ describe('selecting a call', () => {
     story(
       update,
       given(loadedModel),
-      message(Message.SelectedService({ typeName: 'demo.v1.OrderService' })),
+      message(pickedService('demo.v1.OrderService')),
       Command.expectExact(
         ValidateRequest({
           registryId: REGISTRY_ID,
@@ -235,15 +252,12 @@ describe('selecting a call', () => {
   })
 
   test('a client-streaming method is listed but cannot be selected', () => {
-    const orderModel = update(
-      loadedModel,
-      Message.SelectedService({ typeName: 'demo.v1.OrderService' })
-    ).model
+    const orderModel = update(loadedModel, pickedService('demo.v1.OrderService')).model
 
     story(
       update,
       given(orderModel),
-      message(Message.SelectedMethod({ localName: 'collect' })),
+      message(pickedMethod('collect')),
       Command.expectNone(),
       model((next) => {
         expect(checkedOf(next).methodName).toBe('issue')
@@ -252,15 +266,12 @@ describe('selecting a call', () => {
   })
 
   test('a bidirectional method is selectable and says so in the config', () => {
-    const orderModel = update(
-      loadedModel,
-      Message.SelectedService({ typeName: 'demo.v1.OrderService' })
-    ).model
+    const orderModel = update(loadedModel, pickedService('demo.v1.OrderService')).model
 
     story(
       update,
       given(orderModel),
-      message(Message.SelectedMethod({ localName: 'trade' })),
+      message(pickedMethod('trade')),
       Command.resolve(
         ValidateRequest,
         Message.SucceededValidateRequest({
@@ -278,6 +289,90 @@ describe('selecting a call', () => {
           isBidirectional: true,
           requestTemplate: ORDER_TEMPLATE,
         })
+      })
+    )
+  })
+})
+
+describe('enum fields', () => {
+  const orderModel = update(loadedModel, pickedService('demo.v1.OrderService')).model
+
+  const enumFieldIdsOf = (current: Model) =>
+    Option.getOrThrow(selectedRequest(current)).enumListboxes.map((entry) => entry.fieldId)
+
+  test('each enum field of the selected method has a picker of its own, and no other field does', () => {
+    expect(enumFieldIdsOf(loadedModel)).toEqual([])
+    expect(enumFieldIdsOf(orderModel)).toEqual(['5'])
+    expect(Option.getOrThrow(selectedRequest(orderModel)).enumListboxes[0]?.listbox.id).toBe(
+      'dxlink-rpc-request-field-5'
+    )
+  })
+
+  test('the pickers go with the method they were made for', () => {
+    story(
+      update,
+      given(orderModel),
+      message(pickedService('demo.v1.AccountService')),
+      Command.resolve(ValidateRequest, verdictFor(loadedModel, Option.none())),
+      model((next) => {
+        expect(enumFieldIdsOf(next)).toEqual([])
+      }),
+      message(pickedEnumValue('5', 'SELL')),
+      Command.expectNone(),
+      model((next) => {
+        expect(checkedOf(next).json).toBe('{\n  "id": ""\n}')
+      })
+    )
+  })
+
+  test('picking a value writes its name into the request and asks for a verdict', () => {
+    const edited = JSON.stringify(
+      { symbol: '', quantity: '0', live: false, price: 0, side: 'SELL' },
+      null,
+      2
+    )
+
+    story(
+      update,
+      given(orderModel),
+      message(pickedEnumValue('5', 'SELL')),
+      Command.expectExact(ValidateRequest({ ...checkedOf(orderModel), json: edited })),
+      model((next) => {
+        expect(checkedOf(next).json).toBe(edited)
+        expect(validationOf(next)).toEqual(Option.some(Validation.Pending()))
+        expect(enumFieldIdsOf(next)).toEqual(['5'])
+      }),
+      Command.resolve(
+        ValidateRequest,
+        Message.SucceededValidateRequest({
+          ...checkedOf(orderModel),
+          json: edited,
+          maybeError: Option.none(),
+        })
+      ),
+      model((next) => {
+        expect(Option.getOrThrow(toConfig(next)).requestJson).toBe(edited)
+      })
+    )
+  })
+
+  test('a pick leaves the text alone while it is not a JSON object', () => {
+    story(
+      update,
+      given(orderModel),
+      message(Message.UpdatedRequestJson({ value: '[' })),
+      Command.resolve(
+        ValidateRequest,
+        Message.SucceededValidateRequest({
+          ...checkedOf(orderModel),
+          json: '[',
+          maybeError: Option.some('Invalid JSON'),
+        })
+      ),
+      message(pickedEnumValue('5', 'SELL')),
+      Command.expectNone(),
+      model((next) => {
+        expect(checkedOf(next).json).toBe('[')
       })
     )
   })
@@ -393,7 +488,7 @@ describe('definitions and selection', () => {
         Message.SucceededLoadDescriptors({ registryId: 3, source: 'x', services: collectOnly })
       ),
       Command.expectNone(),
-      message(Message.SelectedService({ typeName: 'demo.v1.OrderService' })),
+      message(pickedService('demo.v1.OrderService')),
       Command.expectNone(),
       model((next) => {
         expect(Option.getOrThrow(next.maybeDefinitions).maybeSelection).toEqual(
@@ -411,8 +506,9 @@ describe('definitions and selection', () => {
       update,
       given(initialModel),
       message(Message.UpdatedRequestJson({ value: '{}' })),
-      message(Message.SelectedService({ typeName: 'demo.v1.OrderService' })),
-      message(Message.SelectedMethod({ localName: 'issue' })),
+      message(pickedService('demo.v1.OrderService')),
+      message(pickedMethod('issue')),
+      message(pickedEnumValue('5', 'SELL')),
       Command.expectNone(),
       model((next) => {
         expect(next).toEqual(initialModel)

@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
-import { Dialog } from '@foldkit/ui'
+import { Dialog, Popover } from '@foldkit/ui'
 
 import * as ErasedChannel from './channel/erasedChannel'
 import * as ErasedRequest from './channel/erasedRequest'
@@ -21,7 +21,7 @@ export const Message = defineMessageUnion({
   ChangedAuthState: { auth: AuthState },
   ReportedConnectionError: { error: ReportedError },
   ClickedClearConnectionErrors: {},
-  ToggledConnectionErrorList: { isOpen: Schema.Boolean },
+  GotConnectionErrorPopoverMessage: { message: Popover.Message },
   SucceededReconnectClient: {},
   FailedReconnectClient: { error: ReportedError },
   UpdatedAuthToken: { value: Schema.Redacted(Schema.String) },
@@ -39,7 +39,7 @@ export const Message = defineMessageUnion({
   ClickedToggleChannel: { channelId: Schema.String },
   ClickedCloseChannel: { channelId: Schema.String },
   ClickedClearChannelErrors: { channelId: Schema.String },
-  ToggledChannelErrorList: { channelId: Schema.String, isOpen: Schema.Boolean },
+  GotChannelErrorPopoverMessage: { channelId: Schema.String, message: Popover.Message },
   CompletedScrollToChannel: {},
 })
 export type Message = typeof Message.Type

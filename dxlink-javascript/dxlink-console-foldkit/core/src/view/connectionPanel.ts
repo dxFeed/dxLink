@@ -172,10 +172,10 @@ export const connectionPanel = (model: Model, h: HtmlBuilder<Message>): Html => 
             [
               errorCenter(
                 {
-                  id: 'dxlink-connection-errors',
+                  popover: model.errorPopover,
+                  toPopoverMessage: (message) =>
+                    Message.GotConnectionErrorPopoverMessage({ message }),
                   errors: model.errorLog.errors,
-                  isOpen: model.isErrorListOpen,
-                  onToggle: (isOpen) => Message.ToggledConnectionErrorList({ isOpen }),
                   onClear: Message.ClickedClearConnectionErrors(),
                   scope: 'Connection',
                   size: 'Medium',

@@ -1,6 +1,8 @@
 import { Array, Option, String, pipe } from 'effect'
-import type { Update } from 'foldkit'
+import { Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
+
+import { Listbox } from '@foldkit/ui'
 
 import { Summary } from '../domain'
 import type { RpcRegistry } from '../service'
@@ -10,16 +12,22 @@ import {
   type Definitions,
   Load,
   type Model,
+  NameListbox,
+  type RequestDraft,
   type RequestOptions,
   type Selection,
   Validation,
+  draftOf,
   emptyModel,
   findService,
+  parseRequestObject,
   selectedCallOf,
   selectedServiceOf,
+  writeRequestField,
 } from './model'
 
 type UpdateReturn = Update.Return<Model, Message, RpcRegistry>
+type UpdateStep = Update.Step<Model, Message, RpcRegistry>
 
 /** A service selected on a method, or on none, with the editor on the shape of its request. */
 const selectionOf = (
@@ -27,11 +35,7 @@ const selectionOf = (
   maybeMethod: Option.Option<Summary.MethodSummary>
 ): Selection => ({
   serviceName: service.typeName,
-  maybeRequest: Option.map(maybeMethod, (method) => ({
-    methodName: method.localName,
-    json: method.requestTemplate,
-    validation: Validation.Pending(),
-  })),
+  maybeRequest: Option.map(maybeMethod, draftOf),
 })
 
 /** Hold these definitions and, when a method is selected in them, ask for a verdict on its request. */
@@ -103,6 +107,157 @@ const withVerdict = (
     })
   )
 
+/** Select a service and start on its first method the wire can carry. */
+const selectService =
+  (typeName: string): UpdateStep =>
+  (model) =>
+    pipe(
+      model.maybeDefinitions,
+      Option.flatMap((definitions) =>
+        Option.map(findService(definitions, typeName), (service) =>
+          withSelection(
+            model,
+            definitions,
+            selectionOf(service, Summary.firstSupportedMethod(service))
+          )
+        )
+      ),
+      Option.getOrElse(() => ({ model }))
+    )
+
+/**
+ * Select a method of the selected service and start a request for it. A method the wire
+ * cannot carry is not selectable, whatever asked for it.
+ */
+const selectMethod =
+  (localName: string): UpdateStep =>
+  (model) =>
+    pipe(
+      model.maybeDefinitions,
+      Option.flatMap((definitions) =>
+        Option.flatMap(selectedServiceOf(definitions), (service) =>
+          pipe(
+            Array.findFirst(
+              service.methods,
+              (method) => method.localName === localName && method.isSupported
+            ),
+            Option.map((method) =>
+              withSelection(model, definitions, selectionOf(service, Option.some(method)))
+            )
+          )
+        )
+      ),
+      Option.getOrElse(() => ({ model }))
+    )
+
+/** Replace the request text and ask for a verdict on it. */
+const writeRequestJson =
+  (json: string): UpdateStep =>
+  (model) =>
+    pipe(
+      model.maybeDefinitions,
+      Option.flatMap(selectedCallOf),
+      Option.match({
+        onNone: () => ({ model }),
+        onSome: ({ definitions, serviceName, request }) =>
+          withSelection(model, definitions, {
+            serviceName,
+            maybeRequest: Option.some(
+              modifyFields(request, {
+                json: () => json,
+                validation: () => Validation.Pending(),
+              })
+            ),
+          }),
+      })
+    )
+
+/**
+ * Write a value name into the enum field with this key. Nothing changes while the request
+ * text is not a JSON object, or when the selected method has no such enum field.
+ */
+const selectEnumValue =
+  (fieldId: string, valueName: string): UpdateStep =>
+  (model) =>
+    pipe(
+      model.maybeDefinitions,
+      Option.flatMap(selectedCallOf),
+      Option.flatMap(({ method, request }) =>
+        Option.flatMap(
+          Array.findFirst(method.fields, (field) => field._tag === 'Enum' && field.key === fieldId),
+          (field) =>
+            Option.map(parseRequestObject(request.json), (requestObject) =>
+              writeRequestField(requestObject, field.jsonName, valueName)
+            )
+        )
+      ),
+      Option.match({
+        onNone: () => ({ model }),
+        onSome: (json) => writeRequestJson(json)(model),
+      })
+    )
+
+const modifyRequest = (model: Model, modify: (request: RequestDraft) => RequestDraft): Model =>
+  modifyFields(model, {
+    maybeDefinitions: Option.map((definitions) =>
+      modifyFields(definitions, {
+        maybeSelection: Option.map((selection) =>
+          modifyFields(selection, { maybeRequest: Option.map(modify) })
+        ),
+      })
+    ),
+  })
+
+const foldServiceListbox = Update.foldChild({
+  update: NameListbox.update,
+  read: (model: Model) => Option.some(model.serviceListbox),
+  write: (model, nextListbox) => modifyFields(model, { serviceListbox: () => nextListbox }),
+  toParentMessage: (message) => Message.GotServiceListboxMessage({ message }),
+  foldOutMessage: Listbox.OutMessage.match<UpdateStep, Listbox.OutMessage>({
+    Selected: ({ value }) => selectService(value),
+  }),
+})
+
+const foldMethodListbox = Update.foldChild({
+  update: NameListbox.update,
+  read: (model: Model) => Option.some(model.methodListbox),
+  write: (model, nextListbox) => modifyFields(model, { methodListbox: () => nextListbox }),
+  toParentMessage: (message) => Message.GotMethodListboxMessage({ message }),
+  foldOutMessage: Listbox.OutMessage.match<UpdateStep, Listbox.OutMessage>({
+    Selected: ({ value }) => selectMethod(value),
+  }),
+})
+
+/**
+ * The pickers of the enum fields of the request being written, addressed by field key. A
+ * Message for a field the selected method does not have changes nothing.
+ */
+const foldEnumListbox = Update.foldChildAt({
+  update: NameListbox.update,
+  readAt: (model: Model, fieldId: string) =>
+    pipe(
+      model.maybeDefinitions,
+      Option.flatMap(selectedCallOf),
+      Option.flatMap(({ request }) =>
+        Array.findFirst(request.enumListboxes, (entry) => entry.fieldId === fieldId)
+      ),
+      Option.map((entry) => entry.listbox)
+    ),
+  writeAt: (model, fieldId, nextListbox) =>
+    modifyRequest(model, (request) =>
+      modifyFields(request, {
+        enumListboxes: Array.map((entry) =>
+          entry.fieldId === fieldId ? modifyFields(entry, { listbox: () => nextListbox }) : entry
+        ),
+      })
+    ),
+  toParentMessage: (fieldId, message) => Message.GotEnumListboxMessage({ fieldId, message }),
+  foldOutMessage: (fieldId) =>
+    Listbox.OutMessage.match<UpdateStep, Listbox.OutMessage>({
+      Selected: ({ value }) => selectEnumValue(fieldId, value),
+    }),
+})
+
 export const makeInit = (options: RequestOptions) => (): UpdateReturn => ({
   model: emptyModel(options.descriptorSetUrl),
 })
@@ -153,57 +308,16 @@ export const makeUpdate = (options: RequestOptions) => (model: Model, message: M
       model: modifyFields(model, { load: () => Load.Idle() }),
     }),
 
-    SelectedService: ({ typeName }) =>
-      pipe(
-        model.maybeDefinitions,
-        Option.flatMap((definitions) =>
-          Option.map(findService(definitions, typeName), (service) =>
-            withSelection(
-              model,
-              definitions,
-              selectionOf(service, Summary.firstSupportedMethod(service))
-            )
-          )
-        ),
-        Option.getOrElse(() => ({ model }))
-      ),
+    GotServiceListboxMessage: ({ message: listboxMessage }) =>
+      foldServiceListbox(model, listboxMessage),
 
-    SelectedMethod: ({ localName }) =>
-      pipe(
-        model.maybeDefinitions,
-        Option.flatMap((definitions) =>
-          Option.flatMap(selectedServiceOf(definitions), (service) =>
-            pipe(
-              Array.findFirst(
-                service.methods,
-                (method) => method.localName === localName && method.isSupported
-              ),
-              Option.map((method) =>
-                withSelection(model, definitions, selectionOf(service, Option.some(method)))
-              )
-            )
-          )
-        ),
-        Option.getOrElse(() => ({ model }))
-      ),
+    GotMethodListboxMessage: ({ message: listboxMessage }) =>
+      foldMethodListbox(model, listboxMessage),
 
-    UpdatedRequestJson: ({ value }) =>
-      pipe(
-        model.maybeDefinitions,
-        Option.flatMap(selectedCallOf),
-        Option.match({
-          onNone: () => ({ model }),
-          onSome: ({ definitions, serviceName, request }) =>
-            withSelection(model, definitions, {
-              serviceName,
-              maybeRequest: Option.some({
-                methodName: request.methodName,
-                json: value,
-                validation: Validation.Pending(),
-              }),
-            }),
-        })
-      ),
+    GotEnumListboxMessage: ({ fieldId, message: listboxMessage }) =>
+      foldEnumListbox(model, fieldId, listboxMessage),
+
+    UpdatedRequestJson: ({ value }) => writeRequestJson(value)(model),
 
     SucceededValidateRequest: ({ maybeError, ...checked }) =>
       withVerdict(

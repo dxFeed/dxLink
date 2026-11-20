@@ -2,13 +2,14 @@ import { Effect, Fiber, Stream } from 'effect'
 import { describe, expect, test } from 'vitest'
 
 import type { RegisteredChannelPlugin } from './channel/plugin'
+import { emptyErrorLog } from './domain/error'
 import { echoPlugin } from './echoPlugin.fixture'
 import { type OpenChannel, streamChannels } from './subscription'
 
 const channel = (id: string): OpenChannel => ({
   id,
   kind: 'echo',
-  model: { channelId: id, text: id, isClosed: false },
+  model: { channelId: id, text: id, isClosed: false, errorLog: emptyErrorLog() },
 })
 
 /** The echo plugin with a live side that records when it is connected and released. */
