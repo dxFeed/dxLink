@@ -1,4 +1,15 @@
-import { Array, Clock, Duration, Effect, Option, Predicate, Schema, Stream, pipe } from 'effect'
+import {
+  Array,
+  Clock,
+  Duration,
+  Effect,
+  Match,
+  Option,
+  Predicate,
+  Schema,
+  Stream,
+  pipe,
+} from 'effect'
 import { Command, Submodel, type Update } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 import { defineMessageUnion } from 'foldkit/message'
@@ -22,13 +33,18 @@ import {
 import { describeCallFailure, formatWireJson, startCall } from './call'
 import { parseRequest } from './descriptors'
 import { Config, Validation } from './request'
-import { type CallEvent, RpcHandles, RpcRegistry, type RpcServices } from './service'
+import { type CallEvent, RpcHandles, type RpcServices, resolveMethod } from './service'
 
 // MODEL
 
 const CHANNEL_TAG = 'RpcChannel'
 
-export const CallState = Schema.Literals(['Active', 'Completed', 'Failed'])
+/**
+ * Where the call stands. `Opening` lasts until the Command that starts the call reports
+ * back. `Closed` is the user having closed the card, and it is final: whatever the call
+ * still reports afterwards leaves it closed.
+ */
+export const CallState = Schema.Literals(['Opening', 'Active', 'Completed', 'Failed', 'Closed'])
 export type CallState = typeof CallState.Type
 
 /** A message with the local time it was observed at, kept as the protobuf-JSON text. */
@@ -81,14 +97,17 @@ export const Message = defineMessageUnion({
   EndedCall: {},
   FailedCall: { error: ReportedError },
   UpdatedSendJson: { value: Schema.String },
-  CompletedValidateSendRequest: {
+  SucceededValidateSendRequest: {
     json: Schema.String,
+    /** What is wrong with the request, or `None` when it fits the method's input message. */
     maybeError: Schema.Option(Schema.String),
   },
+  FailedValidateSendRequest: { json: Schema.String, error: ReportedError },
   ClickedSend: {},
   SucceededSendRequest: { sent: StampedJson },
   FailedSendRequest: { error: ReportedError },
-  CompletedCloseCall: {},
+  SucceededCloseCall: {},
+  FailedCloseCall: { error: ReportedError },
 })
 export type Message = typeof Message.Type
 
@@ -106,57 +125,63 @@ const stamp = (json: string): Effect.Effect<StampedJson> =>
 
 const CALL_NOT_OPEN = 'The call is no longer open.'
 
+type CallFailure = Readonly<{ type: string; message: string }>
+
+const unknownFailure = (message: string): CallFailure => ({ type: 'UNKNOWN', message })
+
 /**
- * Resolve the call's descriptors from the loaded registry, start it, and file the live call
- * under the channel's id. The request is parsed again here because the channel receives it
- * as text; a request the form let through parses.
+ * Resolve the call's descriptors from the registry the config names, start the call, and
+ * file it under the channel's id. The request is parsed again here because the channel
+ * receives it as text; a request the form let through parses.
+ *
+ * Everything that can fail is done before the call is started, and a started call is filed
+ * without an interruption point in between, so a call that is running is always one that
+ * {@link CloseCall} can find and stop.
  */
 export const OpenCall = Command.define('OpenCall', {
   args: {
     channelId: Schema.String,
+    registryId: Schema.Finite,
     serviceName: Schema.String,
     methodLocalName: Schema.String,
     requestJson: Schema.String,
   },
   messages: [Message.SucceededOpenCall, Message.FailedOpenCall],
-  execute: ({ channelId, serviceName, methodLocalName, requestJson }) =>
+  execute: ({ channelId, registryId, serviceName, methodLocalName, requestJson }) =>
     Effect.gen(function* () {
-      const client = yield* DxLinkClient.get
-      const store = yield* RpcRegistry
+      const { service, method } = yield* Effect.mapError(
+        resolveMethod({ registryId, serviceName, methodLocalName }),
+        (error) => unknownFailure(error.message)
+      )
+      const client = yield* Effect.catchTag(DxLinkClient.get, 'ResourceNotAvailable', () =>
+        Effect.fail(unknownFailure('RPC channel opened without an active connection'))
+      )
       const handles = yield* RpcHandles
-      const maybeRegistry = yield* store.get
 
-      const sent = yield* Effect.try({
-        try: () => {
-          const service = Option.getOrUndefined(maybeRegistry)?.getService(serviceName)
-          const method = service?.method[methodLocalName]
-          if (service === undefined || method === undefined) {
-            throw new Error(
-              `The loaded definitions do not declare ${serviceName}/${methodLocalName}`
-            )
-          }
-          const parsed = parseRequest(method.input, requestJson)
-          if ('error' in parsed) {
-            throw new Error(parsed.error)
-          }
-          const handle = startCall(client, service, method, parsed.message, (event) => {
-            handles.emit(channelId, event)
-          })
-
-          return { handle, json: formatWireJson(method, parsed.message) }
-        },
+      const parsed = parseRequest(method.input, requestJson)
+      if ('error' in parsed) {
+        return yield* Effect.fail(unknownFailure(parsed.error))
+      }
+      const sentJson = yield* Effect.try({
+        try: () => formatWireJson(method, parsed.message),
         catch: describeCallFailure,
       })
-      yield* handles.put(channelId, sent.handle)
 
-      return Message.SucceededOpenCall({ sent: yield* stamp(sent.json) })
+      yield* Effect.uninterruptible(
+        Effect.flatMap(
+          Effect.try({
+            try: () =>
+              startCall(client, service, method, parsed.message, (event) => {
+                handles.emit(channelId, event)
+              }),
+            catch: describeCallFailure,
+          }),
+          (handle) => handles.put(channelId, handle)
+        )
+      )
+
+      return Message.SucceededOpenCall({ sent: yield* stamp(sentJson) })
     }).pipe(
-      Effect.catchTag('ResourceNotAvailable', () =>
-        Effect.fail({
-          type: 'UNKNOWN',
-          message: 'RPC channel opened without an active connection',
-        })
-      ),
       Effect.catch((failure) =>
         Effect.map(reportError(failure), (error) => Message.FailedOpenCall({ error }))
       )
@@ -164,28 +189,28 @@ export const OpenCall = Command.define('OpenCall', {
 })
 
 /**
- * Check the next request of a bidirectional call against the method's input message. The
- * result carries the text that was checked, so a verdict on text that has since changed is
- * recognisable.
+ * Check the next request of a bidirectional call against the method's input message.
+ * Succeeds with a verdict; fails when no live call is filed under the channel, since there
+ * is then nothing to check against. Either result carries the text it is about, so one
+ * about text that has since changed is recognisable.
  */
 export const ValidateSendRequest = Command.define('ValidateSendRequest', {
   args: { channelId: Schema.String, json: Schema.String },
-  messages: [Message.CompletedValidateSendRequest],
+  messages: [Message.SucceededValidateSendRequest, Message.FailedValidateSendRequest],
   execute: ({ channelId, json }) =>
     Effect.gen(function* () {
       const handles = yield* RpcHandles
       const maybeHandle = yield* handles.get(channelId)
+      if (Option.isNone(maybeHandle)) {
+        const error = yield* reportError(unknownFailure(CALL_NOT_OPEN))
 
-      return Message.CompletedValidateSendRequest({
+        return Message.FailedValidateSendRequest({ json, error })
+      }
+      const parsed = parseRequest(maybeHandle.value.method.input, json)
+
+      return Message.SucceededValidateSendRequest({
         json,
-        maybeError: Option.match(maybeHandle, {
-          onNone: () => Option.some(CALL_NOT_OPEN),
-          onSome: (handle) => {
-            const parsed = parseRequest(handle.method.input, json)
-
-            return 'error' in parsed ? Option.some(parsed.error) : Option.none()
-          },
-        }),
+        maybeError: 'error' in parsed ? Option.some(parsed.error) : Option.none(),
       })
     }),
 })
@@ -198,23 +223,22 @@ export const SendRequest = Command.define('SendRequest', {
     Effect.gen(function* () {
       const handles = yield* RpcHandles
       const maybeHandle = yield* handles.get(channelId)
+      const maybeSend = Option.flatMap(maybeHandle, ({ maybeSend }) => maybeSend)
+      if (Option.isNone(maybeHandle) || Option.isNone(maybeSend)) {
+        return yield* Effect.fail(unknownFailure(CALL_NOT_OPEN))
+      }
+      const { method } = maybeHandle.value
+      const send = maybeSend.value
 
+      const parsed = parseRequest(method.input, json)
+      if ('error' in parsed) {
+        return yield* Effect.fail(unknownFailure(parsed.error))
+      }
       const sentJson = yield* Effect.try({
         try: () => {
-          const handle = Option.getOrUndefined(maybeHandle)
-          const send = Option.getOrUndefined(
-            Option.flatMap(maybeHandle, ({ maybeSend }) => maybeSend)
-          )
-          if (handle === undefined || send === undefined) {
-            throw new Error(CALL_NOT_OPEN)
-          }
-          const parsed = parseRequest(handle.method.input, json)
-          if ('error' in parsed) {
-            throw new Error(parsed.error)
-          }
           send(parsed.message)
 
-          return formatWireJson(handle.method, parsed.message)
+          return formatWireJson(method, parsed.message)
         },
         catch: describeCallFailure,
       })
@@ -227,25 +251,35 @@ export const SendRequest = Command.define('SendRequest', {
     ),
 })
 
-/** Cancel the call, which releases its channel. Closing twice is harmless. */
+/**
+ * Cancel the call, which releases its channel. The call is taken out of the handles first,
+ * so it is no longer addressable whether or not stopping it throws. A channel with no call
+ * filed under it has nothing left to release, which is a success: closing twice is harmless.
+ */
 export const CloseCall = Command.define('CloseCall', {
   args: { channelId: Schema.String },
-  messages: [Message.CompletedCloseCall],
+  messages: [Message.SucceededCloseCall, Message.FailedCloseCall],
   execute: ({ channelId }) =>
     Effect.gen(function* () {
       const handles = yield* RpcHandles
       const maybeHandle = yield* handles.take(channelId)
-      yield* Effect.sync(() => {
-        Option.match(maybeHandle, {
-          onNone: () => undefined,
-          onSome: (handle) => {
-            handle.stop()
-          },
-        })
+      yield* Option.match(maybeHandle, {
+        onNone: () => Effect.void,
+        onSome: (handle) =>
+          Effect.try({
+            try: () => {
+              handle.stop()
+            },
+            catch: describeCallFailure,
+          }),
       })
 
-      return Message.CompletedCloseCall()
-    }),
+      return Message.SucceededCloseCall()
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.map(reportError(failure), (error) => Message.FailedCloseCall({ error }))
+      )
+    ),
 })
 
 // EVENTS
@@ -334,7 +368,7 @@ export const init = ({
     _tag: CHANNEL_TAG,
     channelId,
     config,
-    callState: 'Active',
+    callState: 'Opening',
     requests: [],
     responses: [],
     nextEntryId: 1,
@@ -345,6 +379,7 @@ export const init = ({
   commands: [
     OpenCall({
       channelId,
+      registryId: config.registryId,
       serviceName: config.serviceName,
       methodLocalName: config.methodLocalName,
       requestJson: config.requestJson,
@@ -376,11 +411,13 @@ const recordRequest = (model: Model, sent: StampedJson): Model =>
     nextEntryId: (nextEntryId) => nextEntryId + 1,
   })
 
-const fail = (model: Model, error: ReportedError): Model =>
+const recordError = (model: Model, error: ReportedError): Model =>
   modifyFields(model, {
-    callState: () => 'Failed',
     errorLog: (errorLog) => prependError(errorLog, error),
   })
+
+const fail = (model: Model, error: ReportedError): Model =>
+  modifyFields(recordError(model, error), { callState: () => 'Failed' })
 
 const validateSend = (model: Model): UpdateReturn => ({
   model: modifyFields(model, {
@@ -392,47 +429,86 @@ const validateSend = (model: Model): UpdateReturn => ({
 const canSend = (model: Model): boolean =>
   model.callState === 'Active' && model.sendValidation._tag === 'Valid'
 
+const isClosed = (model: Model): boolean => model.callState === 'Closed'
+
+/** What the call reports changes the channel only until the card is closed. */
+const unlessClosed = (model: Model, next: (open: Model) => UpdateReturn): UpdateReturn =>
+  isClosed(model) ? { model } : next(model)
+
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
+    // NOTE: a call that reports itself open after its card was closed was not filed yet
+    // when the card's CloseCall ran, so it is stopped here rather than left running.
     SucceededOpenCall: ({ sent }) => {
-      const recorded = recordRequest(model, sent)
+      if (isClosed(model)) {
+        return { model, commands: [CloseCall({ channelId: model.channelId })] }
+      }
+      const opened = modifyFields(recordRequest(model, sent), {
+        callState: (callState) => (callState === 'Opening' ? 'Active' : callState),
+      })
 
-      return model.config.isBidirectional ? validateSend(recorded) : { model: recorded }
+      return opened.callState === 'Active' && opened.config.isBidirectional
+        ? validateSend(opened)
+        : { model: opened }
     },
 
-    FailedOpenCall: ({ error }) => ({ model: fail(model, error) }),
+    FailedOpenCall: ({ error }) => unlessClosed(model, (open) => ({ model: fail(open, error) })),
 
-    ReceivedResponses: ({ responses }) => ({
-      model: modifyFields(model, {
-        responses: (entries) => prependEntries(entries, responses, model.nextEntryId),
-        nextEntryId: (nextEntryId) => nextEntryId + responses.length,
-      }),
-    }),
+    ReceivedResponses: ({ responses }) =>
+      unlessClosed(model, (open) => ({
+        model: modifyFields(open, {
+          responses: (entries) => prependEntries(entries, responses, open.nextEntryId),
+          nextEntryId: (nextEntryId) => nextEntryId + responses.length,
+        }),
+      })),
 
     // NOTE: a failed call stays failed; the Observable never completes after an error, but
     // a late event must not paper over it either.
     EndedCall: () => ({
       model: modifyFields(model, {
-        callState: (callState) => (callState === 'Failed' ? callState : 'Completed'),
+        callState: (callState) =>
+          callState === 'Opening' || callState === 'Active' ? 'Completed' : callState,
       }),
     }),
 
-    FailedCall: ({ error }) => ({ model: fail(model, error) }),
+    FailedCall: ({ error }) => unlessClosed(model, (open) => ({ model: fail(open, error) })),
 
-    UpdatedSendJson: ({ value }) => validateSend(modifyFields(model, { sendJson: () => value })),
+    // NOTE: a request can be drafted while the call is opening, but only an open call has
+    // a method to check it against; SucceededOpenCall asks for the verdict then.
+    UpdatedSendJson: ({ value }) => {
+      if (model.callState === 'Active') {
+        return validateSend(modifyFields(model, { sendJson: () => value }))
+      }
 
-    CompletedValidateSendRequest: ({ json, maybeError }) =>
-      json === model.sendJson
+      return model.callState === 'Opening'
         ? {
             model: modifyFields(model, {
-              sendValidation: () =>
-                Option.match(maybeError, {
-                  onNone: () => Validation.Valid(),
-                  onSome: (error) => Validation.Invalid({ error }),
-                }),
+              sendJson: () => value,
+              sendValidation: () => Validation.Pending(),
             }),
           }
-        : { model },
+        : { model }
+    },
+
+    SucceededValidateSendRequest: ({ json, maybeError }) =>
+      unlessClosed(model, (open) =>
+        json === open.sendJson
+          ? {
+              model: modifyFields(open, {
+                sendValidation: () =>
+                  Option.match(maybeError, {
+                    onNone: () => Validation.Valid(),
+                    onSome: (error) => Validation.Invalid({ error }),
+                  }),
+              }),
+            }
+          : { model: open }
+      ),
+
+    // NOTE: a call the Model holds as active but the handles do not have is gone, so it
+    // is reported and ended rather than left looking sendable.
+    FailedValidateSendRequest: ({ error }) =>
+      model.callState === 'Active' ? { model: fail(model, error) } : { model },
 
     ClickedSend: () =>
       canSend(model)
@@ -442,34 +518,42 @@ export const update = (model: Model, message: Message) =>
           }
         : { model },
 
-    SucceededSendRequest: ({ sent }) => ({ model: recordRequest(model, sent) }),
+    SucceededSendRequest: ({ sent }) =>
+      unlessClosed(model, (open) => ({ model: recordRequest(open, sent) })),
 
     // NOTE: a request the channel rejects is reported on the card and ends the call, so a
     // typo in the editor cannot take anything else down.
-    FailedSendRequest: ({ error }) => ({ model: fail(model, error) }),
+    FailedSendRequest: ({ error }) => unlessClosed(model, (open) => ({ model: fail(open, error) })),
 
-    CompletedCloseCall: () => ({ model }),
+    SucceededCloseCall: () => ({ model }),
+
+    FailedCloseCall: ({ error }) => ({ model: recordError(model, error) }),
   })
 
+/**
+ * End the channel's part in the call. The Model is closed here, not when the Command
+ * reports back: from this point nothing can be sent and nothing the call reports is shown.
+ */
 export const close = (model: Model): UpdateReturn => ({
-  model,
+  model: modifyFields(model, { callState: () => 'Closed' }),
   commands: [CloseCall({ channelId: model.channelId })],
 })
 
 export const clearErrors = (model: Model): Model => modifyFields(model, { errorLog: clearErrorLog })
 
-const statusOf = (model: Model): ChannelStatus => {
-  if (model.callState === 'Failed') {
-    return { label: 'failed', tone: 'Danger' }
-  }
-  if (model.callState === 'Completed') {
-    return { label: 'completed', tone: 'Neutral' }
-  }
-
-  return Array.isReadonlyArrayEmpty(model.responses)
-    ? { label: 'waiting', tone: 'Warning' }
-    : { label: 'streaming', tone: 'Success' }
-}
+const statusOf = (model: Model): ChannelStatus =>
+  Match.value(model.callState).pipe(
+    Match.withReturnType<ChannelStatus>(),
+    Match.when('Failed', () => ({ label: 'failed', tone: 'Danger' })),
+    Match.when('Completed', () => ({ label: 'completed', tone: 'Neutral' })),
+    Match.when('Closed', () => ({ label: 'closed', tone: 'Neutral' })),
+    Match.whenOr('Opening', 'Active', () =>
+      Array.isReadonlyArrayEmpty(model.responses)
+        ? { label: 'waiting', tone: 'Warning' }
+        : { label: 'streaming', tone: 'Success' }
+    ),
+    Match.exhaustive
+  )
 
 /**
  * The channel is opened inside the RPC transport, so its protocol id is not exposed here;
@@ -495,7 +579,7 @@ const messageList = (
   h: HtmlBuilder<Message>
 ): Html =>
   h.div(
-    [h.Class('flex flex-col gap-2')],
+    [h.Role('group'), h.AriaLabel(title), h.Class('flex flex-col gap-2')],
     [
       h.div(
         [h.Class('flex items-baseline gap-2')],
@@ -524,6 +608,9 @@ const messageList = (
     ]
   )
 
+const canDraft = (model: Model): boolean =>
+  model.callState === 'Opening' || model.callState === 'Active'
+
 /**
  * Send box of a bidirectional call — the only model where the client keeps talking after
  * the channel is open. Nothing can be sent once the call has completed or failed: the
@@ -540,6 +627,7 @@ const sendRequestView = (model: Model, h: HtmlBuilder<Message>): Html =>
           value: model.sendJson,
           rows: 4,
           onInput: (value) => Message.UpdatedSendJson({ value }),
+          isDisabled: !canDraft(model),
         },
         h
       ),
@@ -565,7 +653,16 @@ const sendRequestView = (model: Model, h: HtmlBuilder<Message>): Html =>
     ]
   )
 
-/** Live RPC channel — one method of a protobuf service, bound to the connection. */
+const noResponseText = (callState: CallState): string =>
+  Match.value(callState).pipe(
+    Match.when('Completed', () => 'The server closed the channel without a response.'),
+    Match.when('Failed', () => 'The call failed without a response.'),
+    Match.when('Closed', () => 'The channel was closed without a response.'),
+    Match.whenOr('Opening', 'Active', () => 'Waiting for the first response…'),
+    Match.exhaustive
+  )
+
+/** RPC channel — one method of a protobuf service, bound to the connection. */
 export const view = Submodel.defineView<Model, Message>((model, h) =>
   h.div(
     [h.Class('flex flex-col gap-4')],
@@ -578,16 +675,10 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
           Kit.chip(`out: ${model.config.outputTypeName}`, 'Neutral', h),
         ]
       ),
-      model.config.isBidirectional ? sendRequestView(model, h) : h.empty,
+      isClosed(model) ? Kit.notice('The channel is closed.', 'Neutral', h) : h.empty,
+      model.config.isBidirectional && !isClosed(model) ? sendRequestView(model, h) : h.empty,
       messageList('Sent', model.requests, 'Nothing sent yet.', h),
-      messageList(
-        'Received',
-        model.responses,
-        model.callState === 'Completed'
-          ? 'The server closed the channel without a response.'
-          : 'Waiting for the first response…',
-        h
-      ),
+      messageList('Received', model.responses, noResponseText(model.callState), h),
     ]
   )
 )

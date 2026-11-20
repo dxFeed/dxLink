@@ -259,7 +259,7 @@ const subscriptionChip = (subscription: FeedSubscription, h: HtmlBuilder<Message
   h.span(
     [
       h.Class(
-        subscription.kind === 'Regular'
+        subscription._tag === 'Regular'
           ? 'inline-flex h-6 items-center gap-1 rounded-full border border-zinc-300 pr-1 pl-2.5 text-xs font-medium dark:border-zinc-700'
           : 'inline-flex h-6 items-center gap-1 rounded-full border border-sky-500 pr-1 pl-2.5 text-xs font-medium text-sky-700 dark:text-sky-300'
       ),
@@ -443,9 +443,18 @@ const subscriptionSection = (
 }
 
 /** Received events: one tab per event type, one row per symbol and source. */
-const eventsSection = (state: SubscriptionsState, h: HtmlBuilder<Message>): Html => {
+export const eventsSection = (state: SubscriptionsState, h: HtmlBuilder<Message>): Html => {
   const events = displayedEvents(state)
-  const isPaused = Option.isSome(state.maybeFrozenEvents)
+  const isPaused = state.table._tag === 'Paused'
+
+  const pauseButton = Kit.iconButton(
+    {
+      label: isPaused ? 'Resume' : 'Pause',
+      iconPath: isPaused ? ICON_PLAY : ICON_PAUSE,
+      onClick: Message.ClickedTogglePause(),
+    },
+    h
+  )
 
   return Option.match(activeEventType(state), {
     onNone: () =>
@@ -453,10 +462,24 @@ const eventsSection = (state: SubscriptionsState, h: HtmlBuilder<Message>): Html
         [h.Class('flex flex-col gap-1')],
         [
           h.h4([h.Class('text-sm font-semibold')], ['Events']),
-          h.p(
-            [h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)],
-            ['No events received yet. Add a subscription to start receiving data.']
-          ),
+          // NOTE: a paused table with nothing to show still offers Resume: events received
+          // while it is paused stay out of sight, so without it the table could not leave
+          // the pause.
+          isPaused
+            ? h.div(
+                [h.Class('flex items-center justify-between gap-2')],
+                [
+                  h.p(
+                    [h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)],
+                    ['Paused. Events received meanwhile are shown when the table resumes.']
+                  ),
+                  pauseButton,
+                ]
+              )
+            : h.p(
+                [h.Class(`text-sm ${Kit.MUTED_TEXT_CLASS}`)],
+                ['No events received yet. Add a subscription to start receiving data.']
+              ),
         ]
       ),
     onSome: (active) => {
@@ -500,14 +523,7 @@ const eventsSection = (state: SubscriptionsState, h: HtmlBuilder<Message>): Html
               h.div(
                 [h.Class('flex shrink-0 gap-1')],
                 [
-                  Kit.iconButton(
-                    {
-                      label: isPaused ? 'Resume' : 'Pause',
-                      iconPath: isPaused ? ICON_PLAY : ICON_PAUSE,
-                      onClick: Message.ClickedTogglePause(),
-                    },
-                    h
-                  ),
+                  pauseButton,
                   Kit.iconButton(
                     {
                       label: 'Clear',

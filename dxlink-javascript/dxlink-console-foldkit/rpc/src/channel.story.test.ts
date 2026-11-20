@@ -17,8 +17,10 @@ import {
   update,
 } from './channel'
 import { type Config, Validation } from './request'
+import { REGISTRY_NOT_RETAINED } from './service'
 
 const unaryConfig: Config = {
+  registryId: 1,
   serviceName: 'demo.v1.OrderService',
   methodLocalName: 'issue',
   methodName: 'Issue',
@@ -51,7 +53,7 @@ const openBidiModel = (() => {
 
   return update(
     opened,
-    Message.CompletedValidateSendRequest({
+    Message.SucceededValidateSendRequest({
       json: opened.sendJson,
       maybeError: Option.none(),
     })
@@ -65,6 +67,7 @@ describe('opening a call', () => {
         name: OpenCall.name,
         args: {
           channelId: '7',
+          registryId: 1,
           serviceName: 'demo.v1.OrderService',
           methodLocalName: 'issue',
           requestJson: '{"symbol":"AAPL"}',
@@ -227,7 +230,7 @@ describe('a bidirectional call', () => {
       ),
       Command.resolve(
         ValidateSendRequest,
-        Message.CompletedValidateSendRequest({
+        Message.SucceededValidateSendRequest({
           json: bidiConfig.requestTemplate,
           maybeError: Option.none(),
         })
@@ -262,7 +265,7 @@ describe('a bidirectional call', () => {
       message(Message.UpdatedSendJson({ value: '{"smybol":""}' })),
       Command.resolve(
         ValidateSendRequest,
-        Message.CompletedValidateSendRequest({
+        Message.SucceededValidateSendRequest({
           json: '{"smybol":""}',
           maybeError: Option.some('unknown field'),
         })
@@ -318,16 +321,165 @@ describe('a bidirectional call', () => {
   })
 })
 
+describe('a bidirectional call that is not open', () => {
+  test('a request drafted while the call opens is checked once it is open', () => {
+    story(
+      update,
+      given(bidiInit.model),
+      message(Message.UpdatedSendJson({ value: '{"symbol":"MSFT"}' })),
+      Command.expectNone(),
+      model((next) => {
+        expect(next.callState).toBe('Opening')
+        expect(next.sendValidation).toEqual(Validation.Pending())
+      }),
+      message(Message.SucceededOpenCall({ sent: sent('{"symbol":"AAPL"}') })),
+      Command.expectExact(ValidateSendRequest({ channelId: '8', json: '{"symbol":"MSFT"}' })),
+      Command.resolve(
+        ValidateSendRequest,
+        Message.SucceededValidateSendRequest({
+          json: '{"symbol":"MSFT"}',
+          maybeError: Option.none(),
+        })
+      ),
+      model((next) => {
+        expect(next.callState).toBe('Active')
+        expect(next.sendValidation).toEqual(Validation.Valid())
+      })
+    )
+  })
+
+  test('a check that finds no live call reports it and ends the call', () => {
+    story(
+      update,
+      given(openBidiModel),
+      message(Message.UpdatedSendJson({ value: '{}' })),
+      Command.resolve(
+        ValidateSendRequest,
+        Message.FailedValidateSendRequest({
+          json: '{}',
+          error: { type: 'UNKNOWN', message: 'The call is no longer open.', time: '10:05' },
+        })
+      ),
+      model((next) => {
+        expect(next.callState).toBe('Failed')
+        expect(summarize(next).errors).toEqual([
+          { id: 1, type: 'UNKNOWN', message: 'The call is no longer open.', time: '10:05' },
+        ])
+      }),
+      message(Message.ClickedSend()),
+      Command.expectNone()
+    )
+  })
+
+  test('a call whose definitions are gone fails on its own card', () => {
+    story(
+      update,
+      given(bidiInit.model),
+      message(
+        Message.FailedOpenCall({
+          error: { type: 'UNKNOWN', message: REGISTRY_NOT_RETAINED, time: '10:06' },
+        })
+      ),
+      Command.expectNone(),
+      model((next) => {
+        expect(next.callState).toBe('Failed')
+        expect(summarize(next).errors[0]?.message).toBe(REGISTRY_NOT_RETAINED)
+        expect(summarize(next).maybeStatus).toEqual(
+          Option.some({ label: 'failed', tone: 'Danger' })
+        )
+      })
+    )
+  })
+})
+
 describe('closing', () => {
-  test('cancels the call filed under the channel', () => {
+  const closedModel = close(openBidiModel).model
+
+  test('ends the call in the Model and cancels the one filed under the channel', () => {
     const channelClose = close(openBidiModel)
 
-    expect(channelClose.model).toEqual(openBidiModel)
+    expect(channelClose.model).toEqual({ ...openBidiModel, callState: 'Closed' })
     expect(channelClose.commands).toEqual([
       expect.objectContaining({
         name: CloseCall.name,
         args: { channelId: '8' },
       }),
     ])
+    expect(summarize(channelClose.model).maybeStatus).toEqual(
+      Option.some({ label: 'closed', tone: 'Neutral' })
+    )
+  })
+
+  test('nothing the call reports afterwards revives it', () => {
+    const error = { type: 'TIMEOUT', message: 'late', time: '10:07' }
+
+    story(
+      update,
+      given(closedModel),
+      message(Message.ReceivedResponses({ responses: [sent('{"id":"9"}')] })),
+      message(Message.EndedCall()),
+      message(Message.FailedCall({ error })),
+      message(Message.FailedOpenCall({ error })),
+      message(Message.FailedSendRequest({ error })),
+      message(Message.SucceededSendRequest({ sent: sent('{}') })),
+      message(Message.FailedValidateSendRequest({ json: closedModel.sendJson, error })),
+      message(
+        Message.SucceededValidateSendRequest({
+          json: closedModel.sendJson,
+          maybeError: Option.some('late verdict'),
+        })
+      ),
+      message(Message.SucceededCloseCall()),
+      Command.expectNone(),
+      model((next) => {
+        expect(next).toEqual(closedModel)
+      })
+    )
+  })
+
+  test('nothing can be drafted or sent on a closed channel', () => {
+    story(
+      update,
+      given(closedModel),
+      message(Message.UpdatedSendJson({ value: '{"symbol":"MSFT"}' })),
+      message(Message.ClickedSend()),
+      Command.expectNone(),
+      model((next) => {
+        expect(next).toEqual(closedModel)
+      })
+    )
+  })
+
+  test('a call that opens after its card was closed is stopped', () => {
+    story(
+      update,
+      given(close(bidiInit.model).model),
+      message(Message.SucceededOpenCall({ sent: sent('{"symbol":"AAPL"}') })),
+      Command.expectExact(CloseCall({ channelId: '8' })),
+      Command.resolve(CloseCall, Message.SucceededCloseCall()),
+      model((next) => {
+        expect(next.callState).toBe('Closed')
+        expect(next.requests).toEqual([])
+      })
+    )
+  })
+
+  test('a call that could not be stopped is reported and stays closed', () => {
+    story(
+      update,
+      given(closedModel),
+      message(
+        Message.FailedCloseCall({
+          error: { type: 'UNKNOWN', message: 'unsubscribe failed', time: '10:08' },
+        })
+      ),
+      Command.expectNone(),
+      model((next) => {
+        expect(next.callState).toBe('Closed')
+        expect(summarize(next).errors).toEqual([
+          { id: 1, type: 'UNKNOWN', message: 'unsubscribe failed', time: '10:08' },
+        ])
+      })
+    )
   })
 })

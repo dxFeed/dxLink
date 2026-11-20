@@ -10,7 +10,7 @@ import {
 } from '@dxfeed/dxlink-api'
 
 import type { RegisteredChannelPlugin } from './channel/plugin'
-import { DxLinkClient, type DxLinkClientService } from './client'
+import { type DxLinkClientService, DxLinkSession } from './client'
 import { reportError } from './error'
 import { Message } from './message'
 import type { ClientStatus, ConnectionDetails, Model } from './model'
@@ -91,6 +91,20 @@ const streamClient = (client: DXLinkClient): Stream.Stream<ClientMessage> =>
     )
   )
 
+/**
+ * What the Model's session hears when its client is not there to listen to: one error, so a
+ * session that will never report anything says so instead of staying silent.
+ */
+const streamMissingClient: Stream.Stream<ClientMessage> = Stream.fromEffect(
+  Effect.map(
+    reportError({
+      type: 'CONSOLE',
+      message: 'The client of this session is not available; connect again.',
+    }),
+    (error) => Message.ReportedConnectionError({ error })
+  )
+)
+
 const maybeOpenSessionId = (model: Model): Option.Option<number> =>
   model.session._tag === 'Open' ? Option.some(model.session.sessionId) : Option.none()
 
@@ -111,11 +125,15 @@ export const makeSubscriptions = <Services>(
         dependenciesToStream: ({ maybeSessionId }) =>
           Option.match(maybeSessionId, {
             onNone: () => Stream.empty,
-            onSome: () =>
+            onSome: (sessionId) =>
               Stream.unwrap(
-                DxLinkClient.get.pipe(
-                  Effect.map(streamClient),
-                  Effect.catchTag('ResourceNotAvailable', () => Effect.succeed(Stream.empty))
+                DxLinkSession.get.pipe(
+                  Effect.filterOrFail(
+                    (session) => session.sessionId === sessionId,
+                    () => 'another session'
+                  ),
+                  Effect.map(({ client }) => streamClient(client)),
+                  Effect.orElseSucceed(() => streamMissingClient)
                 )
               ),
           }),

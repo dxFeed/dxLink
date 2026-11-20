@@ -12,8 +12,11 @@ import {
   ValidateRequest,
   Validation,
   makeRequest,
+  selectedRequest,
+  selectedService,
   toConfig,
 } from './request'
+import { REGISTRY_NOT_RETAINED } from './service'
 import { summarizeRegistry } from './summary'
 
 const services = summarizeRegistry(parseDescriptorSet(binaryDescriptorSet()))
@@ -24,19 +27,33 @@ const { init, update } = makeRequest({
 })
 const initialModel = init().model
 
+const REGISTRY_ID = 1
+
 const loaded = Message.SucceededLoadDescriptors({
+  registryId: REGISTRY_ID,
   source: '/proto/docs',
   services,
 })
 
+/** The request as the Model holds it, named the way a validation names what it checked. */
+const checkedOf = (current: Model) => {
+  const definitions = Option.getOrThrow(current.maybeDefinitions)
+  const request = Option.getOrThrow(selectedRequest(current))
+
+  return {
+    registryId: definitions.registryId,
+    serviceName: Option.getOrThrow(selectedService(current)).typeName,
+    methodName: request.methodName,
+    json: request.json,
+  }
+}
+
 /** The verdict a validation would return for the request as the Model holds it. */
 const verdictFor = (current: Model, maybeError: Option.Option<string>) =>
-  Message.CompletedValidateRequest({
-    serviceName: current.serviceName,
-    methodName: current.methodName,
-    json: current.json,
-    maybeError,
-  })
+  Message.SucceededValidateRequest({ ...checkedOf(current), maybeError })
+
+const validationOf = (current: Model) =>
+  Option.map(selectedRequest(current), (request) => request.validation)
 
 /** The form after a descriptor set loaded and its preselected request passed validation. */
 const loadedModel = (() => {
@@ -85,15 +102,20 @@ describe('loading definitions', () => {
       message(loaded),
       Command.expectExact(
         ValidateRequest({
+          registryId: REGISTRY_ID,
           serviceName: 'demo.v1.AccountService',
           methodName: 'get',
           json: '{\n  "id": ""\n}',
         })
       ),
       model((next) => {
-        expect(next.serviceName).toBe('demo.v1.AccountService')
-        expect(next.methodName).toBe('get')
-        expect(next.validation).toEqual(Validation.Pending())
+        expect(checkedOf(next)).toEqual({
+          registryId: REGISTRY_ID,
+          serviceName: 'demo.v1.AccountService',
+          methodName: 'get',
+          json: '{\n  "id": ""\n}',
+        })
+        expect(validationOf(next)).toEqual(Option.some(Validation.Pending()))
         expect(toConfig(next)).toEqual(Option.none())
       }),
       Command.resolve(ValidateRequest, verdictFor(loadedModel, Option.none()))
@@ -172,19 +194,20 @@ describe('selecting a call', () => {
       message(Message.SelectedService({ typeName: 'demo.v1.OrderService' })),
       Command.expectExact(
         ValidateRequest({
+          registryId: REGISTRY_ID,
           serviceName: 'demo.v1.OrderService',
           methodName: 'issue',
           json: ORDER_TEMPLATE,
         })
       ),
       model((next) => {
-        expect(next.methodName).toBe('issue')
-        expect(next.json).toBe(ORDER_TEMPLATE)
-        expect(next.validation).toEqual(Validation.Pending())
+        expect(checkedOf(next)).toMatchObject({ methodName: 'issue', json: ORDER_TEMPLATE })
+        expect(validationOf(next)).toEqual(Option.some(Validation.Pending()))
       }),
       Command.resolve(
         ValidateRequest,
-        Message.CompletedValidateRequest({
+        Message.SucceededValidateRequest({
+          registryId: REGISTRY_ID,
           serviceName: 'demo.v1.OrderService',
           methodName: 'issue',
           json: ORDER_TEMPLATE,
@@ -193,6 +216,7 @@ describe('selecting a call', () => {
       ),
       model((next) => {
         expect(Option.getOrThrow(toConfig(next))).toMatchObject({
+          registryId: REGISTRY_ID,
           serviceName: 'demo.v1.OrderService',
           methodLocalName: 'issue',
           methodName: 'Issue',
@@ -216,7 +240,7 @@ describe('selecting a call', () => {
       message(Message.SelectedMethod({ localName: 'collect' })),
       Command.expectNone(),
       model((next) => {
-        expect(next.methodName).toBe('issue')
+        expect(checkedOf(next).methodName).toBe('issue')
       })
     )
   })
@@ -233,7 +257,8 @@ describe('selecting a call', () => {
       message(Message.SelectedMethod({ localName: 'trade' })),
       Command.resolve(
         ValidateRequest,
-        Message.CompletedValidateRequest({
+        Message.SucceededValidateRequest({
+          registryId: REGISTRY_ID,
           serviceName: 'demo.v1.OrderService',
           methodName: 'trade',
           json: ORDER_TEMPLATE,
@@ -264,27 +289,22 @@ describe('validating the request', () => {
       update,
       given(loadedModel),
       message(Message.UpdatedRequestJson({ value: edited })),
-      Command.expectExact(
-        ValidateRequest({
-          serviceName: loadedModel.serviceName,
-          methodName: loadedModel.methodName,
-          json: edited,
-        })
-      ),
+      Command.expectExact(ValidateRequest({ ...checkedOf(loadedModel), json: edited })),
       model((next) => {
         expect(toConfig(next)).toEqual(Option.none())
       }),
       Command.resolve(
         ValidateRequest,
-        Message.CompletedValidateRequest({
-          serviceName: loadedModel.serviceName,
-          methodName: loadedModel.methodName,
+        Message.SucceededValidateRequest({
+          ...checkedOf(loadedModel),
           json: edited,
           maybeError: Option.some('unknown field "idd"'),
         })
       ),
       model((next) => {
-        expect(next.validation).toEqual(Validation.Invalid({ error: 'unknown field "idd"' }))
+        expect(validationOf(next)).toEqual(
+          Option.some(Validation.Invalid({ error: 'unknown field "idd"' }))
+        )
         expect(toConfig(next)).toEqual(Option.none())
       })
     )
@@ -295,18 +315,101 @@ describe('validating the request', () => {
       update,
       given(loadedModel),
       message(Message.UpdatedRequestJson({ value: '{"id": "1"' })),
+      Command.resolve(ValidateRequest, verdictFor(loadedModel, Option.none())),
+      model((next) => {
+        expect(validationOf(next)).toEqual(Option.some(Validation.Pending()))
+        expect(toConfig(next)).toEqual(Option.none())
+      })
+    )
+  })
+
+  test('a request whose definitions are gone cannot be opened and says why', () => {
+    story(
+      update,
+      given(loadedModel),
+      message(Message.UpdatedRequestJson({ value: '{"id": "1"}' })),
       Command.resolve(
         ValidateRequest,
-        Message.CompletedValidateRequest({
-          serviceName: loadedModel.serviceName,
-          methodName: loadedModel.methodName,
-          json: loadedModel.json,
-          maybeError: Option.none(),
+        Message.FailedValidateRequest({
+          ...checkedOf(loadedModel),
+          json: '{"id": "1"}',
+          reason: REGISTRY_NOT_RETAINED,
         })
       ),
       model((next) => {
-        expect(next.validation).toEqual(Validation.Pending())
+        expect(validationOf(next)).toEqual(
+          Option.some(Validation.Invalid({ error: REGISTRY_NOT_RETAINED }))
+        )
         expect(toConfig(next)).toEqual(Option.none())
+      })
+    )
+  })
+
+  test('a verdict against definitions that were since replaced is ignored', () => {
+    story(
+      update,
+      given(loadedModel),
+      message(Message.SucceededLoadDescriptors({ registryId: 2, source: 'set.binpb', services })),
+      Command.resolve(ValidateRequest, verdictFor(loadedModel, Option.none())),
+      model((next) => {
+        expect(checkedOf(next).registryId).toBe(2)
+        expect(validationOf(next)).toEqual(Option.some(Validation.Pending()))
+        expect(toConfig(next)).toEqual(Option.none())
+      })
+    )
+  })
+})
+
+describe('definitions and selection', () => {
+  test('a descriptor set with no services has nothing selected', () => {
+    story(
+      update,
+      given(loadedModel),
+      message(Message.SucceededLoadDescriptors({ registryId: 2, source: 'empty', services: [] })),
+      Command.expectNone(),
+      model((next) => {
+        expect(Option.getOrThrow(next.maybeDefinitions).maybeSelection).toEqual(Option.none())
+        expect(toConfig(next)).toEqual(Option.none())
+      })
+    )
+  })
+
+  test('a service with no supported method is selected without a request', () => {
+    const collectOnly = services.map((service) => ({
+      ...service,
+      methods: service.methods.filter((method) => !method.isSupported),
+    }))
+
+    story(
+      update,
+      given(initialModel),
+      message(
+        Message.SucceededLoadDescriptors({ registryId: 3, source: 'x', services: collectOnly })
+      ),
+      Command.expectNone(),
+      message(Message.SelectedService({ typeName: 'demo.v1.OrderService' })),
+      Command.expectNone(),
+      model((next) => {
+        expect(Option.getOrThrow(next.maybeDefinitions).maybeSelection).toEqual(
+          Option.some({ serviceName: 'demo.v1.OrderService', maybeRequest: Option.none() })
+        )
+        expect(toConfig(next)).toEqual(Option.none())
+      }),
+      message(Message.UpdatedRequestJson({ value: '{}' })),
+      Command.expectNone()
+    )
+  })
+
+  test('an edit with nothing loaded changes nothing', () => {
+    story(
+      update,
+      given(initialModel),
+      message(Message.UpdatedRequestJson({ value: '{}' })),
+      message(Message.SelectedService({ typeName: 'demo.v1.OrderService' })),
+      message(Message.SelectedMethod({ localName: 'issue' })),
+      Command.expectNone(),
+      model((next) => {
+        expect(next).toEqual(initialModel)
       })
     )
   })

@@ -5,7 +5,7 @@ import { defineMessageUnion } from 'foldkit/message'
 import { modifyFields } from 'foldkit/struct'
 
 import {
-  type ConsoleConfig,
+  ConsoleConfig,
   Message as ConsoleMessage,
   Model as ConsoleModel,
   type DxLinkClientService,
@@ -35,18 +35,27 @@ export type Model = typeof Model.Type
 
 // FLAGS
 
+/** Everything the first Model takes from outside the application. */
 export const Flags = Schema.Struct({
+  /** The configuration profile the console's forms start from. */
+  config: ConsoleConfig,
   maybeThemeMode: Schema.Option(ThemeMode),
   prefersDark: Schema.Boolean,
 })
 export type Flags = typeof Flags.Type
 
-export const flags: Effect.Effect<Flags> = Effect.gen(function* () {
-  const maybeThemeMode = yield* loadThemeMode
-  const prefersDark = yield* Effect.sync(() => window.matchMedia(DARK_SCHEME_QUERY).matches)
+/**
+ * Gather the Flags. How the profile is resolved is the caller's business — it depends on the
+ * page and on the plugins registered — so it arrives as an Effect.
+ */
+export const makeFlags = (resolveConfig: Effect.Effect<ConsoleConfig>): Effect.Effect<Flags> =>
+  Effect.gen(function* () {
+    const config = yield* resolveConfig
+    const maybeThemeMode = yield* loadThemeMode
+    const prefersDark = yield* Effect.sync(() => window.matchMedia(DARK_SCHEME_QUERY).matches)
 
-  return { maybeThemeMode, prefersDark }
-})
+    return { config, maybeThemeMode, prefersDark }
+  })
 
 // MESSAGE
 
@@ -145,10 +154,7 @@ const themeSwitcherView = (selected: ThemeMode, h: HtmlBuilder<Message>): Html =
  * The page owns the mode. The root element carries the `dark` class, and everything below —
  * the console included — only follows it.
  */
-export const makeApp = <Services>(
-  plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>,
-  config: ConsoleConfig
-) => {
+export const makeApp = <Services>(plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>) => {
   const Console = makeConsole(plugins)
 
   const toConsoleMessage = (message: ConsoleMessage): Message =>
@@ -163,7 +169,7 @@ export const makeApp = <Services>(
   })
 
   const init = (flags_: Flags) =>
-    Update.foldChildInit(Console.init(config), {
+    Update.foldChildInit(Console.init(flags_.config), {
       toParentModel: (console: ConsoleModel): Model => ({
         console,
         themeMode: Option.getOrElse(flags_.maybeThemeMode, () => 'System'),

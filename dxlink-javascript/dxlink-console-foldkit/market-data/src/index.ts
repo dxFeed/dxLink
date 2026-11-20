@@ -5,13 +5,6 @@
  * one imports the subpaths instead — `/feed` and `/dom` — so the other's dependencies never
  * reach its bundle.
  */
-import { Layer } from 'effect'
-
-import { domLayer } from './dom'
-import { feedLayer } from './feed'
-
 export * from './feed'
 export * from './dom'
-
-/** The live state behind both plugins, for the runtime's `resources`. */
-export const marketDataLayer = Layer.mergeAll(feedLayer, domLayer)
+export { marketDataLayer } from './layer'

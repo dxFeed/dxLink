@@ -3,7 +3,7 @@ import { ManagedResource } from 'foldkit'
 
 import { DXLinkLogLevel, DXLinkWebSocketClient } from '@dxfeed/dxlink-api'
 
-import { DxLinkClient } from './client'
+import { DxLinkSession } from './client'
 import { Message } from './message'
 import { ClientParams, type Model, Session } from './model'
 
@@ -28,9 +28,9 @@ const sessionToMaybeRequirements = (session: Session): Option.Option<ClientRequi
  */
 export const managedResources = ManagedResource.make<Model, Message>()((entry) => ({
   client: entry(Schema.Option(ClientRequirements), {
-    resource: DxLinkClient,
+    resource: DxLinkSession,
     modelToMaybeRequirements: (model) => sessionToMaybeRequirements(model.session),
-    acquire: ({ params }) =>
+    acquire: ({ sessionId, params }) =>
       Effect.try({
         try: () => {
           const client = new DXLinkWebSocketClient({
@@ -42,15 +42,15 @@ export const managedResources = ManagedResource.make<Model, Message>()((entry) =
           })
           client.connect(params.url)
 
-          return client
+          return { sessionId, client }
         },
         catch: (error) => (error instanceof Error ? error.message : 'Failed to create client'),
       }),
-    release: (client) =>
+    release: ({ client }) =>
       Effect.sync(() => {
         client.close()
       }),
-    onAcquired: () => Message.AcquiredClient(),
+    onAcquired: ({ sessionId }) => Message.AcquiredClient({ sessionId }),
     onReleased: () => Message.ReleasedClient(),
     onAcquireError: (error) => Message.FailedAcquireClient({ reason: String(error) }),
   }),

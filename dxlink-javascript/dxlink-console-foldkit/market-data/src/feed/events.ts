@@ -78,11 +78,11 @@ const toMessage = (signal: FeedSignal): Effect.Effect<Message> =>
     Match.tag('Error', ({ type, message }) =>
       Effect.map(reportError({ type, message }), (error) => Message.ReportedChannelError({ error }))
     ),
-    Match.tag('Candles', ({ count }) =>
-      Effect.succeed(Message.ReceivedCandles({ candleCount: count }))
+    Match.tag('Candles', ({ generation, count }) =>
+      Effect.succeed(Message.ReceivedCandles({ generation, candleCount: count }))
     ),
-    Match.tag('ChartFailure', ({ reason }) =>
-      Effect.succeed(Message.FailedDrawCandles({ reason }))
+    Match.tag('ChartFailure', ({ generation, reason }) =>
+      Effect.succeed(Message.FailedDrawCandles({ generation, reason }))
     ),
     Match.exhaustive
   )

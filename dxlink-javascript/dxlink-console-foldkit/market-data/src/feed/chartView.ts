@@ -10,8 +10,13 @@ import type { ChartState, Model } from './model'
 import { ICON_CANDLES, ICON_PLAY, docLink, withHelp } from './viewKit'
 
 /** Candle subscription form over a chart that draws whatever the subscription delivers. */
-export const chartView = (model: Model, state: ChartState, h: HtmlBuilder<Message>): Html =>
-  h.div(
+export const chartView = (model: Model, state: ChartState, h: HtmlBuilder<Message>): Html => {
+  const candleCount = Option.match(state.maybeActive, {
+    onNone: () => 0,
+    onSome: (active) => active.candleCount,
+  })
+
+  return h.div(
     [h.Class('flex flex-col gap-4')],
     [
       h.div(
@@ -79,10 +84,10 @@ export const chartView = (model: Model, state: ChartState, h: HtmlBuilder<Messag
           h.p(
             [h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)],
             [
-              Option.match(state.maybeSubscription, {
+              Option.match(state.maybeActive, {
                 onNone: () => 'Set a subscription to load candles.',
-                onSome: ({ symbol }) =>
-                  `${symbol} · ${state.candleCount} candle${state.candleCount === 1 ? '' : 's'}`,
+                onSome: ({ subscription }) =>
+                  `${subscription.symbol} · ${candleCount} candle${candleCount === 1 ? '' : 's'}`,
               }),
             ]
           ),
@@ -93,7 +98,7 @@ export const chartView = (model: Model, state: ChartState, h: HtmlBuilder<Messag
                 h.Class('h-[360px] w-full'),
                 h.OnMount(MountChart({ channelId: model.channelId })),
               ]),
-              state.candleCount === 0
+              candleCount === 0
                 ? h.div(
                     [
                       h.Class(
@@ -105,7 +110,7 @@ export const chartView = (model: Model, state: ChartState, h: HtmlBuilder<Messag
                       h.p(
                         [h.Class('text-sm')],
                         [
-                          Option.isNone(state.maybeSubscription)
+                          Option.isNone(state.maybeActive)
                             ? 'Subscribe to load candles.'
                             : 'Loading candles…',
                         ]
@@ -120,3 +125,4 @@ export const chartView = (model: Model, state: ChartState, h: HtmlBuilder<Messag
       ),
     ]
   )
+}

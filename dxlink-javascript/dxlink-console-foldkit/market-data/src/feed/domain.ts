@@ -1,4 +1,5 @@
 import { Array, Option, Order, Predicate, Record, Schema, String, pipe } from 'effect'
+import { defineTaggedUnion } from 'foldkit/schema'
 
 import type {
   FeedEventFields,
@@ -19,50 +20,52 @@ export type FeedConfig = Readonly<{
   space: string
 }>
 
+/** The subscription shapes the form offers; the tags of {@link FeedSubscription}. */
 export const SubscriptionKind = Schema.Literals(['Regular', 'Indexed', 'TimeSeries'])
 export type SubscriptionKind = typeof SubscriptionKind.Type
 
 /**
- * A subscription as entered in the form.
- *
- * `source` is read only for `Indexed` and `fromTime` only for `TimeSeries`; the other kinds
- * carry the neutral value.
+ * A subscription the feed was asked for. Each kind carries exactly what its protocol shape
+ * has: only an indexed subscription names a source, only a time series a start time.
  */
-export const FeedSubscription = Schema.Struct({
-  kind: SubscriptionKind,
-  type: Schema.String,
-  symbol: Schema.String,
-  source: Schema.String,
-  fromTime: Schema.Finite,
+export const FeedSubscription = defineTaggedUnion({
+  Regular: { type: Schema.String, symbol: Schema.String },
+  Indexed: { type: Schema.String, symbol: Schema.String, source: Schema.String },
+  TimeSeries: { type: Schema.String, symbol: Schema.String, fromTime: Schema.Finite },
 })
 export type FeedSubscription = typeof FeedSubscription.Type
 
-const hasSource = (subscription: FeedSubscription): boolean =>
-  subscription.kind === 'Indexed' && subscription.source !== ''
-
-/** Dedup key, mirroring the feed's own subscription key: `type[#source]:symbol`. */
+/**
+ * Dedup key, mirroring the feed's own subscription key: `type[#source]:symbol`. Two indexed
+ * subscriptions to one symbol from different sources are different subscriptions.
+ */
 export const subscriptionKey = (subscription: FeedSubscription): string =>
-  `${subscription.type}${hasSource(subscription) ? `#${subscription.source}` : ''}:${subscription.symbol}`
+  FeedSubscription.match(subscription, {
+    Regular: ({ type, symbol }) => `${type}:${symbol}`,
+    Indexed: ({ type, symbol, source }) =>
+      source === '' ? `${type}:${symbol}` : `${type}#${source}:${symbol}`,
+    TimeSeries: ({ type, symbol }) => `${type}:${symbol}`,
+  })
 
 /** Human label for a subscription chip. */
 export const subscriptionLabel = (subscription: FeedSubscription): string =>
-  subscription.kind === 'TimeSeries'
-    ? `${subscriptionKey(subscription)} · from ${subscription.fromTime}`
-    : subscriptionKey(subscription)
+  FeedSubscription.match(subscription, {
+    Regular: subscriptionKey,
+    Indexed: subscriptionKey,
+    TimeSeries: (timeSeries) => `${subscriptionKey(timeSeries)} · from ${timeSeries.fromTime}`,
+  })
 
 export const toProtocolSubscription = (
   subscription: FeedSubscription
-): Subscription | IndexedEventSubscription | TimeSeriesSubscription => {
-  const { type, symbol } = subscription
-  if (subscription.kind === 'Indexed') {
-    return { type, symbol, source: subscription.source }
-  }
-  if (subscription.kind === 'TimeSeries') {
-    return { type, symbol, fromTime: subscription.fromTime }
-  }
-
-  return { type, symbol }
-}
+): Subscription | IndexedEventSubscription | TimeSeriesSubscription =>
+  FeedSubscription.match<Subscription | IndexedEventSubscription | TimeSeriesSubscription>(
+    subscription,
+    {
+      Regular: ({ type, symbol }) => ({ type, symbol }),
+      Indexed: ({ type, symbol, source }) => ({ type, symbol, source }),
+      TimeSeries: ({ type, symbol, fromTime }) => ({ type, symbol, fromTime }),
+    }
+  )
 
 /** One received event: a flat record of protocol fields. */
 export const FeedEvent = Schema.Record(Schema.String, Schema.Unknown)

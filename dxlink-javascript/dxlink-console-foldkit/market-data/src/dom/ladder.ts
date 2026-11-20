@@ -4,15 +4,16 @@ import { Array, Option, Order, pipe } from 'effect'
 export type LadderOrder = Readonly<{ price: number; maybeSize: Option.Option<number> }>
 
 /**
- * One row of the combined ladder: the bid and the ask of the same rank.
+ * One price level as the ladder renders it.
  *
- * `level` is the row's rank from the spread, starting at 1. It is the row's identity — a
- * ladder row is "the third best level", whichever prices happen to occupy it.
+ * `key` is the level's identity within its side of the book: its price, which stays the same
+ * while the level's size changes and while levels around it come and go. Levels a server
+ * repeats at one price are told apart by their order among themselves.
  */
-export type LadderRow = Readonly<{
-  level: number
-  maybeBid: Option.Option<LadderOrder>
-  maybeAsk: Option.Option<LadderOrder>
+export type LadderLevel = Readonly<{
+  key: string
+  price: number
+  maybeSize: Option.Option<number>
 }>
 
 /** Split a comma- or space-separated list into entries, dropping blanks. */
@@ -40,25 +41,27 @@ export const parseOptionalNumber = (draft: string): Option.Option<number> =>
 
 const byPriceAscending = Order.mapInput(Order.Number, (order: LadderOrder) => order.price)
 
-/**
- * The combined ladder: best levels first, the highest bid beside the lowest ask. The shorter
- * side simply runs out.
- */
-export const toLadderRows = (
-  bids: ReadonlyArray<LadderOrder>,
-  asks: ReadonlyArray<LadderOrder>
-): ReadonlyArray<LadderRow> => {
-  const sortedBids = Array.sort(bids, Order.flip(byPriceAscending))
-  const sortedAsks = Array.sort(asks, byPriceAscending)
+const toLevels = (sorted: ReadonlyArray<LadderOrder>): ReadonlyArray<LadderLevel> =>
+  Array.match(sorted, {
+    onEmpty: () => [],
+    onNonEmpty: (orders) =>
+      pipe(
+        orders,
+        Array.groupWith((left, right) => left.price === right.price),
+        Array.flatMap((samePrice) =>
+          Array.map(samePrice, (order, occurrence) => ({
+            key: occurrence === 0 ? `${order.price}` : `${order.price}#${occurrence}`,
+            price: order.price,
+            maybeSize: order.maybeSize,
+          }))
+        )
+      ),
+  })
 
-  const levels = Math.max(sortedBids.length, sortedAsks.length)
+/** The bid side of the ladder, best level first: the highest price on top. */
+export const toBidLevels = (bids: ReadonlyArray<LadderOrder>): ReadonlyArray<LadderLevel> =>
+  toLevels(Array.sort(bids, Order.flip(byPriceAscending)))
 
-  // NOTE: `Array.makeBy` never returns an empty array, so an empty book is its own case.
-  return levels === 0
-    ? []
-    : Array.makeBy(levels, (index) => ({
-        level: index + 1,
-        maybeBid: Array.get(sortedBids, index),
-        maybeAsk: Array.get(sortedAsks, index),
-      }))
-}
+/** The ask side of the ladder, best level first: the lowest price on top. */
+export const toAskLevels = (asks: ReadonlyArray<LadderOrder>): ReadonlyArray<LadderLevel> =>
+  toLevels(Array.sort(asks, byPriceAscending))

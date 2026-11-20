@@ -98,14 +98,19 @@ export const startCall = (
     maybeSend: Option.map(maybeInput, (input) => (message: Message) => {
       input.next({ ...message })
     }),
+    // NOTE: the subscription is released even when completing the request stream throws, so
+    // a failed stop never leaves the call listening.
     stop: () => {
-      Option.match(maybeInput, {
-        onNone: () => undefined,
-        onSome: (input) => {
-          input.complete()
-        },
-      })
-      subscription.unsubscribe()
+      try {
+        Option.match(maybeInput, {
+          onNone: () => undefined,
+          onSome: (input) => {
+            input.complete()
+          },
+        })
+      } finally {
+        subscription.unsubscribe()
+      }
     },
   }
 }

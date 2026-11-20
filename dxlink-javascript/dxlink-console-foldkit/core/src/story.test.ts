@@ -1,73 +1,19 @@
-import { Option, Redacted, Schema, Stream } from 'effect'
-import { Submodel } from 'foldkit'
-import { defineMessageUnion } from 'foldkit/message'
+import { Option, Redacted } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
 
-import { defineChannelPlugin } from './channel/plugin'
-import { ReconnectClient, ScrollToChannel, SetAuthToken } from './command'
+import { ReconnectClient, ScrollToChannel, SetAuthToken, StampAcquireFailure } from './command'
 import { builtinConsoleConfig } from './config'
 import { emptyErrorLog } from './error'
 import { Message } from './message'
-import { type Model, Session } from './model'
-import { makeConsole } from './update'
+import { ChannelCard, type Model, Session } from './model'
+import { makeUpdate } from './update'
 
-const EchoRequest = Schema.Struct({ text: Schema.String })
-type EchoRequest = typeof EchoRequest.Type
+import { EchoMessage, echoPlugin } from './echoPlugin.fixture'
 
-const EchoChannel = Schema.Struct({
-  channelId: Schema.String,
-  text: Schema.String,
-  isClosed: Schema.Boolean,
-})
-type EchoChannel = typeof EchoChannel.Type
-
-const EchoMessage = defineMessageUnion({
-  UpdatedText: { value: Schema.String },
-})
-type EchoMessage = typeof EchoMessage.Type
-
-const echoPlugin = defineChannelPlugin<EchoRequest, EchoMessage, string, EchoChannel, EchoMessage>({
-  kind: 'echo',
-  label: 'Echo',
-  iconPath: '',
-  dialogTitle: 'New Echo channel',
-  request: {
-    init: () => ({ model: { text: '' } }),
-    update: (_request, echoMessage) => ({
-      model: { text: echoMessage.value },
-    }),
-    view: Submodel.defineView<EchoRequest, EchoMessage>((_request, h) => h.div([])),
-    toConfig: (request) => Option.liftPredicate(request.text.trim(), (text) => text !== ''),
-    isModel: Schema.is(EchoRequest),
-    isMessage: Schema.is(EchoMessage),
-  },
-  channel: {
-    init: ({ channelId, config }) => ({
-      model: { channelId, text: config, isClosed: false },
-    }),
-    update: (channel, echoMessage) => ({
-      model: { ...channel, text: echoMessage.value },
-    }),
-    view: Submodel.defineView<EchoChannel, EchoMessage>((_channel, h) => h.div([])),
-    summarize: (channel) => ({
-      subtitle: channel.text,
-      maybeStatus: Option.none(),
-      maybeChannelId: Option.none(),
-      parameters: {},
-      errors: [],
-    }),
-    close: (channel) => ({ model: { ...channel, isClosed: true } }),
-    clearErrors: (channel) => channel,
-    isModel: Schema.is(EchoChannel),
-    isMessage: Schema.is(EchoMessage),
-  },
-  events: Stream.empty,
-})
-
-const { init, update } = makeConsole([echoPlugin])
+const { init, update } = makeUpdate([echoPlugin])
 
 const initialModel = init(builtinConsoleConfig()).model
 
@@ -177,9 +123,73 @@ describe('connection', () => {
       given(authorizedModel),
       message(Message.ClickedReconnect()),
       Command.expectExact(ReconnectClient),
-      Command.resolve(ReconnectClient, Message.CompletedReconnectClient()),
+      Command.resolve(ReconnectClient, Message.SucceededReconnectClient()),
       model((next) => {
         expect(next.session).toEqual(authorizedModel.session)
+      })
+    )
+  })
+
+  test('a client built for an earlier session does not open the current one', () => {
+    const opening = Session.Opening({
+      sessionId: 2,
+      params: {
+        url: 'wss://example.test',
+        keepaliveInterval: 30,
+        keepaliveTimeout: 60,
+        acceptKeepaliveTimeout: 60,
+      },
+    })
+
+    story(
+      update,
+      given({ ...initialModel, lastSessionId: 2, session: opening }),
+      message(Message.AcquiredClient({ sessionId: 1 })),
+      model((next) => {
+        expect(next.session).toEqual(opening)
+      }),
+      message(Message.AcquiredClient({ sessionId: 2 })),
+      model((next) => {
+        expect(next.session._tag).toBe('Open')
+      })
+    )
+  })
+
+  test('a failure to build the client does not end a session that is already open', () => {
+    story(
+      update,
+      given(authorizedModel),
+      message(Message.FailedAcquireClient({ reason: 'late' })),
+      Command.resolve(
+        StampAcquireFailure,
+        Message.CompletedStampAcquireFailure({
+          error: { type: 'CONNECT_FAILED', message: 'late', time: '10:00:00' },
+        })
+      ),
+      model((next) => {
+        expect(next.session).toEqual(authorizedModel.session)
+        expect(next.errorLog.errors).toEqual([
+          { id: 1, type: 'CONNECT_FAILED', message: 'late', time: '10:00:00' },
+        ])
+      })
+    )
+  })
+
+  test('a reconnect that fails is reported in the connection log', () => {
+    story(
+      update,
+      given(authorizedModel),
+      message(Message.ClickedReconnect()),
+      Command.resolve(
+        ReconnectClient,
+        Message.FailedReconnectClient({
+          error: { type: 'CONSOLE', message: 'No connection is open.', time: '10:00:00' },
+        })
+      ),
+      model((next) => {
+        expect(next.errorLog.errors).toEqual([
+          { id: 1, type: 'CONSOLE', message: 'No connection is open.', time: '10:00:00' },
+        ])
       })
     )
   })
@@ -199,7 +209,7 @@ describe('connection', () => {
       given({ ...authorizedModel, authToken: Redacted.make(' secret ') }),
       message(Message.SubmittedAuthToken()),
       Command.expectHas(SetAuthToken),
-      Command.resolve(SetAuthToken, Message.CompletedSetAuthToken())
+      Command.resolve(SetAuthToken, Message.SucceededSetAuthToken())
     )
   })
 })
@@ -243,12 +253,29 @@ describe('channels', () => {
           {
             id: '1',
             kind: 'echo',
-            title: 'Echo #1',
-            isExpanded: true,
-            isClosed: true,
+            card: ChannelCard.Closed(),
             model: { channelId: '1', text: 'world', isClosed: true },
           },
         ])
+      })
+    )
+  })
+
+  test('a closed card cannot be expanded again', () => {
+    story(
+      update,
+      given({ ...authorizedModel, maybeRequestKind: Option.some('echo') }),
+      message(requestMessage('hello')),
+      message(Message.ClickedOpenChannel()),
+      Command.resolve(ScrollToChannel, Message.CompletedScrollToChannel()),
+      message(Message.ClickedToggleChannel({ channelId: '1' })),
+      model((next) => {
+        expect(next.channels[0]?.card).toEqual(ChannelCard.Open({ isExpanded: false }))
+      }),
+      message(Message.ClickedCloseChannel({ channelId: '1' })),
+      message(Message.ClickedToggleChannel({ channelId: '1' })),
+      model((next) => {
+        expect(next.channels[0]?.card).toEqual(ChannelCard.Closed())
       })
     )
   })

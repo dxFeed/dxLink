@@ -76,27 +76,35 @@ export class DXLinkCandles {
   constructor(client: DXLinkClient, options: DXLinkCandlesOptions = {}) {
     this.feed = new DXLinkFeed(client, FeedContract.HISTORY, options)
 
-    this.feed.configure({
-      acceptDataFormat: FeedDataFormat.COMPACT,
-      acceptEventFields: {
-        Candle: [
-          'eventType',
-          'eventSymbol',
-          'eventFlags',
-          'index',
-          'time',
-          'open',
-          'high',
-          'low',
-          'close',
-          'volume',
-        ],
-      },
-    })
+    // NOTE: the feed holds a protocol channel from the moment it is constructed, so a
+    // constructor that cannot finish closes it rather than leaving it to its caller, who
+    // never receives the instance.
+    try {
+      this.feed.configure({
+        acceptDataFormat: FeedDataFormat.COMPACT,
+        acceptEventFields: {
+          Candle: [
+            'eventType',
+            'eventSymbol',
+            'eventFlags',
+            'index',
+            'time',
+            'open',
+            'high',
+            'low',
+            'close',
+            'volume',
+          ],
+        },
+      })
 
-    this.feed.addEventListener((events) => {
-      events.filter(isCandleEvent).forEach(this.processEvent)
-    })
+      this.feed.addEventListener((events) => {
+        events.filter(isCandleEvent).forEach(this.processEvent)
+      })
+    } catch (error) {
+      this.feed.close()
+      throw error
+    }
   }
 
   getChannel = () => this.feed.getChannel()

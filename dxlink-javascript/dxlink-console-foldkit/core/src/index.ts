@@ -5,39 +5,9 @@
  * plugin builds on. Everything else in this package is internal — if a channel package needs
  * something that is not here, that is a boundary decision, not an import to reach for.
  */
-import type { RegisteredChannelPlugin } from './channel/plugin'
-import { Message } from './message'
-import { Model } from './model'
-import { managedResources } from './resource'
-import { makeSubscriptions } from './subscription'
-import { makeConsole as makeConsoleUpdate } from './update'
-import { makeView } from './view/view'
-
-/**
- * Build the console for a set of channel services.
- *
- * The plugin list is an argument, never a default: which services exist is a composition
- * decision, and a host that leaves a channel package out never imports its code. The result
- * is a Submodel — `init` takes the configuration profile, and the host lifts `update`, `view`,
- * `subscriptions` and `managedResources` into its own application.
- */
-export const makeConsole = <Services>(
-  plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>
-) => {
-  const { init, update } = makeConsoleUpdate(plugins)
-
-  return {
-    Model,
-    Message,
-    init,
-    update,
-    view: makeView(plugins),
-    subscriptions: makeSubscriptions(plugins),
-    managedResources,
-  }
-}
-
-export { Model, Message }
+export { makeConsole } from './console'
+export { Message } from './message'
+export { Model } from './model'
 
 // The channel-plugin contract.
 export { defineChannelPlugin } from './channel/plugin'

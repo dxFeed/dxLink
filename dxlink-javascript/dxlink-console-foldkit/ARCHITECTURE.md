@@ -21,12 +21,12 @@ request form. It holds plain data only — what can be rendered, compared and re
 DevTools. A dxLink object is none of those things, so no client, feed or call is ever a Model
 field. Each lives where Foldkit keeps things with a lifetime:
 
-| Live object                       | Home                                                   | Lifetime                              |
-| --------------------------------- | ------------------------------------------------------ | ------------------------------------- |
-| `DXLinkWebSocketClient`           | ManagedResource `DxLinkClient` (`core/src/client`)     | while the Model holds a session       |
-| a channel's feed / DOM / RPC call | the plugin's `ChannelHandles` service (a Resource)     | from its Open Command to its Close    |
-| the protobuf registry (RPC)       | a service of the RPC plugin's Layer                    | from loading a descriptor set onwards |
-| a candle chart and what it drew   | a per-channel sink, attached to its element by a Mount | from the channel's Open to its Close  |
+| Live object                       | Home                                                                  | Lifetime                             |
+| --------------------------------- | --------------------------------------------------------------------- | ------------------------------------ |
+| `DXLinkWebSocketClient`           | ManagedResource `DxLinkClient` (`core/src/client`)                    | while the Model holds a session      |
+| a channel's feed / DOM / RPC call | the plugin's `ChannelHandles` service (a Resource)                    | from its Open Command to its Close   |
+| a loaded protobuf registry (RPC)  | a store in the RPC plugin's Layer, addressed by an id the Model keeps | the most recently loaded few         |
+| a candle chart and what it drew   | a per-channel sink, attached to its element by a Mount                | from the channel's Open to its Close |
 
 Everything those objects report comes back as Messages: the client through a Subscription that
 follows the open session, the channels through each plugin's event Stream.
@@ -36,7 +36,9 @@ follows the open session, the channels through each plugin's event Stream.
 `Session` is a tagged union — `Idle | Opening | Open` — and it is the client's requirements:
 the ManagedResource acquires a client when the Model holds a session and releases it when it
 does not. `sessionId` makes two sessions with identical parameters different, so **Connect**
-always builds a fresh client, while **Reconnect** is a Command on the same one.
+always builds a fresh client, while **Reconnect** is a Command on the same one. The resource
+carries the session id next to the client, and the Messages about it name the session they
+belong to, so a client built for an earlier session cannot open or listen for a later one.
 
 What is shown below the connection panel follows from the session alone:
 
@@ -60,7 +62,8 @@ dxlink-javascript/dxlink-console-foldkit/
   ARCHITECTURE.md · README.md · AGENTS.md · FOLDKIT.md
 
   core/        @dxfeed/dxlink-console-foldkit-core          no market-data anything
-    src/index.ts             # the public surface: makeConsole, plugin contract, host API, profile
+    src/index.ts             # the public surface, a barrel: console, plugin contract, host API, profile
+    console.ts               # makeConsole — the console for a set of plugins
     model.ts · message.ts    # the console's Model and Messages
     update.ts · command.ts   # init/update and the Commands they return
     subscription.ts          # client listeners + the plugins' event Streams
@@ -112,7 +115,8 @@ knows nothing about FEED, DOM or RPC; each service is a `ChannelPlugin`
 | `events`                        | a Stream of `{ channelId, message }` from the live channels        |
 
 The card — header, error center, collapse and close — belongs to core and is the same for every
-kind; a plugin's view is the body alone.
+kind; a plugin's view is the body alone. What the user did with a card is one union,
+`Open { isExpanded } | Closed`: closing is terminal, and the card stays as a record.
 
 **Erasure is checked, not assumed.** The registry stores plugins without their types, so every
 value that crosses the boundary is `unknown`: a channel's Model, a request, a Message.
@@ -142,7 +146,7 @@ services are on offer, and which of those values the user may not change. Anythi
 service needs is that plugin's option instead — the RPC descriptor-set URL is resolved in
 `app/src/consoleConfig.ts` and handed to `rpcChannelPlugin()`.
 
-It seeds the Model once and is never written back. The exception is `locked`: a locked field
+It reaches `init` as Flags, seeds the Model once and is never written back. The exception is `locked`: a locked field
 renders read-only rather than hidden, because in a debug console the endpoint you are talking
 to is worth seeing even when you cannot change it.
 
@@ -163,7 +167,9 @@ every source already parsed.
 
 **Core merges; app parses.** Reading `window.__DXLINK_CONFIG__` or a query string is a
 standalone-deployment concern, so both readers live in `app/src/consoleConfigSources.ts`, and
-`app/src/entry.ts` is the only module that touches globals or `import.meta.env`.
+`app/src/entry.ts` is the only module that touches globals or `import.meta.env`. The sources
+decide two things there: which plugins exist and with what options, which is composition, and
+the profile, which is the first Model's outside data and so travels as Flags.
 
 ## 6. Theming
 

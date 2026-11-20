@@ -8,8 +8,14 @@ import { modifyFields } from 'foldkit/struct'
 import type { FileRegistry } from '@bufbuild/protobuf'
 import { Kit } from '@dxfeed/dxlink-console-foldkit-core'
 
-import { DescriptorSetError, decodeRegistry, fetchDescriptorSet, parseRequest } from './descriptors'
-import { RpcRegistry } from './service'
+import {
+  DescriptorSetError,
+  decodeRegistry,
+  describeFailure,
+  fetchDescriptorSet,
+  parseRequest,
+} from './descriptors'
+import { RpcRegistry, resolveMethod } from './service'
 import {
   type MethodSummary,
   RequestField,
@@ -38,10 +44,36 @@ export const Validation = defineTaggedUnion({
 })
 export type Validation = typeof Validation.Type
 
+/** The request being written for the selected method. */
+export const RequestDraft = Schema.Struct({
+  /** ECMAScript name of the method. */
+  methodName: Schema.String,
+  /** The request message being edited, as protobuf-JSON. */
+  json: Schema.String,
+  validation: Validation,
+})
+export type RequestDraft = typeof RequestDraft.Type
+
+export const Selection = Schema.Struct({
+  /** Fully qualified name of the selected service. */
+  serviceName: Schema.String,
+  /** `None` while the service has no method selected, as when it declares none the wire can carry. */
+  maybeRequest: Schema.Option(RequestDraft),
+})
+export type Selection = typeof Selection.Type
+
+/**
+ * One loaded descriptor set and what is selected in it. A selection exists only inside the
+ * definitions it was made in, so replacing the definitions replaces the selection with them.
+ */
 export const Definitions = Schema.Struct({
+  /** The identity the registry behind this summary is addressable by in `RpcRegistry`. */
+  registryId: Schema.Finite,
   /** Where the descriptor set came from — a URL or a file name. */
   source: Schema.String,
   services: Schema.Array(ServiceSummary),
+  /** `None` only when the descriptor set declares no services. */
+  maybeSelection: Schema.Option(Selection),
 })
 export type Definitions = typeof Definitions.Type
 
@@ -49,7 +81,9 @@ export type Definitions = typeof Definitions.Type
  * RPC channel-request form.
  *
  * The loaded definitions are held here rather than re-fetched per dialog open, so a
- * descriptor set is loaded once and several channels can be opened against it.
+ * descriptor set is loaded once and several channels can be opened against it. `load` is
+ * the state of the latest attempt to load a set; the definitions of the previous successful
+ * one stay usable while it runs and after it fails.
  */
 export const Model = Schema.Struct({
   _tag: Schema.Literal(REQUEST_TAG),
@@ -57,13 +91,6 @@ export const Model = Schema.Struct({
   url: Schema.String,
   load: Load,
   maybeDefinitions: Schema.Option(Definitions),
-  /** Fully qualified name of the selected service; empty when none is. */
-  serviceName: Schema.String,
-  /** ECMAScript name of the selected method; empty when none is. */
-  methodName: Schema.String,
-  /** The request message being edited, as protobuf-JSON. */
-  json: Schema.String,
-  validation: Validation,
 })
 export type Model = typeof Model.Type
 
@@ -71,6 +98,8 @@ export const isModel = (value: unknown): value is Model => Predicate.isTagged(va
 
 /** What a channel is opened with: the call, named, and what the card shows about it. */
 export const Config = Schema.Struct({
+  /** The registry the call's descriptors are resolved from. */
+  registryId: Schema.Finite,
   serviceName: Schema.String,
   methodLocalName: Schema.String,
   methodName: Schema.String,
@@ -86,11 +115,20 @@ export type Config = typeof Config.Type
 
 // MESSAGE
 
+/** A request text together with the method it was checked against. */
+const checkedRequestFields = {
+  registryId: Schema.Finite,
+  serviceName: Schema.String,
+  methodName: Schema.String,
+  json: Schema.String,
+}
+
 export const Message = defineMessageUnion({
   UpdatedUrl: { value: Schema.String },
   ClickedLoadUrl: {},
   ClickedLoadFile: {},
   SucceededLoadDescriptors: {
+    registryId: Schema.Finite,
     source: Schema.String,
     services: Schema.Array(ServiceSummary),
   },
@@ -99,12 +137,12 @@ export const Message = defineMessageUnion({
   SelectedService: { typeName: Schema.String },
   SelectedMethod: { localName: Schema.String },
   UpdatedRequestJson: { value: Schema.String },
-  CompletedValidateRequest: {
-    serviceName: Schema.String,
-    methodName: Schema.String,
-    json: Schema.String,
+  SucceededValidateRequest: {
+    ...checkedRequestFields,
+    /** What is wrong with the request, or `None` when it fits the method's input message. */
     maybeError: Schema.Option(Schema.String),
   },
+  FailedValidateRequest: { ...checkedRequestFields, reason: Schema.String },
 })
 export type Message = typeof Message.Type
 
@@ -113,19 +151,20 @@ export const isMessage = Schema.is(Message)
 // COMMAND
 
 /**
- * Make a registry the one calls are resolved from, and hand its plain summary to the Model.
- * The registry is replaced before the summary is returned, so by the time the form shows a
- * service the registry can resolve it.
+ * Retain a registry and hand its plain summary, with the identity it was retained under,
+ * to the Model. The registry is retained before the summary is returned, so by the time
+ * the form shows a service the registry can resolve it.
  */
 const publishRegistry = (source: string, registry: FileRegistry) =>
   Effect.gen(function* () {
-    const store = yield* RpcRegistry
-    yield* store.set(registry)
-
-    return Message.SucceededLoadDescriptors({
-      source,
-      services: summarizeRegistry(registry),
+    const services = yield* Effect.try({
+      try: () => summarizeRegistry(registry),
+      catch: (cause) => new DescriptorSetError({ message: describeFailure(cause), cause }),
     })
+    const store = yield* RpcRegistry
+    const registryId = yield* store.add(registry)
+
+    return Message.SucceededLoadDescriptors({ registryId, source, services })
   })
 
 export const LoadDescriptorUrl = Command.define('LoadDescriptorUrl', {
@@ -167,68 +206,91 @@ export const LoadDescriptorFile = Command.define('LoadDescriptorFile', {
   }),
 })
 
-const DEFINITIONS_NOT_LOADED = 'The service definitions are not loaded.'
-
 /**
- * Check the request JSON against the selected method's input message.
+ * Check the request JSON against the input message of the method it names, in the registry
+ * it names. Succeeds with a verdict; fails when that method cannot be resolved, which is
+ * the case once its registry is not retained.
  *
- * The result names what was checked, so a verdict that arrives after the text or the
- * selection moved on can be told apart from one about the current request.
+ * Either result names what was checked, so one that arrives after the text or the selection
+ * moved on can be told apart from one about the current request.
  */
 export const ValidateRequest = Command.define('ValidateRequest', {
-  args: {
-    serviceName: Schema.String,
-    methodName: Schema.String,
-    json: Schema.String,
-  },
-  messages: [Message.CompletedValidateRequest],
-  execute: ({ serviceName, methodName, json }) =>
-    Effect.gen(function* () {
-      const store = yield* RpcRegistry
-      const maybeRegistry = yield* store.get
-      const maybeError = pipe(
-        maybeRegistry,
-        Option.flatMapNullishOr((registry) => registry.getService(serviceName)?.method[methodName]),
-        Option.match({
-          onNone: () => Option.some(DEFINITIONS_NOT_LOADED),
-          onSome: (method) => {
-            const parsed = parseRequest(method.input, json)
+  args: checkedRequestFields,
+  messages: [Message.SucceededValidateRequest, Message.FailedValidateRequest],
+  execute: ({ registryId, serviceName, methodName, json }) =>
+    resolveMethod({ registryId, serviceName, methodLocalName: methodName }).pipe(
+      Effect.map(({ method }) => {
+        const parsed = parseRequest(method.input, json)
 
-            return 'error' in parsed ? Option.some(parsed.error) : Option.none()
-          },
+        return Message.SucceededValidateRequest({
+          registryId,
+          serviceName,
+          methodName,
+          json,
+          maybeError: 'error' in parsed ? Option.some(parsed.error) : Option.none(),
         })
+      }),
+      Effect.catch((error) =>
+        Effect.succeed(
+          Message.FailedValidateRequest({
+            registryId,
+            serviceName,
+            methodName,
+            json,
+            reason: error.message,
+          })
+        )
       )
-
-      return Message.CompletedValidateRequest({
-        serviceName,
-        methodName,
-        json,
-        maybeError,
-      })
-    }),
+    ),
 })
 
 // UPDATE
 
-const EMPTY_REQUEST = '{}'
+const findService = (definitions: Definitions, typeName: string): Option.Option<ServiceSummary> =>
+  Array.findFirst(definitions.services, (service) => service.typeName === typeName)
 
-const findService = (model: Model, typeName: string): Option.Option<ServiceSummary> =>
-  pipe(
-    model.maybeDefinitions,
-    Option.flatMap((definitions) =>
-      Array.findFirst(definitions.services, (service) => service.typeName === typeName)
+const selectedServiceOf = (definitions: Definitions): Option.Option<ServiceSummary> =>
+  Option.flatMap(definitions.maybeSelection, ({ serviceName }) =>
+    findService(definitions, serviceName)
+  )
+
+/** The selected method with the request being written for it. */
+type SelectedCall = Readonly<{
+  definitions: Definitions
+  serviceName: string
+  method: MethodSummary
+  request: RequestDraft
+}>
+
+const selectedCallOf = (definitions: Definitions): Option.Option<SelectedCall> =>
+  Option.flatMap(definitions.maybeSelection, ({ serviceName, maybeRequest }) =>
+    Option.flatMap(maybeRequest, (request) =>
+      pipe(
+        findService(definitions, serviceName),
+        Option.flatMap((service) =>
+          Array.findFirst(service.methods, (method) => method.localName === request.methodName)
+        ),
+        Option.map((method) => ({ definitions, serviceName, method, request }))
+      )
     )
   )
 
 export const selectedService = (model: Model): Option.Option<ServiceSummary> =>
-  findService(model, model.serviceName)
+  Option.flatMap(model.maybeDefinitions, selectedServiceOf)
 
 export const selectedMethod = (model: Model): Option.Option<MethodSummary> =>
   pipe(
-    selectedService(model),
-    Option.flatMap((service) =>
-      Array.findFirst(service.methods, (method) => method.localName === model.methodName)
-    )
+    model.maybeDefinitions,
+    Option.flatMap(selectedCallOf),
+    Option.map(({ method }) => method)
+  )
+
+/** The request being written, or `None` while no method is selected. */
+export const selectedRequest = (model: Model): Option.Option<RequestDraft> =>
+  pipe(
+    model.maybeDefinitions,
+    Option.flatMap(selectedCallOf),
+    Option.map(({ request }) => request)
   )
 
 /**
@@ -237,17 +299,21 @@ export const selectedMethod = (model: Model): Option.Option<MethodSummary> =>
  */
 export const toConfig = (model: Model): Option.Option<Config> =>
   pipe(
-    selectedMethod(model),
-    Option.filter((method) => method.isSupported && model.validation._tag === 'Valid'),
-    Option.map((method) => ({
-      serviceName: model.serviceName,
+    model.maybeDefinitions,
+    Option.flatMap(selectedCallOf),
+    Option.filter(
+      ({ method, request }) => method.isSupported && request.validation._tag === 'Valid'
+    ),
+    Option.map(({ definitions, serviceName, method, request }) => ({
+      registryId: definitions.registryId,
+      serviceName,
       methodLocalName: method.localName,
       methodName: method.name,
       modelLabel: method.modelLabel,
       isBidirectional: method.isBidirectional,
       inputTypeName: method.inputTypeName,
       outputTypeName: method.outputTypeName,
-      requestJson: model.json,
+      requestJson: request.json,
       requestTemplate: method.requestTemplate,
     }))
   )
@@ -264,45 +330,85 @@ export type RequestOptions = Readonly<{
 
 type UpdateReturn = Update.Return<Model, Message, RpcRegistry>
 
-/** Mark the request unchecked and, when a method is selected, ask for a verdict on it. */
-const revalidate = (model: Model): UpdateReturn => {
-  const pending = modifyFields(model, {
-    validation: () => Validation.Pending(),
-  })
-
-  return String.isEmpty(pending.methodName)
-    ? { model: pending }
-    : {
-        model: pending,
-        commands: [
-          ValidateRequest({
-            serviceName: pending.serviceName,
-            methodName: pending.methodName,
-            json: pending.json,
-          }),
-        ],
-      }
-}
-
-/** Select a method, or none, and open the editor on the shape of its request message. */
-const withMethod = (
-  model: Model,
-  serviceName: string,
+/** A service selected on a method, or on none, with the editor on the shape of its request. */
+const selectionOf = (
+  service: ServiceSummary,
   maybeMethod: Option.Option<MethodSummary>
+): Selection => ({
+  serviceName: service.typeName,
+  maybeRequest: Option.map(maybeMethod, (method) => ({
+    methodName: method.localName,
+    json: method.requestTemplate,
+    validation: Validation.Pending(),
+  })),
+})
+
+/** Hold these definitions and, when a method is selected in them, ask for a verdict on its request. */
+const withDefinitions = (model: Model, definitions: Definitions): UpdateReturn => ({
+  model: modifyFields(model, {
+    maybeDefinitions: () => Option.some(definitions),
+  }),
+  commands: pipe(
+    definitions.maybeSelection,
+    Option.flatMap(({ serviceName, maybeRequest }) =>
+      Option.map(maybeRequest, ({ methodName, json }) =>
+        ValidateRequest({
+          registryId: definitions.registryId,
+          serviceName,
+          methodName,
+          json,
+        })
+      )
+    ),
+    Option.toArray
+  ),
+})
+
+const withSelection = (model: Model, definitions: Definitions, selection: Selection) =>
+  withDefinitions(
+    model,
+    modifyFields(definitions, {
+      maybeSelection: () => Option.some(selection),
+    })
+  )
+
+/**
+ * Record a verdict on the request it is about. A verdict about any other registry, method
+ * or text than the Model currently holds changes nothing.
+ */
+const withVerdict = (
+  model: Model,
+  checked: Readonly<{ registryId: number; serviceName: string; methodName: string; json: string }>,
+  validation: Validation
 ): UpdateReturn =>
-  revalidate(
-    modifyFields(model, {
-      serviceName: () => serviceName,
-      methodName: () =>
-        Option.match(maybeMethod, {
-          onNone: () => '',
-          onSome: (method) => method.localName,
+  pipe(
+    model.maybeDefinitions,
+    Option.flatMap(selectedCallOf),
+    Option.filter(
+      ({ definitions, serviceName, request }) =>
+        definitions.registryId === checked.registryId &&
+        serviceName === checked.serviceName &&
+        request.methodName === checked.methodName &&
+        request.json === checked.json
+    ),
+    Option.match({
+      onNone: () => ({ model }),
+      onSome: ({ definitions, serviceName, request }) => ({
+        model: modifyFields(model, {
+          maybeDefinitions: () =>
+            Option.some(
+              modifyFields(definitions, {
+                maybeSelection: () =>
+                  Option.some({
+                    serviceName,
+                    maybeRequest: Option.some(
+                      modifyFields(request, { validation: () => validation })
+                    ),
+                  }),
+              })
+            ),
         }),
-      json: () =>
-        Option.match(maybeMethod, {
-          onNone: () => EMPTY_REQUEST,
-          onSome: (method) => method.requestTemplate,
-        }),
+      }),
     })
   )
 
@@ -313,10 +419,6 @@ export const makeRequest = (options: RequestOptions) => {
       url: options.descriptorSetUrl,
       load: Load.Idle(),
       maybeDefinitions: Option.none(),
-      serviceName: '',
-      methodName: '',
-      json: EMPTY_REQUEST,
-      validation: Validation.Pending(),
     },
   })
 
@@ -341,23 +443,17 @@ export const makeRequest = (options: RequestOptions) => {
               commands: [LoadDescriptorFile()],
             },
 
-      // NOTE: a new descriptor set invalidates the current selection, so its first service
-      // and that service's first supported method are preselected, as in a fresh dialog.
-      SucceededLoadDescriptors: ({ source, services }) => {
-        const maybeService = Array.head(services)
-
-        return withMethod(
-          modifyFields(model, {
-            load: () => Load.Idle(),
-            maybeDefinitions: () => Option.some({ source, services }),
-          }),
-          Option.match(maybeService, {
-            onNone: () => '',
-            onSome: (service) => service.typeName,
-          }),
-          Option.flatMap(maybeService, firstSupportedMethod)
-        )
-      },
+      // NOTE: a new descriptor set replaces the current selection with its own: its first
+      // service and that service's first supported method, as in a fresh dialog.
+      SucceededLoadDescriptors: ({ registryId, source, services }) =>
+        withDefinitions(modifyFields(model, { load: () => Load.Idle() }), {
+          registryId,
+          source,
+          services,
+          maybeSelection: Option.map(Array.head(services), (service) =>
+            selectionOf(service, firstSupportedMethod(service))
+          ),
+        }),
 
       FailedLoadDescriptors: ({ source, reason }) => ({
         model: modifyFields(model, {
@@ -373,40 +469,67 @@ export const makeRequest = (options: RequestOptions) => {
       }),
 
       SelectedService: ({ typeName }) =>
-        Option.match(findService(model, typeName), {
-          onNone: () => ({ model }),
-          onSome: (service) => withMethod(model, service.typeName, firstSupportedMethod(service)),
-        }),
+        pipe(
+          model.maybeDefinitions,
+          Option.flatMap((definitions) =>
+            Option.map(findService(definitions, typeName), (service) =>
+              withSelection(model, definitions, selectionOf(service, firstSupportedMethod(service)))
+            )
+          ),
+          Option.getOrElse(() => ({ model }))
+        ),
 
       SelectedMethod: ({ localName }) =>
         pipe(
-          selectedService(model),
-          Option.flatMap((service) =>
-            Array.findFirst(
-              service.methods,
-              (method) => method.localName === localName && method.isSupported
+          model.maybeDefinitions,
+          Option.flatMap((definitions) =>
+            Option.flatMap(selectedServiceOf(definitions), (service) =>
+              pipe(
+                Array.findFirst(
+                  service.methods,
+                  (method) => method.localName === localName && method.isSupported
+                ),
+                Option.map((method) =>
+                  withSelection(model, definitions, selectionOf(service, Option.some(method)))
+                )
+              )
             )
           ),
+          Option.getOrElse(() => ({ model }))
+        ),
+
+      UpdatedRequestJson: ({ value }) =>
+        pipe(
+          model.maybeDefinitions,
+          Option.flatMap(selectedCallOf),
           Option.match({
             onNone: () => ({ model }),
-            onSome: (method) => withMethod(model, model.serviceName, Option.some(method)),
+            onSome: ({ definitions, serviceName, request }) =>
+              withSelection(model, definitions, {
+                serviceName,
+                maybeRequest: Option.some({
+                  methodName: request.methodName,
+                  json: value,
+                  validation: Validation.Pending(),
+                }),
+              }),
           })
         ),
 
-      UpdatedRequestJson: ({ value }) => revalidate(modifyFields(model, { json: () => value })),
+      SucceededValidateRequest: ({ maybeError, ...checked }) =>
+        withVerdict(
+          model,
+          checked,
+          Option.match(maybeError, {
+            onNone: () => Validation.Valid(),
+            onSome: (error) => Validation.Invalid({ error }),
+          })
+        ),
 
-      CompletedValidateRequest: ({ serviceName, methodName, json, maybeError }) =>
-        serviceName === model.serviceName && methodName === model.methodName && json === model.json
-          ? {
-              model: modifyFields(model, {
-                validation: () =>
-                  Option.match(maybeError, {
-                    onNone: () => Validation.Valid(),
-                    onSome: (error) => Validation.Invalid({ error }),
-                  }),
-              }),
-            }
-          : { model },
+      // NOTE: a request that could not be checked is not sendable; the reason is shown where
+      // a verdict would be, and loading the definitions again replaces it.
+      FailedValidateRequest: ({ reason, ...checked }) =>
+        withVerdict(model, checked, Validation.Invalid({ error: reason })),
     })
 
   const view = Submodel.defineView<Model, Message>((model, h) =>
@@ -608,23 +731,23 @@ const definitionsView = (model: Model, isUrlLocked: boolean, h: HtmlBuilder<Mess
   )
 }
 
-const methodView = (model: Model, method: MethodSummary, h: HtmlBuilder<Message>): Html =>
+const methodView = (method: MethodSummary, request: RequestDraft, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex flex-col gap-3')],
     [
       Kit.sectionLabel(`Request · ${method.inputTypeName}`, h),
-      requestFields(method, model.json, h),
+      requestFields(method, request.json, h),
       Kit.textArea(
         {
           id: 'dxlink-rpc-request-json',
           label: 'Request JSON',
-          value: model.json,
+          value: request.json,
           onInput: (value) => Message.UpdatedRequestJson({ value }),
           helperText: 'Canonical protobuf-JSON — exactly what is sent on the channel.',
         },
         h
       ),
-      Validation.match(model.validation, {
+      Validation.match(request.validation, {
         Pending: () => h.empty,
         Valid: () => h.empty,
         Invalid: ({ error }) => Kit.notice(error, 'Danger', h),
@@ -632,20 +755,21 @@ const methodView = (model: Model, method: MethodSummary, h: HtmlBuilder<Message>
     ]
   )
 
-const pickersView = (
-  model: Model,
-  definitions: Definitions,
-  h: HtmlBuilder<Message>
-): ReadonlyArray<Html> => {
-  const maybeService = selectedService(model)
-  const maybeMethod = selectedMethod(model)
+const NO_METHOD_VALUE = ''
+
+const pickersView = (definitions: Definitions, h: HtmlBuilder<Message>): ReadonlyArray<Html> => {
+  const maybeService = selectedServiceOf(definitions)
+  const maybeCall = selectedCallOf(definitions)
 
   return [
     Kit.selectField(
       {
         id: 'dxlink-rpc-service',
         label: 'Service',
-        value: model.serviceName,
+        value: Option.match(maybeService, {
+          onNone: () => '',
+          onSome: (service) => service.typeName,
+        }),
         options: Array.map(definitions.services, (service) => ({
           value: service.typeName,
           label: service.typeName,
@@ -665,9 +789,14 @@ const pickersView = (
           {
             id: 'dxlink-rpc-method',
             label: 'Method',
-            value: model.methodName,
+            value: Option.match(maybeCall, {
+              onNone: () => NO_METHOD_VALUE,
+              onSome: ({ method }) => method.localName,
+            }),
             options: [
-              ...(Option.isNone(maybeMethod) ? [{ value: '', label: '', isDisabled: true }] : []),
+              ...(Option.isNone(maybeCall)
+                ? [{ value: NO_METHOD_VALUE, label: '', isDisabled: true }]
+                : []),
               ...Array.map(service.methods, (method) => ({
                 value: method.localName,
                 label: `${method.name} — ${method.modelLabel}`,
@@ -675,17 +804,17 @@ const pickersView = (
               })),
             ],
             onChange: (localName) => Message.SelectedMethod({ localName }),
-            ...Option.match(maybeMethod, {
+            ...Option.match(maybeCall, {
               onNone: () => ({}),
-              onSome: (method) => ({ helperText: method.modelDescription }),
+              onSome: ({ method }) => ({ helperText: method.modelDescription }),
             }),
           },
           h
         ),
     }),
-    Option.match(maybeMethod, {
+    Option.match(maybeCall, {
       onNone: () => h.empty,
-      onSome: (method) => methodView(model, method, h),
+      onSome: ({ method, request }) => methodView(method, request, h),
     }),
   ]
 }
@@ -705,7 +834,7 @@ const requestView = (model: Model, isUrlLocked: boolean, h: HtmlBuilder<Message>
       definitionsView(model, isUrlLocked, h),
       ...Option.match(model.maybeDefinitions, {
         onNone: () => [],
-        onSome: (definitions) => pickersView(model, definitions, h),
+        onSome: (definitions) => pickersView(definitions, h),
       }),
     ]
   )

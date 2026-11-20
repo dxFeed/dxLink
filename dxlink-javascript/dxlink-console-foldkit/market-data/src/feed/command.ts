@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from 'effect'
+import { Effect, MutableRef, Option, Schema } from 'effect'
 import { Command, Mount } from 'foldkit'
 
 import {
@@ -11,16 +11,18 @@ import {
 } from '@dxfeed/dxlink-api'
 import {
   DxLinkClient,
+  type ReportedError,
   describeChannelParameters,
   reportError,
 } from '@dxfeed/dxlink-console-foldkit-core'
 
-import { dropSink, sinkFor } from './candleChart'
+import { CandleChartSink, findSink, registerSink, unregisterSink } from './candleChart'
 import { DXLinkCandles } from './candles'
 import {
   EventFieldRow,
   FeedSubscription,
   buildAcceptEventFields,
+  subscriptionKey,
   toProtocolSubscription,
 } from './domain'
 import { type FeedHandle, FeedLive } from './live'
@@ -41,13 +43,40 @@ const opened = (channel: DXLinkChannel) =>
     parameters: describeChannelParameters(channel.parameters),
   })
 
-const failedOpen = (message: string) =>
-  Effect.map(reportError({ type: 'CONSOLE', message }), (error) =>
-    Message.FailedOpenChannel({ error })
-  )
-
 const describe = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
+
+/** Run a dxLink call, which may throw, as an Effect that fails with the reason instead. */
+const attempt = <A>(act: () => A): Effect.Effect<A, string> =>
+  Effect.try({ try: act, catch: describe })
+
+/**
+ * Turn a failure reason into the Command's `Failed*` Message, stamped with the time it was
+ * observed at.
+ */
+const reportFailure =
+  <Failed>(toMessage: (error: ReportedError) => Failed) =>
+  (reason: string): Effect.Effect<Failed> =>
+    Effect.map(reportError({ type: 'CONSOLE', message: reason }), toMessage)
+
+/**
+ * Build a live dxLink object and wire it up, returning what `wire` made of it.
+ *
+ * An object exists — and holds its protocol channel — from the moment `make` returns, so one
+ * whose wiring throws is closed before the failure is reported: a failed open leaves nothing
+ * behind.
+ */
+export const acquireWired = <Live, Wired>(
+  make: () => Live,
+  wire: (live: Live) => Wired,
+  close: (live: Live) => void
+): Effect.Effect<Wired, string> =>
+  Effect.flatMap(attempt(make), (live) =>
+    Effect.tapError(
+      attempt(() => wire(live)),
+      () => Effect.ignore(attempt(() => close(live)))
+    )
+  )
 
 const OpenArgs = {
   channelId: Schema.String,
@@ -63,9 +92,9 @@ export const OpenFeed = Command.define('OpenFeed', {
     Effect.gen(function* () {
       const client = yield* DxLinkClient.get
       const handles = yield* FeedLive
-      const live = yield* Effect.try({
-        try: () => {
-          const dxFeed = new DXLinkFeed(client, FeedContract.AUTO, feedOptions(feed, space))
+      const wired = yield* acquireWired(
+        () => new DXLinkFeed(client, FeedContract.AUTO, feedOptions(feed, space)),
+        (dxFeed) => {
           dxFeed.addEventListener((events) => {
             handles.emit(channelId, { _tag: 'Events', events })
           })
@@ -83,22 +112,28 @@ export const OpenFeed = Command.define('OpenFeed', {
             })
           })
 
-          return dxFeed
+          return { feed: dxFeed, message: opened(dxFeed.getChannel()) }
         },
-        catch: describe,
-      })
-      yield* handles.put(channelId, { _tag: 'Feed', feed: live })
+        (dxFeed) => {
+          dxFeed.close()
+        }
+      )
+      yield* handles.put(channelId, { _tag: 'Feed', feed: wired.feed })
 
-      return opened(live.getChannel())
+      return wired.message
     }).pipe(
       Effect.catchTag('ResourceNotAvailable', () =>
-        failedOpen('Feed channel opened without an active connection')
+        Effect.fail('Feed channel opened without an active connection')
       ),
-      Effect.catch(failedOpen)
+      Effect.catch(reportFailure((error) => Message.FailedOpenChannel({ error })))
     ),
 })
 
-/** Open the candle aggregator behind the chart view. */
+/**
+ * Open the candle aggregator behind the chart view, with the sink its candles are drawn
+ * into. The sink is registered for the chart's Mount only once the channel's handle is held,
+ * so a failed open registers nothing.
+ */
 export const OpenCandles = Command.define('OpenCandles', {
   args: OpenArgs,
   messages: [Message.SucceededOpenChannel, Message.FailedOpenChannel],
@@ -106,11 +141,13 @@ export const OpenCandles = Command.define('OpenCandles', {
     Effect.gen(function* () {
       const client = yield* DxLinkClient.get
       const handles = yield* FeedLive
-      const sink = sinkFor(channelId)
-      const candles = yield* Effect.try({
-        try: () => {
-          const live = new DXLinkCandles(client, feedOptions(feed, space))
-          live.addListener((data) => {
+      const sink = new CandleChartSink()
+      const generation = MutableRef.make(0)
+      const wired = yield* acquireWired(
+        () => new DXLinkCandles(client, feedOptions(feed, space)),
+        (candles) => {
+          candles.addListener((data) => {
+            const reportedUnder = MutableRef.get(generation)
             // NOTE: this runs synchronously inside the WebSocket frame dispatch, which does
             // not guard its listeners: an escaping throw would abort that frame for every
             // other channel. A drawing failure is contained and reported instead.
@@ -119,15 +156,17 @@ export const OpenCandles = Command.define('OpenCandles', {
             } catch (error) {
               handles.emit(channelId, {
                 _tag: 'ChartFailure',
+                generation: reportedUnder,
                 reason: describe(error),
               })
             }
             handles.emit(channelId, {
               _tag: 'Candles',
+              generation: reportedUnder,
               count: data.events.length,
             })
           })
-          const channel = live.getChannel()
+          const channel = candles.getChannel()
           channel.addStateChangeListener((state) => {
             handles.emit(channelId, { _tag: 'State', state })
           })
@@ -139,66 +178,97 @@ export const OpenCandles = Command.define('OpenCandles', {
             })
           })
 
-          return live
+          return { candles, message: opened(channel) }
         },
-        catch: describe,
+        (candles) => {
+          candles.close()
+        }
+      )
+      yield* handles.put(channelId, {
+        _tag: 'Candles',
+        candles: wired.candles,
+        sink,
+        generation,
       })
-      yield* handles.put(channelId, { _tag: 'Candles', candles })
+      yield* Effect.sync(() => {
+        registerSink(channelId, sink)
+      })
 
-      return opened(candles.getChannel())
+      return wired.message
     }).pipe(
       Effect.catchTag('ResourceNotAvailable', () =>
-        failedOpen('Feed chart channel opened without an active connection')
+        Effect.fail('Feed chart channel opened without an active connection')
       ),
-      Effect.catch(failedOpen)
+      Effect.catch(reportFailure((error) => Message.FailedOpenChannel({ error })))
     ),
 })
 
-/** Run an action against the channel's live handle, if it is still there. */
-const withHandle = (
-  channelId: string,
-  act: (handle: FeedHandle) => void
-): Effect.Effect<void, never, FeedLive> =>
+/** The channel's live handle. A channel without one cannot be acted on, which is a failure. */
+const liveHandle = (channelId: string): Effect.Effect<FeedHandle, string, FeedLive> =>
   Effect.gen(function* () {
     const handles = yield* FeedLive
     const maybeHandle = yield* handles.get(channelId)
-    yield* Effect.sync(() => {
-      Option.map(maybeHandle, act)
-    })
+
+    return yield* Effect.mapError(
+      Effect.fromOption(maybeHandle),
+      () => 'The channel has no live feed behind it'
+    )
   })
 
-const withFeed = (channelId: string, act: (feed: DXLinkFeed<FeedContract.AUTO>) => void) =>
-  withHandle(channelId, (handle) => {
-    if (handle._tag === 'Feed') {
-      act(handle.feed)
-    }
-  })
+const withFeed = <A>(
+  channelId: string,
+  act: (feed: DXLinkFeed<FeedContract.AUTO>) => A
+): Effect.Effect<A, string, FeedLive> =>
+  Effect.flatMap(liveHandle(channelId), (handle) =>
+    handle._tag === 'Feed'
+      ? attempt(() => act(handle.feed))
+      : Effect.fail('The channel is a candle chart and takes no feed subscriptions')
+  )
+
+const withCandles = <A>(
+  channelId: string,
+  act: (handle: Extract<FeedHandle, { _tag: 'Candles' }>) => A
+): Effect.Effect<A, string, FeedLive> =>
+  Effect.flatMap(liveHandle(channelId), (handle) =>
+    handle._tag === 'Candles'
+      ? attempt(() => act(handle))
+      : Effect.fail('The channel is a subscriptions feed and draws no candles')
+  )
 
 export const AddSubscription = Command.define('AddSubscription', {
   args: { channelId: Schema.String, subscription: FeedSubscription },
-  messages: [Message.CompletedAddSubscription],
+  messages: [Message.SucceededAddSubscription, Message.FailedAddSubscription],
   execute: ({ channelId, subscription }) =>
     withFeed(channelId, (feed) => {
       feed.addSubscriptions([toProtocolSubscription(subscription)])
-    }).pipe(Effect.as(Message.CompletedAddSubscription())),
+    }).pipe(
+      Effect.as(Message.SucceededAddSubscription({ subscription })),
+      Effect.catch(reportFailure((error) => Message.FailedAddSubscription({ error })))
+    ),
 })
 
 export const RemoveSubscription = Command.define('RemoveSubscription', {
   args: { channelId: Schema.String, subscription: FeedSubscription },
-  messages: [Message.CompletedRemoveSubscription],
+  messages: [Message.SucceededRemoveSubscription, Message.FailedRemoveSubscription],
   execute: ({ channelId, subscription }) =>
     withFeed(channelId, (feed) => {
       feed.removeSubscriptions([toProtocolSubscription(subscription)])
-    }).pipe(Effect.as(Message.CompletedRemoveSubscription())),
+    }).pipe(
+      Effect.as(Message.SucceededRemoveSubscription({ key: subscriptionKey(subscription) })),
+      Effect.catch(reportFailure((error) => Message.FailedRemoveSubscription({ error })))
+    ),
 })
 
 export const ClearSubscriptions = Command.define('ClearSubscriptions', {
   args: { channelId: Schema.String },
-  messages: [Message.CompletedClearSubscriptions],
+  messages: [Message.SucceededClearSubscriptions, Message.FailedClearSubscriptions],
   execute: ({ channelId }) =>
     withFeed(channelId, (feed) => {
       feed.clearSubscriptions()
-    }).pipe(Effect.as(Message.CompletedClearSubscriptions())),
+    }).pipe(
+      Effect.as(Message.SucceededClearSubscriptions()),
+      Effect.catch(reportFailure((error) => Message.FailedClearSubscriptions({ error })))
+    ),
 })
 
 const toDataFormat = (choice: DataFormatChoice): Option.Option<FeedDataFormat> => {
@@ -209,6 +279,18 @@ const toDataFormat = (choice: DataFormatChoice): Option.Option<FeedDataFormat> =
   return choice === 'COMPACT' ? Option.some(FeedDataFormat.COMPACT) : Option.none()
 }
 
+/** The typed aggregation period: `None` when left empty, a failure when it is not a number. */
+const parseAggregationPeriod = (draft: string): Effect.Effect<Option.Option<number>, string> => {
+  if (draft.trim() === '') {
+    return Effect.succeedNone
+  }
+  const period = Number(draft)
+
+  return Number.isFinite(period)
+    ? Effect.succeedSome(period)
+    : Effect.fail(`Aggregation period "${draft}" is not a number`)
+}
+
 /** Send the requested configuration; every empty part is left to the server's default. */
 export const ConfigureFeed = Command.define('ConfigureFeed', {
   args: {
@@ -217,100 +299,129 @@ export const ConfigureFeed = Command.define('ConfigureFeed', {
     dataFormat: DataFormatChoice,
     rows: Schema.Array(EventFieldRow),
   },
-  messages: [Message.CompletedConfigureFeed],
+  messages: [Message.SucceededConfigureFeed, Message.FailedConfigureFeed],
   execute: ({ channelId, aggregationPeriod, dataFormat, rows }) =>
-    withFeed(channelId, (feed) => {
-      feed.configure({
-        ...(aggregationPeriod.trim() === ''
-          ? {}
-          : { acceptAggregationPeriod: Number(aggregationPeriod) }),
-        ...Option.match(toDataFormat(dataFormat), {
-          onNone: () => ({}),
-          onSome: (acceptDataFormat) => ({ acceptDataFormat }),
-        }),
-        ...Option.match(buildAcceptEventFields(rows), {
-          onNone: () => ({}),
-          onSome: (acceptEventFields) => ({ acceptEventFields }),
-        }),
+    Effect.flatMap(parseAggregationPeriod(aggregationPeriod), (maybeAggregationPeriod) =>
+      withFeed(channelId, (feed) => {
+        feed.configure({
+          ...Option.match(maybeAggregationPeriod, {
+            onNone: () => ({}),
+            onSome: (acceptAggregationPeriod) => ({ acceptAggregationPeriod }),
+          }),
+          ...Option.match(toDataFormat(dataFormat), {
+            onNone: () => ({}),
+            onSome: (acceptDataFormat) => ({ acceptDataFormat }),
+          }),
+          ...Option.match(buildAcceptEventFields(rows), {
+            onNone: () => ({}),
+            onSome: (acceptEventFields) => ({ acceptEventFields }),
+          }),
+        })
       })
-    }).pipe(Effect.as(Message.CompletedConfigureFeed())),
+    ).pipe(
+      Effect.as(Message.SucceededConfigureFeed()),
+      Effect.catch(reportFailure((error) => Message.FailedConfigureFeed({ error })))
+    ),
 })
 
-/** Replace the candle subscription; what the chart drew for the previous one is dropped. */
+/**
+ * Replace the candle subscription; what the chart drew for the previous one is dropped.
+ *
+ * From here on the channel stamps what it reports with `generation`, which is how a report
+ * produced under the previous subscription is recognised after this one replaced it.
+ */
 export const SetCandleSubscription = Command.define('SetCandleSubscription', {
-  args: { channelId: Schema.String, subscription: CandleSubscription },
-  messages: [Message.CompletedSetCandleSubscription],
-  execute: ({ channelId, subscription }) =>
-    Effect.gen(function* () {
-      yield* Effect.sync(() => {
-        sinkFor(channelId).reset()
-      })
-      yield* withHandle(channelId, (handle) => {
-        if (handle._tag === 'Candles') {
-          handle.candles.setSubscription(subscription)
-        }
-      })
-
-      return Message.CompletedSetCandleSubscription()
-    }),
+  args: {
+    channelId: Schema.String,
+    generation: Schema.Finite,
+    subscription: CandleSubscription,
+  },
+  messages: [Message.SucceededSetCandleSubscription, Message.FailedSetCandleSubscription],
+  execute: ({ channelId, generation, subscription }) =>
+    withCandles(channelId, (handle) => {
+      MutableRef.set(handle.generation, generation)
+      handle.sink.reset()
+      handle.candles.setSubscription(subscription)
+    }).pipe(
+      Effect.as(Message.SucceededSetCandleSubscription({ generation })),
+      Effect.catch(
+        reportFailure((error) => Message.FailedSetCandleSubscription({ generation, error }))
+      )
+    ),
 })
 
 export const CopyEvents = Command.define('CopyEvents', {
   args: { text: Schema.String },
-  messages: [Message.CompletedCopyEvents],
+  messages: [Message.SucceededCopyEvents, Message.FailedCopyEvents],
   execute: ({ text }) =>
-    Effect.tryPromise(() => navigator.clipboard.writeText(text)).pipe(
-      Effect.as(Message.CompletedCopyEvents()),
-      Effect.orElseSucceed(() => Message.CompletedCopyEvents())
+    Effect.tryPromise({
+      try: () => navigator.clipboard.writeText(text),
+      catch: (error) => `Could not copy the events: ${describe(error)}`,
+    }).pipe(
+      Effect.as(Message.SucceededCopyEvents()),
+      Effect.catch(reportFailure((error) => Message.FailedCopyEvents({ error })))
     ),
 })
 
-/** Closing is terminal: the feed sends CHANNEL_CANCEL and its handle is gone. */
+/**
+ * Closing is terminal: the feed sends CHANNEL_CANCEL and its handle is gone, together with
+ * the chart sink registered beside it.
+ *
+ * A channel with no handle — never opened, or closed already — has nothing to release, so
+ * closing it succeeds.
+ */
 export const CloseChannel = Command.define('CloseChannel', {
   args: { channelId: Schema.String },
-  messages: [Message.CompletedCloseChannel],
+  messages: [Message.SucceededCloseChannel, Message.FailedCloseChannel],
   execute: ({ channelId }) =>
     Effect.gen(function* () {
       const handles = yield* FeedLive
       const maybeHandle = yield* handles.take(channelId)
       yield* Effect.sync(() => {
-        dropSink(channelId)
-        Option.map(maybeHandle, (handle) => {
-          if (handle._tag === 'Feed') {
-            handle.feed.close()
-          } else {
-            handle.candles.close()
-          }
-        })
+        unregisterSink(channelId)
+      })
+      yield* Option.match(maybeHandle, {
+        onNone: () => Effect.void,
+        onSome: (handle) =>
+          attempt(() => {
+            if (handle._tag === 'Feed') {
+              handle.feed.close()
+            } else {
+              handle.candles.close()
+            }
+          }),
       })
 
-      return Message.CompletedCloseChannel()
-    }),
+      return Message.SucceededCloseChannel()
+    }).pipe(Effect.catch(reportFailure((error) => Message.FailedCloseChannel({ error })))),
 })
 
 /**
- * Build the candle chart in its container. The chart lives as long as the element; the
- * candles it shows live in the channel's sink, so a rebuilt chart starts where the last one
- * left off.
+ * Build the candle chart in its container, drawing from the sink of the channel's handle.
+ * The chart lives as long as the element; the candles it shows live in the sink, so a
+ * rebuilt chart starts where the last one left off.
+ *
+ * It attaches to a sink and never makes one: a channel with no live handle has nothing to
+ * draw, and the Mount fails instead.
  */
 export const MountChart = Mount.define('MountChart', {
   args: { channelId: Schema.String },
-  messages: [Message.CompletedMountChart, Message.FailedDrawCandles],
+  messages: [Message.SucceededMountChart, Message.FailedMountChart],
   execute: ({ element, channelId }) =>
     Effect.gen(function* () {
       if (!(element instanceof HTMLElement)) {
-        return Message.FailedDrawCandles({
-          reason: 'The chart container is not an HTML element',
-        })
+        return yield* Effect.fail('The chart container is not an HTML element')
       }
+      const maybeSink = yield* Effect.sync(() => findSink(channelId))
+      const sink = yield* Effect.mapError(
+        Effect.fromOption(maybeSink),
+        () => 'The channel has no live candle feed to draw'
+      )
       yield* Effect.acquireRelease(
-        Effect.try({
-          try: () => sinkFor(channelId).attach(element),
-          catch: describe,
-        }),
-        (detach) => Effect.sync(detach)
+        attempt(() => sink.attach(element)),
+        (detach) => Effect.ignore(attempt(detach))
       )
 
-      return Message.CompletedMountChart()
-    }).pipe(Effect.catch((reason) => Effect.succeed(Message.FailedDrawCandles({ reason })))),
+      return Message.SucceededMountChart()
+    }).pipe(Effect.catch((reason) => Effect.succeed(Message.FailedMountChart({ reason })))),
 })

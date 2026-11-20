@@ -3,7 +3,7 @@ import { defineMessageUnion } from 'foldkit/message'
 
 import { ReportedError } from '@dxfeed/dxlink-console-foldkit-core'
 
-import { FeedEvent, FeedView, SubscriptionKind } from './domain'
+import { FeedEvent, FeedSubscription, FeedView, SubscriptionKind } from './domain'
 import { AppliedConfig, ChannelState, DataFormatChoice } from './model'
 
 export const RequestMessage = defineMessageUnion({
@@ -20,7 +20,8 @@ export const Message = defineMessageUnion({
     parameters: Schema.Record(Schema.String, Schema.String),
   },
   FailedOpenChannel: { error: ReportedError },
-  CompletedCloseChannel: {},
+  SucceededCloseChannel: {},
+  FailedCloseChannel: { error: ReportedError },
   ChangedChannelState: { channelState: ChannelState },
   ReportedChannelError: { error: ReportedError },
 
@@ -32,9 +33,12 @@ export const Message = defineMessageUnion({
   SubmittedSubscription: {},
   ClickedRemoveSubscription: { key: Schema.String },
   ClickedClearSubscriptions: {},
-  CompletedAddSubscription: {},
-  CompletedRemoveSubscription: {},
-  CompletedClearSubscriptions: {},
+  SucceededAddSubscription: { subscription: FeedSubscription },
+  FailedAddSubscription: { error: ReportedError },
+  SucceededRemoveSubscription: { key: Schema.String },
+  FailedRemoveSubscription: { error: ReportedError },
+  SucceededClearSubscriptions: {},
+  FailedClearSubscriptions: { error: ReportedError },
 
   UpdatedAggregationPeriod: { value: Schema.String },
   SelectedDataFormat: { value: Schema.String },
@@ -43,7 +47,8 @@ export const Message = defineMessageUnion({
   ClickedRemoveFieldRow: { rowId: Schema.Finite },
   ClickedAddFieldRow: {},
   ClickedApplyConfiguration: {},
-  CompletedConfigureFeed: {},
+  SucceededConfigureFeed: {},
+  FailedConfigureFeed: { error: ReportedError },
   ChangedAppliedConfig: { applied: AppliedConfig },
 
   ReceivedEvents: { events: Schema.Array(FeedEvent) },
@@ -51,15 +56,19 @@ export const Message = defineMessageUnion({
   ClickedTogglePause: {},
   ClickedClearEvents: {},
   ClickedCopyEvents: {},
-  CompletedCopyEvents: {},
+  SucceededCopyEvents: {},
+  FailedCopyEvents: { error: ReportedError },
 
   UpdatedCandleSymbol: { value: Schema.String },
   UpdatedCandleFromTime: { value: Schema.String },
   SubmittedCandleSubscription: {},
-  CompletedSetCandleSubscription: {},
-  CompletedMountChart: {},
-  ReceivedCandles: { candleCount: Schema.Finite },
-  FailedDrawCandles: { reason: Schema.String },
+  SucceededSetCandleSubscription: { generation: Schema.Finite },
+  FailedSetCandleSubscription: { generation: Schema.Finite, error: ReportedError },
+  SucceededMountChart: {},
+  FailedMountChart: { reason: Schema.String },
+  /** `generation` names the candle subscription the report was produced under. */
+  ReceivedCandles: { generation: Schema.Finite, candleCount: Schema.Finite },
+  FailedDrawCandles: { generation: Schema.Finite, reason: Schema.String },
 })
 export type Message = typeof Message.Type
 

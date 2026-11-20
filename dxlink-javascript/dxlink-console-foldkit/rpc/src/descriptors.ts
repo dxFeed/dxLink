@@ -73,7 +73,7 @@ const isJsonValue = (value: unknown): value is JsonValue =>
     ? Array.every(value, isJsonValue)
     : Predicate.isObject(value) && Array.every(Object.values(value), isJsonValue))
 
-const describeFailure = (error: unknown): string =>
+export const describeFailure = (error: unknown): string =>
   error instanceof Error ? error.message : globalThis.String(error)
 
 const FIRST_PRINTABLE_BYTE = 0x21

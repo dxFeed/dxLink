@@ -2,12 +2,14 @@ import { Option } from 'effect'
 import { describe, expect, test } from 'vitest'
 
 import {
+  FeedSubscription,
   buildAcceptEventFields,
   buildColumns,
   eventKey,
   eventType,
   subscriptionKey,
   toFeedEvent,
+  toProtocolSubscription,
   upsertEvents,
 } from './domain'
 import { EVENT_TYPES } from './eventTypes'
@@ -57,19 +59,42 @@ describe('eventType', () => {
 })
 
 describe('subscriptionKey', () => {
-  const order = { type: 'Order', symbol: 'AAPL', fromTime: 0 }
+  const order = { type: 'Order', symbol: 'AAPL' }
 
   test('includes the source only for indexed subscriptions', () => {
-    expect(subscriptionKey({ ...order, kind: 'Indexed', source: 'NTV' })).toBe('Order#NTV:AAPL')
-    expect(subscriptionKey({ ...order, type: 'Quote', kind: 'Regular', source: 'NTV' })).toBe(
+    expect(subscriptionKey(FeedSubscription.Indexed({ ...order, source: 'NTV' }))).toBe(
+      'Order#NTV:AAPL'
+    )
+    expect(subscriptionKey(FeedSubscription.Regular({ type: 'Quote', symbol: 'AAPL' }))).toBe(
       'Quote:AAPL'
+    )
+    expect(subscriptionKey(FeedSubscription.TimeSeries({ ...order, fromTime: 5 }))).toBe(
+      'Order:AAPL'
     )
   })
 
   test('separates two sources of the same symbol', () => {
-    expect(subscriptionKey({ ...order, kind: 'Indexed', source: 'NTV' })).not.toBe(
-      subscriptionKey({ ...order, kind: 'Indexed', source: 'DEX' })
+    expect(subscriptionKey(FeedSubscription.Indexed({ ...order, source: 'NTV' }))).not.toBe(
+      subscriptionKey(FeedSubscription.Indexed({ ...order, source: 'DEX' }))
     )
+  })
+})
+
+describe('toProtocolSubscription', () => {
+  test('sends each kind in its own protocol shape', () => {
+    expect(
+      toProtocolSubscription(FeedSubscription.Regular({ type: 'Quote', symbol: 'AAPL' }))
+    ).toEqual({ type: 'Quote', symbol: 'AAPL' })
+    expect(
+      toProtocolSubscription(
+        FeedSubscription.Indexed({ type: 'Order', symbol: 'AAPL', source: 'NTV' })
+      )
+    ).toEqual({ type: 'Order', symbol: 'AAPL', source: 'NTV' })
+    expect(
+      toProtocolSubscription(
+        FeedSubscription.TimeSeries({ type: 'Candle', symbol: 'AAPL{=d}', fromTime: 5 })
+      )
+    ).toEqual({ type: 'Candle', symbol: 'AAPL{=d}', fromTime: 5 })
   })
 })
 
@@ -168,13 +193,13 @@ describe('coalesce', () => {
         { channelId: '1', message: { _tag: 'Events', events: [quote] } },
         { channelId: '2', message: { _tag: 'Events', events: [trade] } },
         { channelId: '1', message: { _tag: 'Events', events: [trade] } },
-        { channelId: '1', message: { _tag: 'Candles', count: 3 } },
+        { channelId: '1', message: { _tag: 'Candles', generation: 1, count: 3 } },
         { channelId: '1', message: { _tag: 'Events', events: [quote] } },
       ])
     ).toEqual([
       { channelId: '1', message: { _tag: 'Events', events: [quote, trade] } },
       { channelId: '2', message: { _tag: 'Events', events: [trade] } },
-      { channelId: '1', message: { _tag: 'Candles', count: 3 } },
+      { channelId: '1', message: { _tag: 'Candles', generation: 1, count: 3 } },
       { channelId: '1', message: { _tag: 'Events', events: [quote] } },
     ])
   })

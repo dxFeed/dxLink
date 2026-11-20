@@ -7,11 +7,12 @@ import { Dialog } from '@foldkit/ui'
 
 import type { RegisteredChannelPlugin } from './channel/plugin'
 import type { DxLinkClientService } from './client'
-import { ReconnectClient, ReportAcquireFailure, ScrollToChannel, SetAuthToken } from './command'
+import { ReconnectClient, ScrollToChannel, SetAuthToken, StampAcquireFailure } from './command'
 import type { ConsoleConfig } from './config'
 import { clearErrors, emptyErrorLog, prependError } from './error'
 import { Message } from './message'
 import {
+  ChannelCard,
   type ChannelEntry,
   type ClientParams,
   type ClientStatus,
@@ -94,15 +95,15 @@ const toRequestMessage =
   (message: unknown): Message =>
     Message.GotRequestMessage({ pluginId, message })
 
-export const makeConsole = <Services>(
-  plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>
-) => {
+export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>) => {
   type UpdateReturn = Update.Return<Model, Message, Services | DxLinkClientService>
   type Commands = Update.Commands<Message, Services | DxLinkClientService>
 
   const foldRequestDialogOutMessage = Dialog.OutMessage.match<Update.Step<Model, Message>>({
     Opened: () => (model) => ({ model }),
-    Closed: () => (model) => ({ model }),
+    Closed: () => (model) => ({
+      model: modifyFields(model, { maybeRequestKind: () => Option.none() }),
+    }),
   })
 
   const readRequestDialog = (model: Model) => Option.some(model.requestDialog)
@@ -144,7 +145,7 @@ export const makeConsole = <Services>(
   ): Readonly<{ channel: ChannelEntry; commands?: Commands }> =>
     pipe(
       findPlugin(plugins, channel.kind),
-      Option.filter(() => !channel.isClosed),
+      Option.filter(() => channel.card._tag === 'Open'),
       Option.match({
         onNone: () => ({ channel }),
         onSome: (plugin) => {
@@ -152,7 +153,7 @@ export const makeConsole = <Services>(
 
           return {
             channel: modifyFields(channel, {
-              isClosed: () => true,
+              card: () => ChannelCard.Closed(),
               model: () => channelClose.model,
             }),
             commands: Command.mapMessages(
@@ -245,35 +246,42 @@ export const makeConsole = <Services>(
         }
       },
 
-      AcquiredClient: () => ({
+      // NOTE: a client built for an earlier session can report in after the Model has moved
+      // on, so only the acquisition of the session being opened is acted on.
+      AcquiredClient: ({ sessionId: acquiredSessionId }) => ({
         model: modifyFields(model, {
           session: (session) =>
             Session.match(session, {
               Idle: () => session,
               Open: () => session,
               Opening: ({ sessionId, params }) =>
-                Session.Open({
-                  sessionId,
-                  params,
-                  status: {
-                    connection: DXLinkConnectionState.CONNECTING,
-                    maybeAuth: Option.none(),
-                    maybeDetails: Option.none(),
-                  },
-                  hasAuthorized: false,
-                }),
+                sessionId === acquiredSessionId
+                  ? Session.Open({
+                      sessionId,
+                      params,
+                      status: {
+                        connection: DXLinkConnectionState.CONNECTING,
+                        maybeAuth: Option.none(),
+                        maybeDetails: Option.none(),
+                      },
+                      hasAuthorized: false,
+                    })
+                  : session,
             }),
         }),
       }),
 
       ReleasedClient: () => ({ model }),
 
+      // NOTE: only a session still waiting for its client can have failed to get one.
       FailedAcquireClient: ({ reason }) => ({
-        model: modifyFields(model, { session: () => Session.Idle() }),
-        commands: [ReportAcquireFailure({ reason })],
+        model: modifyFields(model, {
+          session: (session) => (session._tag === 'Opening' ? Session.Idle() : session),
+        }),
+        commands: [StampAcquireFailure({ reason })],
       }),
 
-      CompletedReportAcquireFailure: ({ error }) => ({
+      CompletedStampAcquireFailure: ({ error }) => ({
         model: modifyFields(model, {
           errorLog: (errorLog) => prependError(errorLog, error),
         }),
@@ -312,7 +320,13 @@ export const makeConsole = <Services>(
         model: modifyFields(model, { errorLog: clearErrors }),
       }),
 
-      CompletedReconnectClient: () => ({ model }),
+      SucceededReconnectClient: () => ({ model }),
+
+      FailedReconnectClient: ({ error }) => ({
+        model: modifyFields(model, {
+          errorLog: (errorLog) => prependError(errorLog, error),
+        }),
+      }),
 
       UpdatedAuthToken: ({ value }) => ({
         model: modifyFields(model, { authToken: () => value }),
@@ -326,7 +340,13 @@ export const makeConsole = <Services>(
           : { model, commands: [SetAuthToken({ token: Redacted.make(token) })] }
       },
 
-      CompletedSetAuthToken: () => ({ model }),
+      SucceededSetAuthToken: () => ({ model }),
+
+      FailedSetAuthToken: ({ error }) => ({
+        model: modifyFields(model, {
+          errorLog: (errorLog) => prependError(errorLog, error),
+        }),
+      }),
 
       ClickedAddChannel: ({ kind }) =>
         foldRequestDialogOpen(modifyFields(model, { maybeRequestKind: () => Option.some(kind) })),
@@ -378,9 +398,7 @@ export const makeConsole = <Services>(
                   channels: Array.append({
                     id: channelId,
                     kind: plugin.kind,
-                    title: `${plugin.label} #${channelId}`,
-                    isExpanded: true,
-                    isClosed: false,
+                    card: ChannelCard.Open({ isExpanded: true }),
                     model: channelInit.model,
                   }),
                   nextChannelId: (nextChannelId) => nextChannelId + 1,
@@ -432,7 +450,11 @@ export const makeConsole = <Services>(
           channels: Array.map((channel) =>
             channel.id === channelId
               ? modifyFields(channel, {
-                  isExpanded: (isExpanded) => !isExpanded,
+                  card: (card) =>
+                    ChannelCard.match(card, {
+                      Open: ({ isExpanded }) => ChannelCard.Open({ isExpanded: !isExpanded }),
+                      Closed: () => card,
+                    }),
                 })
               : channel
           ),

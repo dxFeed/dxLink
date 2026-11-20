@@ -1,7 +1,7 @@
 import { Option } from 'effect'
 import { describe, expect, test } from 'vitest'
 
-import { formatNumber, parseList, parseOptionalNumber, toLadderRows } from './ladder'
+import { formatNumber, parseList, parseOptionalNumber, toAskLevels, toBidLevels } from './ladder'
 
 describe('parseList', () => {
   test('splits on commas and whitespace and drops blanks', () => {
@@ -38,46 +38,48 @@ describe('formatNumber', () => {
   })
 })
 
-describe('toLadderRows', () => {
-  test('puts the best levels first: highest bid beside lowest ask', () => {
-    const rows = toLadderRows(
-      [
-        { price: 99, maybeSize: Option.some(1) },
-        { price: 100, maybeSize: Option.some(2) },
-      ],
-      [
-        { price: 102, maybeSize: Option.some(3) },
-        { price: 101, maybeSize: Option.some(4) },
-      ]
-    )
+describe('ladder sides', () => {
+  const orders = [
+    { price: 99, maybeSize: Option.some(1) },
+    { price: 101, maybeSize: Option.none() },
+    { price: 100, maybeSize: Option.some(2) },
+  ]
 
-    expect(rows).toEqual([
-      {
-        level: 1,
-        maybeBid: Option.some({ price: 100, maybeSize: Option.some(2) }),
-        maybeAsk: Option.some({ price: 101, maybeSize: Option.some(4) }),
-      },
-      {
-        level: 2,
-        maybeBid: Option.some({ price: 99, maybeSize: Option.some(1) }),
-        maybeAsk: Option.some({ price: 102, maybeSize: Option.some(3) }),
-      },
+  test('bids put the highest price first', () => {
+    expect(toBidLevels(orders)).toEqual([
+      { key: '101', price: 101, maybeSize: Option.none() },
+      { key: '100', price: 100, maybeSize: Option.some(2) },
+      { key: '99', price: 99, maybeSize: Option.some(1) },
     ])
   })
 
-  test('the shorter side runs out', () => {
-    const rows = toLadderRows([{ price: 100, maybeSize: Option.some(2) }], [])
-
-    expect(rows).toEqual([
-      {
-        level: 1,
-        maybeBid: Option.some({ price: 100, maybeSize: Option.some(2) }),
-        maybeAsk: Option.none(),
-      },
-    ])
+  test('asks put the lowest price first', () => {
+    expect(toAskLevels(orders).map((level) => level.price)).toEqual([99, 100, 101])
   })
 
-  test('an empty book has no rows', () => {
-    expect(toLadderRows([], [])).toEqual([])
+  test('a level keeps its key when its size changes and when levels around it come and go', () => {
+    const before = toBidLevels(orders)
+    const after = toBidLevels([
+      { price: 100, maybeSize: Option.some(50) },
+      { price: 102, maybeSize: Option.some(7) },
+    ])
+
+    expect(before.find((level) => level.price === 100)?.key).toBe('100')
+    expect(after.find((level) => level.price === 100)?.key).toBe('100')
+  })
+
+  test('levels repeated at one price have distinct keys', () => {
+    const levels = toAskLevels([
+      { price: 100, maybeSize: Option.some(1) },
+      { price: 100, maybeSize: Option.some(2) },
+      { price: 101, maybeSize: Option.some(3) },
+    ])
+
+    expect(levels.map((level) => level.key)).toEqual(['100', '100#1', '101'])
+  })
+
+  test('an empty side has no levels', () => {
+    expect(toBidLevels([])).toEqual([])
+    expect(toAskLevels([])).toEqual([])
   })
 })

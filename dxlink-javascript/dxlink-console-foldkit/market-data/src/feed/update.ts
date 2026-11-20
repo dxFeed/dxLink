@@ -1,9 +1,10 @@
-import { Array, Option, Record, Schema, pipe } from 'effect'
+import { Array, Match, Option, Record, Schema, pipe } from 'effect'
 import type { Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
 import {
+  type ReportedError,
   clearErrors as clearErrorLog,
   emptyErrorLog,
   prependError,
@@ -24,7 +25,7 @@ import {
   type EventsByType,
   type FeedConfig,
   type FeedEvent,
-  type FeedSubscription,
+  FeedSubscription,
   subscriptionKey,
   upsertEvents,
 } from './domain'
@@ -32,10 +33,14 @@ import type { FeedServices } from './live'
 import { Message, RequestMessage } from './message'
 import {
   CHANNEL_MODEL_KIND,
+  type ChannelLink,
   type ChartState,
   type ConfigurationForm,
   DataFormatChoice,
+  EventsTable,
+  Lifecycle,
   type Model,
+  type OpenedChannel,
   type Request,
   type SubscriptionForm,
   type SubscriptionsState,
@@ -95,16 +100,15 @@ const initialSubscriptionsState = (): SubscriptionsState => ({
     dataFormat: 'FULL',
     eventFields: {},
   },
-  events: {},
-  maybeFrozenEvents: Option.none(),
+  table: EventsTable.Live({ events: {} }),
   maybeActiveType: Option.none(),
 })
 
 const initialChartState = (): ChartState => ({
   symbol: 'AAPL{=d}',
   fromTime: '0',
-  maybeSubscription: Option.none(),
-  candleCount: 0,
+  lastGeneration: 0,
+  maybeActive: Option.none(),
   maybeChartError: Option.none(),
 })
 
@@ -118,9 +122,7 @@ export const init = ({
     model: {
       kind: CHANNEL_MODEL_KIND,
       channelId,
-      channelState: DXLinkChannelState.REQUESTED,
-      maybeProtocolChannelId: Option.none(),
-      parameters: {},
+      lifecycle: Lifecycle.Opening(),
       errorLog: emptyErrorLog(),
       view:
         config.view === 'Chart'
@@ -130,6 +132,36 @@ export const init = ({
     commands: [config.view === 'Chart' ? OpenCandles(openArgs) : OpenFeed(openArgs)],
   }
 }
+
+// LIFECYCLE
+
+/** The link a protocol channel state stands for; `None` for a channel that is closed. */
+const linkOf = (channelState: DXLinkChannelState): Option.Option<ChannelLink> =>
+  Match.value(channelState).pipe(
+    Match.withReturnType<Option.Option<ChannelLink>>(),
+    Match.when(DXLinkChannelState.OPENED, () => Option.some('Ready')),
+    Match.when(DXLinkChannelState.REQUESTED, () => Option.some('Requested')),
+    Match.orElse(() => Option.none())
+  )
+
+/** The lifecycle of an opened channel that reports `channelState`. */
+const lifecycleOf = (channel: OpenedChannel, channelState: DXLinkChannelState): Lifecycle =>
+  Option.match(linkOf(channelState), {
+    onNone: () => Lifecycle.Closed({ maybeChannel: Option.some(channel) }),
+    onSome: (link) => Lifecycle.Opened({ channel, link }),
+  })
+
+/**
+ * Handle input to the live channel. A channel accepts it only while it is opened: before
+ * that, and after it failed or closed, there is no feed behind it to act on.
+ */
+const whenOpened = (model: Model, onOpened: () => UpdateReturn): UpdateReturn =>
+  model.lifecycle._tag === 'Opened' ? onOpened() : { model }
+
+const withError = (model: Model, error: ReportedError): Model =>
+  modifyFields(model, { errorLog: (errorLog) => prependError(errorLog, error) })
+
+// VIEW STATE
 
 /** Apply a change to the subscriptions view; a chart channel is left as it is. */
 const mapSubscriptions = (
@@ -168,6 +200,24 @@ const mapConfiguration = (
   f: (configuration: ConfigurationForm) => ConfigurationForm
 ): Model => mapSubscriptions(model, (state) => modifyFields(state, { configuration: f }))
 
+const mapTable = (model: Model, f: (table: EventsTable) => EventsTable): Model =>
+  mapSubscriptions(model, (state) => modifyFields(state, { table: f }))
+
+const isListed = (state: SubscriptionsState, key: string): boolean =>
+  Array.some(state.subscriptions, (existing) => subscriptionKey(existing) === key)
+
+/** Apply a change to the candle subscription `generation` names; any other is left as it is. */
+const mapActiveCandles = (
+  model: Model,
+  generation: number,
+  f: (state: ChartState) => ChartState
+): Model =>
+  mapChart(model, (state) =>
+    Option.exists(state.maybeActive, (active) => active.generation === generation)
+      ? f(state)
+      : state
+  )
+
 /**
  * The subscription the form describes, or `None` while it cannot be added: type and symbol
  * are required, and an indexed subscription needs its source.
@@ -175,23 +225,32 @@ const mapConfiguration = (
 export const formToSubscription = (form: SubscriptionForm): Option.Option<FeedSubscription> => {
   const type = form.type.trim()
   const symbol = form.symbol.trim()
-  const source = form.kind === 'Indexed' ? form.source.trim() : ''
-  const isComplete = type !== '' && symbol !== '' && (form.kind !== 'Indexed' || source !== '')
+  const source = form.source.trim()
+  if (type === '' || symbol === '') {
+    return Option.none()
+  }
 
-  return isComplete
-    ? Option.some({
-        kind: form.kind,
-        type,
-        symbol,
-        source,
-        fromTime: form.kind === 'TimeSeries' ? toNumber(form.fromTime) : 0,
-      })
-    : Option.none()
+  return Match.value(form.kind).pipe(
+    Match.withReturnType<Option.Option<FeedSubscription>>(),
+    Match.when('Regular', () => Option.some(FeedSubscription.Regular({ type, symbol }))),
+    Match.when('Indexed', () =>
+      source === ''
+        ? Option.none()
+        : Option.some(FeedSubscription.Indexed({ type, symbol, source }))
+    ),
+    Match.when('TimeSeries', () =>
+      Option.some(FeedSubscription.TimeSeries({ type, symbol, fromTime: toNumber(form.fromTime) }))
+    ),
+    Match.exhaustive
+  )
 }
 
-/** The events the table shows: the frozen copy while paused, the live ones otherwise. */
+/** The events the table shows: the frozen rows while paused, the live ones otherwise. */
 export const displayedEvents = (state: SubscriptionsState): EventsByType =>
-  Option.getOrElse(state.maybeFrozenEvents, () => state.events)
+  EventsTable.match(state.table, {
+    Live: ({ events }) => events,
+    Paused: ({ frozen }) => frozen,
+  })
 
 /** The selected event type if it still has a tab, otherwise the first type received. */
 export const activeEventType = (state: SubscriptionsState): Option.Option<string> => {
@@ -219,197 +278,253 @@ export const rowsOf = (
 
 const isDataFormatChoice = Schema.is(DataFormatChoice)
 
+// UPDATE
+
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
     SucceededOpenChannel: ({ channelState, protocolChannelId, parameters }) => ({
       model: modifyFields(model, {
-        channelState: () => channelState,
-        maybeProtocolChannelId: () => Option.some(protocolChannelId),
-        parameters: () => parameters,
+        lifecycle: (lifecycle) =>
+          Lifecycle.match(lifecycle, {
+            Opening: () => lifecycleOf({ protocolChannelId, parameters }, channelState),
+            Opened: () => lifecycle,
+            FailedToOpen: () => lifecycle,
+            Closed: () => lifecycle,
+          }),
       }),
     }),
 
     FailedOpenChannel: ({ error }) => ({
-      model: modifyFields(model, {
-        channelState: () => DXLinkChannelState.CLOSED,
-        errorLog: (errorLog) => prependError(errorLog, error),
-      }),
-    }),
-
-    CompletedCloseChannel: () => ({ model }),
-
-    ChangedChannelState: ({ channelState }) => ({
-      model: modifyFields(model, { channelState: () => channelState }),
-    }),
-
-    ReportedChannelError: ({ error }) => ({
-      model: modifyFields(model, {
-        errorLog: (errorLog) => prependError(errorLog, error),
-      }),
-    }),
-
-    SelectedSubscriptionKind: ({ kind }) => ({
-      model: mapForm(model, (form) => modifyFields(form, { kind: () => kind })),
-    }),
-
-    UpdatedSubscriptionType: ({ value }) => ({
-      model: mapForm(model, (form) => modifyFields(form, { type: () => value })),
-    }),
-
-    UpdatedSubscriptionSymbol: ({ value }) => ({
-      model: mapForm(model, (form) => modifyFields(form, { symbol: () => value })),
-    }),
-
-    UpdatedSubscriptionSource: ({ value }) => ({
-      model: mapForm(model, (form) => modifyFields(form, { source: () => value })),
-    }),
-
-    UpdatedSubscriptionFromTime: ({ value }) => ({
-      model: mapForm(model, (form) =>
-        modifyFields(form, { fromTime: () => value.replace(DIGITS_ONLY, '') })
-      ),
-    }),
-
-    SubmittedSubscription: () =>
-      pipe(
-        maybeSubscriptions(model),
-        Option.flatMap((state) =>
-          pipe(
-            formToSubscription(state.form),
-            Option.filter(
-              (subscription) =>
-                !Array.some(
-                  state.subscriptions,
-                  (existing) => subscriptionKey(existing) === subscriptionKey(subscription)
-                )
-            )
-          )
-        ),
-        Option.match({
-          onNone: (): UpdateReturn => ({ model }),
-          onSome: (subscription) => ({
-            model: mapSubscriptions(model, (state) =>
-              modifyFields(state, {
-                subscriptions: Array.append(subscription),
-              })
-            ),
-            commands: [AddSubscription({ channelId: model.channelId, subscription })],
+      model: modifyFields(withError(model, error), {
+        lifecycle: (lifecycle) =>
+          Lifecycle.match(lifecycle, {
+            Opening: () => Lifecycle.FailedToOpen(),
+            Opened: () => lifecycle,
+            FailedToOpen: () => lifecycle,
+            Closed: () => lifecycle,
           }),
-        })
+      }),
+    }),
+
+    SucceededCloseChannel: () => ({ model }),
+
+    FailedCloseChannel: ({ error }) => ({ model: withError(model, error) }),
+
+    // NOTE: only an opened channel follows its protocol state. State changes are gathered
+    // into batches, so one can arrive after the channel was closed here, and it must not
+    // reopen it. While opening there is nothing to move yet: the open result carries the
+    // state the channel had when it was sampled.
+    ChangedChannelState: ({ channelState }) => ({
+      model: modifyFields(model, {
+        lifecycle: (lifecycle) =>
+          Lifecycle.match(lifecycle, {
+            Opening: () => lifecycle,
+            Opened: ({ channel }) => lifecycleOf(channel, channelState),
+            FailedToOpen: () => lifecycle,
+            Closed: () => lifecycle,
+          }),
+      }),
+    }),
+
+    ReportedChannelError: ({ error }) => ({ model: withError(model, error) }),
+
+    SelectedSubscriptionKind: ({ kind }) =>
+      whenOpened(model, () => ({
+        model: mapForm(model, (form) => modifyFields(form, { kind: () => kind })),
+      })),
+
+    UpdatedSubscriptionType: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapForm(model, (form) => modifyFields(form, { type: () => value })),
+      })),
+
+    UpdatedSubscriptionSymbol: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapForm(model, (form) => modifyFields(form, { symbol: () => value })),
+      })),
+
+    UpdatedSubscriptionSource: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapForm(model, (form) => modifyFields(form, { source: () => value })),
+      })),
+
+    UpdatedSubscriptionFromTime: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapForm(model, (form) =>
+          modifyFields(form, { fromTime: () => value.replace(DIGITS_ONLY, '') })
+        ),
+      })),
+
+    // NOTE: a subscription joins the list when the feed has accepted it, not when it is
+    // submitted, so the list never names one that was not sent.
+    SubmittedSubscription: () =>
+      whenOpened(model, () =>
+        pipe(
+          maybeSubscriptions(model),
+          Option.flatMap((state) =>
+            pipe(
+              formToSubscription(state.form),
+              Option.filter((subscription) => !isListed(state, subscriptionKey(subscription)))
+            )
+          ),
+          Option.match({
+            onNone: (): UpdateReturn => ({ model }),
+            onSome: (subscription) => ({
+              model,
+              commands: [AddSubscription({ channelId: model.channelId, subscription })],
+            }),
+          })
+        )
       ),
+
+    SucceededAddSubscription: ({ subscription }) => ({
+      model: mapSubscriptions(model, (state) =>
+        isListed(state, subscriptionKey(subscription))
+          ? state
+          : modifyFields(state, { subscriptions: Array.append(subscription) })
+      ),
+    }),
+
+    FailedAddSubscription: ({ error }) => ({ model: withError(model, error) }),
 
     ClickedRemoveSubscription: ({ key }) =>
-      pipe(
-        maybeSubscriptions(model),
-        Option.flatMap((state) =>
-          Array.findFirst(
-            state.subscriptions,
-            (subscription) => subscriptionKey(subscription) === key
-          )
-        ),
-        Option.match({
-          onNone: (): UpdateReturn => ({ model }),
-          onSome: (subscription) => ({
-            model: mapSubscriptions(model, (state) =>
-              modifyFields(state, {
-                subscriptions: Array.filter((existing) => subscriptionKey(existing) !== key),
-              })
-            ),
-            commands: [RemoveSubscription({ channelId: model.channelId, subscription })],
-          }),
-        })
+      whenOpened(model, () =>
+        pipe(
+          maybeSubscriptions(model),
+          Option.flatMap((state) =>
+            Array.findFirst(
+              state.subscriptions,
+              (subscription) => subscriptionKey(subscription) === key
+            )
+          ),
+          Option.match({
+            onNone: (): UpdateReturn => ({ model }),
+            onSome: (subscription) => ({
+              model,
+              commands: [RemoveSubscription({ channelId: model.channelId, subscription })],
+            }),
+          })
+        )
       ),
 
-    ClickedClearSubscriptions: () => ({
+    SucceededRemoveSubscription: ({ key }) => ({
+      model: mapSubscriptions(model, (state) =>
+        modifyFields(state, {
+          subscriptions: Array.filter((existing) => subscriptionKey(existing) !== key),
+        })
+      ),
+    }),
+
+    FailedRemoveSubscription: ({ error }) => ({ model: withError(model, error) }),
+
+    ClickedClearSubscriptions: () =>
+      whenOpened(model, () => ({
+        model,
+        commands: [ClearSubscriptions({ channelId: model.channelId })],
+      })),
+
+    SucceededClearSubscriptions: () => ({
       model: mapSubscriptions(model, (state) => modifyFields(state, { subscriptions: () => [] })),
-      commands: [ClearSubscriptions({ channelId: model.channelId })],
     }),
 
-    CompletedAddSubscription: () => ({ model }),
-    CompletedRemoveSubscription: () => ({ model }),
-    CompletedClearSubscriptions: () => ({ model }),
+    FailedClearSubscriptions: ({ error }) => ({ model: withError(model, error) }),
 
-    UpdatedAggregationPeriod: ({ value }) => ({
-      model: mapConfiguration(model, (configuration) =>
-        modifyFields(configuration, { aggregationPeriod: () => value })
-      ),
-    }),
+    UpdatedAggregationPeriod: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapConfiguration(model, (configuration) =>
+          modifyFields(configuration, { aggregationPeriod: () => value })
+        ),
+      })),
 
-    SelectedDataFormat: ({ value }) => ({
-      model: mapConfiguration(model, (configuration) =>
-        modifyFields(configuration, {
-          dataFormat: (dataFormat) => (isDataFormatChoice(value) ? value : dataFormat),
-        })
-      ),
-    }),
+    SelectedDataFormat: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapConfiguration(model, (configuration) =>
+          modifyFields(configuration, {
+            dataFormat: (dataFormat) => (isDataFormatChoice(value) ? value : dataFormat),
+          })
+        ),
+      })),
 
-    UpdatedFieldRowType: ({ rowId, value }) => ({
-      model: mapConfiguration(model, (configuration) =>
-        modifyFields(configuration, {
-          rows: Array.map((row) =>
-            row.id === rowId ? modifyFields(row, { type: () => value }) : row
-          ),
-        })
-      ),
-    }),
+    UpdatedFieldRowType: ({ rowId, value }) =>
+      whenOpened(model, () => ({
+        model: mapConfiguration(model, (configuration) =>
+          modifyFields(configuration, {
+            rows: Array.map((row) =>
+              row.id === rowId ? modifyFields(row, { type: () => value }) : row
+            ),
+          })
+        ),
+      })),
 
-    UpdatedFieldRowFields: ({ rowId, value }) => ({
-      model: mapConfiguration(model, (configuration) =>
-        modifyFields(configuration, {
-          rows: Array.map((row) =>
-            row.id === rowId ? modifyFields(row, { fields: () => value }) : row
-          ),
-        })
-      ),
-    }),
+    UpdatedFieldRowFields: ({ rowId, value }) =>
+      whenOpened(model, () => ({
+        model: mapConfiguration(model, (configuration) =>
+          modifyFields(configuration, {
+            rows: Array.map((row) =>
+              row.id === rowId ? modifyFields(row, { fields: () => value }) : row
+            ),
+          })
+        ),
+      })),
 
-    ClickedRemoveFieldRow: ({ rowId }) => ({
-      model: mapConfiguration(model, (configuration) =>
-        modifyFields(configuration, {
-          rows: Array.filter((row) => row.id !== rowId),
-        })
-      ),
-    }),
+    ClickedRemoveFieldRow: ({ rowId }) =>
+      whenOpened(model, () => ({
+        model: mapConfiguration(model, (configuration) =>
+          modifyFields(configuration, {
+            rows: Array.filter((row) => row.id !== rowId),
+          })
+        ),
+      })),
 
-    ClickedAddFieldRow: () => ({
-      model: mapConfiguration(model, (configuration) =>
-        modifyFields(configuration, {
-          rows: Array.append({
-            id: configuration.nextRowId,
-            type: '',
-            fields: '',
-          }),
-          nextRowId: (nextRowId) => nextRowId + 1,
-        })
-      ),
-    }),
+    ClickedAddFieldRow: () =>
+      whenOpened(model, () => ({
+        model: mapConfiguration(model, (configuration) =>
+          modifyFields(configuration, {
+            rows: Array.append({
+              id: configuration.nextRowId,
+              type: '',
+              fields: '',
+            }),
+            nextRowId: (nextRowId) => nextRowId + 1,
+          })
+        ),
+      })),
 
     ClickedApplyConfiguration: () =>
-      Option.match(maybeSubscriptions(model), {
-        onNone: (): UpdateReturn => ({ model }),
-        onSome: ({ configuration }) => ({
-          model,
-          commands: [
-            ConfigureFeed({
-              channelId: model.channelId,
-              aggregationPeriod: configuration.aggregationPeriod,
-              dataFormat: configuration.dataFormat,
-              rows: configuration.rows,
-            }),
-          ],
-        }),
-      }),
+      whenOpened(model, () =>
+        Option.match(maybeSubscriptions(model), {
+          onNone: (): UpdateReturn => ({ model }),
+          onSome: ({ configuration }) => ({
+            model,
+            commands: [
+              ConfigureFeed({
+                channelId: model.channelId,
+                aggregationPeriod: configuration.aggregationPeriod,
+                dataFormat: configuration.dataFormat,
+                rows: configuration.rows,
+              }),
+            ],
+          }),
+        })
+      ),
 
-    CompletedConfigureFeed: () => ({ model }),
+    SucceededConfigureFeed: () => ({ model }),
+
+    FailedConfigureFeed: ({ error }) => ({ model: withError(model, error) }),
 
     ChangedAppliedConfig: ({ applied }) => ({
       model: mapSubscriptions(model, (state) => modifyFields(state, { applied: () => applied })),
     }),
 
     ReceivedEvents: ({ events }) => ({
-      model: mapSubscriptions(model, (state) =>
-        modifyFields(state, {
-          events: (existing) => upsertEvents(existing, events),
+      model: mapTable(model, (table) =>
+        EventsTable.match(table, {
+          Live: (live) => EventsTable.Live({ events: upsertEvents(live.events, events) }),
+          Paused: (paused) =>
+            EventsTable.Paused({
+              frozen: paused.frozen,
+              events: upsertEvents(paused.events, events),
+            }),
         })
       ),
     }),
@@ -421,16 +536,23 @@ export const update = (model: Model, message: Message) =>
     }),
 
     ClickedTogglePause: () => ({
-      model: mapSubscriptions(model, (state) =>
-        modifyFields(state, {
-          maybeFrozenEvents: (maybeFrozenEvents) =>
-            Option.isSome(maybeFrozenEvents) ? Option.none() : Option.some(state.events),
+      model: mapTable(model, (table) =>
+        EventsTable.match(table, {
+          Live: ({ events }) => EventsTable.Paused({ frozen: events, events }),
+          Paused: ({ events }) => EventsTable.Live({ events }),
         })
       ),
     }),
 
+    // NOTE: clearing empties what is on screen and what was gathered underneath it alike,
+    // so a paused table goes empty at once and resuming does not bring cleared rows back.
     ClickedClearEvents: () => ({
-      model: mapSubscriptions(model, (state) => modifyFields(state, { events: () => ({}) })),
+      model: mapTable(model, (table) =>
+        EventsTable.match(table, {
+          Live: () => EventsTable.Live({ events: {} }),
+          Paused: () => EventsTable.Paused({ frozen: {}, events: {} }),
+        })
+      ),
     }),
 
     ClickedCopyEvents: () =>
@@ -450,67 +572,103 @@ export const update = (model: Model, message: Message) =>
         })
       ),
 
-    CompletedCopyEvents: () => ({ model }),
+    SucceededCopyEvents: () => ({ model }),
 
-    UpdatedCandleSymbol: ({ value }) => ({
-      model: mapChart(model, (state) => modifyFields(state, { symbol: () => value })),
-    }),
+    FailedCopyEvents: ({ error }) => ({ model: withError(model, error) }),
 
-    UpdatedCandleFromTime: ({ value }) => ({
-      model: mapChart(model, (state) =>
-        modifyFields(state, { fromTime: () => value.replace(DIGITS_ONLY, '') })
-      ),
-    }),
+    UpdatedCandleSymbol: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapChart(model, (state) => modifyFields(state, { symbol: () => value })),
+      })),
+
+    UpdatedCandleFromTime: ({ value }) =>
+      whenOpened(model, () => ({
+        model: mapChart(model, (state) =>
+          modifyFields(state, { fromTime: () => value.replace(DIGITS_ONLY, '') })
+        ),
+      })),
 
     SubmittedCandleSubscription: () =>
-      pipe(
-        maybeChart(model),
-        Option.filter((state) => state.symbol.trim() !== ''),
-        Option.match({
-          onNone: (): UpdateReturn => ({ model }),
-          onSome: (state) => {
-            const subscription = {
-              symbol: state.symbol.trim(),
-              fromTime: toNumber(state.fromTime),
-            }
+      whenOpened(model, () =>
+        pipe(
+          maybeChart(model),
+          Option.filter((state) => state.symbol.trim() !== ''),
+          Option.match({
+            onNone: (): UpdateReturn => ({ model }),
+            onSome: (state) => {
+              const generation = state.lastGeneration + 1
+              const subscription = {
+                symbol: state.symbol.trim(),
+                fromTime: toNumber(state.fromTime),
+              }
 
-            return {
-              model: mapChart(model, (chart) =>
-                modifyFields(chart, {
-                  maybeSubscription: () => Option.some(subscription),
-                  candleCount: () => 0,
-                  maybeChartError: () => Option.none(),
-                })
-              ),
-              commands: [
-                SetCandleSubscription({
-                  channelId: model.channelId,
-                  subscription,
-                }),
-              ],
-            }
-          },
-        })
+              return {
+                model: mapChart(model, (chart) =>
+                  modifyFields(chart, {
+                    lastGeneration: () => generation,
+                    maybeActive: () => Option.some({ generation, subscription, candleCount: 0 }),
+                    maybeChartError: () => Option.none(),
+                  })
+                ),
+                commands: [
+                  SetCandleSubscription({
+                    channelId: model.channelId,
+                    generation,
+                    subscription,
+                  }),
+                ],
+              }
+            },
+          })
+        )
       ),
 
-    CompletedSetCandleSubscription: () => ({ model }),
-    CompletedMountChart: () => ({ model }),
+    SucceededSetCandleSubscription: () => ({ model }),
 
-    ReceivedCandles: ({ candleCount }) => ({
-      model: mapChart(model, (state) => modifyFields(state, { candleCount: () => candleCount })),
+    FailedSetCandleSubscription: ({ generation, error }) => ({
+      model: mapActiveCandles(withError(model, error), generation, (state) =>
+        modifyFields(state, { maybeActive: () => Option.none() })
+      ),
     }),
 
-    FailedDrawCandles: ({ reason }) => ({
+    SucceededMountChart: () => ({ model }),
+
+    FailedMountChart: ({ reason }) => ({
       model: mapChart(model, (state) =>
+        modifyFields(state, { maybeChartError: () => Option.some(reason) })
+      ),
+    }),
+
+    ReceivedCandles: ({ generation, candleCount }) => ({
+      model: mapActiveCandles(model, generation, (state) =>
+        modifyFields(state, {
+          maybeActive: Option.map((active) =>
+            modifyFields(active, { candleCount: () => candleCount })
+          ),
+        })
+      ),
+    }),
+
+    FailedDrawCandles: ({ generation, reason }) => ({
+      model: mapActiveCandles(model, generation, (state) =>
         modifyFields(state, { maybeChartError: () => Option.some(reason) })
       ),
     }),
   })
 
-/** Release the live feed. The Model stays as the record of a closed channel. */
+/**
+ * Release the live feed. The Model stays as the record of a closed channel, keeping the
+ * protocol identity it had if it was ever opened.
+ */
 export const close = (model: Model): UpdateReturn => ({
   model: modifyFields(model, {
-    channelState: () => DXLinkChannelState.CLOSED,
+    lifecycle: (lifecycle) =>
+      Lifecycle.match(lifecycle, {
+        Opening: () => Lifecycle.Closed({ maybeChannel: Option.none() }),
+        Opened: ({ channel }) => Lifecycle.Closed({ maybeChannel: Option.some(channel) }),
+        FailedToOpen: () => Lifecycle.Closed({ maybeChannel: Option.none() }),
+        Closed: () => lifecycle,
+      }),
   }),
   commands: [CloseChannel({ channelId: model.channelId })],
 })

@@ -83,6 +83,18 @@ export const ConnectionForm = Schema.Struct({
 export type ConnectionForm = typeof ConnectionForm.Type
 
 /**
+ * What the user did with a channel's card.
+ *
+ * Closing is terminal: the card stays as a header-only record and cannot be reopened, so a
+ * closed card has no expansion to remember. A collapsed card keeps its body, hidden.
+ */
+export const ChannelCard = defineTaggedUnion({
+  Open: { isExpanded: Schema.Boolean },
+  Closed: {},
+})
+export type ChannelCard = typeof ChannelCard.Type
+
+/**
  * One channel card.
  *
  * `model` is opaque: it was produced by the plugin named by `kind` and is only ever handed
@@ -93,10 +105,7 @@ export const ChannelEntry = Schema.Struct({
   /** The card's own id, unique for the lifetime of the console. Not the protocol channel id. */
   id: Schema.String,
   kind: Schema.String,
-  title: Schema.String,
-  isExpanded: Schema.Boolean,
-  /** Closing is terminal: the card stays as a header-only record and cannot be reopened. */
-  isClosed: Schema.Boolean,
+  card: ChannelCard,
   model: ErasedChannel.Model,
 })
 export type ChannelEntry = typeof ChannelEntry.Type

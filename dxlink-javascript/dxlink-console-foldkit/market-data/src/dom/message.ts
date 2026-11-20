@@ -21,7 +21,9 @@ export const Message = defineMessageUnion({
   UpdatedAcceptDepthLimit: { value: Schema.String },
   UpdatedAcceptOrderFields: { value: Schema.String },
   ClickedApplyConfiguration: {},
-  CompletedConfigureDomChannel: {},
-  CompletedCloseDomChannel: {},
+  SucceededConfigureDomChannel: {},
+  FailedConfigureDomChannel: { error: ReportedError },
+  SucceededCloseDomChannel: {},
+  FailedCloseDomChannel: { error: ReportedError },
 })
 export type Message = typeof Message.Type

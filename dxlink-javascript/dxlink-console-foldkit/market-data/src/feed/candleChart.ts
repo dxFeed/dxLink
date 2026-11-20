@@ -1,3 +1,5 @@
+import { Option } from 'effect'
+
 import { type Chart, createChart } from '@devexperts/dxcharts-lite'
 
 import type { DXLinkCandleEvent } from './candles'
@@ -127,7 +129,7 @@ const schemeOf = (element: Element): Scheme =>
   element.closest('.dark') === null ? 'Light' : 'Dark'
 
 /**
- * Where a channel's candles are drawn.
+ * Where a channel's candles are drawn. One belongs to each open candle channel, in its handle.
  *
  * It outlives the chart it draws on: candles can arrive before the chart's element is in the
  * DOM, and a chart fixes its colours at creation, so following a light/dark switch means
@@ -202,23 +204,31 @@ export class CandleChartSink {
 const sinksByChannelId = new Map<string, CandleChartSink>()
 
 /**
- * The chart sink of a channel, created on first use.
+ * The sink of each open candle channel, for the Mount that builds its chart.
  *
- * A registry at module scope rather than a service: the Mount that builds the chart can
- * require nothing but its own scope, and it and the Command that opens the candle feed both
- * need the sink without either being guaranteed to run first.
+ * At module scope because a Mount is the only code handed the chart's element, and a Mount's
+ * Effect runs with its own Scope and nothing else: it cannot require the `FeedLive` service
+ * that holds the channel's handle. This map is the bridge from the channel id in the Mount's
+ * args to the sink in that handle.
+ *
+ * It owns nothing and creates nothing. A sink is registered when its channel's handle is put
+ * and unregistered when that handle is taken, so an entry lives exactly as long as the handle
+ * beside it: a channel that failed to open never has one, closing a channel or ending its
+ * session removes it, and the `FeedLive` layer empties the map when it is released. A Mount
+ * only looks a sink up.
  */
-export const sinkFor = (channelId: string): CandleChartSink => {
-  const existing = sinksByChannelId.get(channelId)
-  if (existing !== undefined) {
-    return existing
-  }
-  const sink = new CandleChartSink()
+export const registerSink = (channelId: string, sink: CandleChartSink): void => {
   sinksByChannelId.set(channelId, sink)
-
-  return sink
 }
 
-export const dropSink = (channelId: string): void => {
+export const unregisterSink = (channelId: string): void => {
   sinksByChannelId.delete(channelId)
+}
+
+/** The sink of an open candle channel; `None` once the channel is closed, or if it never opened. */
+export const findSink = (channelId: string): Option.Option<CandleChartSink> =>
+  Option.fromNullishOr(sinksByChannelId.get(channelId))
+
+export const unregisterAllSinks = (): void => {
+  sinksByChannelId.clear()
 }

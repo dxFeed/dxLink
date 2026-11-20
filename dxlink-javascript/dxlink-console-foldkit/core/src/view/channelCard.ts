@@ -5,7 +5,7 @@ import type { ChannelSummary, RegisteredChannelPlugin } from '../channel/plugin'
 import { channelElementId } from '../command'
 import * as Kit from '../kit'
 import { Message } from '../message'
-import type { ChannelEntry } from '../model'
+import { ChannelCard, type ChannelEntry } from '../model'
 import { errorCenter } from './errorCenter'
 
 const EMPTY_SUMMARY: ChannelSummary = {
@@ -39,12 +39,18 @@ export const channelCard = <Services>(
     Array.join(' · ')
   )
   const parameters = Record.toEntries(summary.parameters)
+  const title = `${plugin.label} #${channel.id}`
+  const isClosed = channel.card._tag === 'Closed'
+  const isExpanded = ChannelCard.match(channel.card, {
+    Open: (card) => card.isExpanded,
+    Closed: () => false,
+  })
 
   return h.section(
     [
       h.Id(channelElementId(channel.id)),
       h.Class(`scroll-mt-20 ${Kit.CARD_CLASS}`),
-      h.AriaLabel(channel.title),
+      h.AriaLabel(title),
     ],
     [
       h.header(
@@ -53,7 +59,7 @@ export const channelCard = <Services>(
           h.span(
             [
               h.Class(
-                channel.isClosed
+                isClosed
                   ? 'flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600'
                   : 'flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-200 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100'
               ),
@@ -64,15 +70,15 @@ export const channelCard = <Services>(
             [h.Class('min-w-0 grow')],
             [
               h.h3(
-                [h.Class(channel.isClosed ? `font-bold ${Kit.MUTED_TEXT_CLASS}` : 'font-bold')],
-                [channel.title]
+                [h.Class(isClosed ? `font-bold ${Kit.MUTED_TEXT_CLASS}` : 'font-bold')],
+                [title]
               ),
               subheader === ''
                 ? h.empty
                 : h.p([h.Class(`truncate text-sm ${Kit.MUTED_TEXT_CLASS}`)], [subheader]),
             ]
           ),
-          channel.isClosed
+          isClosed
             ? Kit.chip('closed', 'Neutral', h)
             : h.div(
                 [h.Class('flex items-center gap-1')],
@@ -94,9 +100,9 @@ export const channelCard = <Services>(
                   }),
                   Kit.iconButton(
                     {
-                      label: channel.isExpanded ? 'Collapse' : 'Expand',
+                      label: isExpanded ? 'Collapse' : 'Expand',
                       iconPath: Kit.ICON_CHEVRON_DOWN,
-                      iconClass: channel.isExpanded
+                      iconClass: isExpanded
                         ? 'size-5 rotate-180 transition-transform'
                         : 'size-5 transition-transform',
                       onClick: Message.ClickedToggleChannel({
@@ -119,10 +125,10 @@ export const channelCard = <Services>(
               ),
         ]
       ),
-      channel.isClosed
+      isClosed
         ? h.empty
         : h.div(
-            [h.Class(channel.isExpanded ? 'px-4 pb-4' : 'hidden px-4 pb-4')],
+            [h.Class(isExpanded ? 'px-4 pb-4' : 'hidden px-4 pb-4')],
             [
               Array.match(parameters, {
                 onEmpty: () => h.empty,
