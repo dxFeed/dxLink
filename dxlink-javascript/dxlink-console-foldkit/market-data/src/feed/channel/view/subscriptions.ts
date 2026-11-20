@@ -2,6 +2,7 @@ import { Array, Option, Record, pipe } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
 import { Kit } from '@dxfeed/dxlink-console-foldkit-core'
+import { Tabs } from '@foldkit/ui'
 
 import {
   CANDLE_SYMBOLS_DOC_URL,
@@ -17,11 +18,17 @@ import {
   ICON_PLUS,
   ICON_SWEEP,
   docLink,
-  segmented,
+  segmentedRadioGroup,
   withHelp,
 } from '../../viewKit'
 import { Message } from '../message'
-import type { ConfigurationForm, Model, SubscriptionsState } from '../model'
+import {
+  type ConfigurationForm,
+  EventTypeTabs,
+  type Model,
+  SubscriptionKindRadioGroup,
+  type SubscriptionsState,
+} from '../model'
 import { activeEventType, displayedEvents, formToSubscription, rowsOf } from '../update'
 
 /**
@@ -29,6 +36,18 @@ import { activeEventType, displayedEvents, formToSubscription, rowsOf } from '..
  * so a broad subscription is cut off here; every row is still counted, kept and copied.
  */
 export const MAX_RENDERED_ROWS = 500
+
+const SUBSCRIPTION_KINDS: ReadonlyArray<Feed.SubscriptionKind> = [
+  'Regular',
+  'Indexed',
+  'TimeSeries',
+]
+
+const SUBSCRIPTION_KIND_LABELS: Readonly<Record<Feed.SubscriptionKind, string>> = {
+  Regular: 'Regular',
+  Indexed: 'Indexed',
+  TimeSeries: 'Time series',
+}
 
 const definitionRow = (label: string, value: string, h: HtmlBuilder<Message>): Html =>
   h.div(
@@ -298,19 +317,19 @@ const subscriptionSection = (
         [],
         [
           // NOTE: the channel uses the AUTO contract, which accepts all three shapes.
-          segmented(
-            {
-              label: 'Subscription kind',
-              value: form.kind,
-              options: [
-                { value: 'Regular', label: 'Regular' },
-                { value: 'Indexed', label: 'Indexed' },
-                { value: 'TimeSeries', label: 'Time series' },
-              ],
-              onSelect: (kind) => Message.SelectedSubscriptionKind({ kind }),
+          h.submodel({
+            slotId: state.subscriptionKindRadioGroup.id,
+            model: state.subscriptionKindRadioGroup,
+            view: SubscriptionKindRadioGroup.view,
+            viewInputs: {
+              options: SUBSCRIPTION_KINDS,
+              selectedValue: Option.some(form.kind),
+              ariaLabel: 'Subscription kind',
+              orientation: 'Horizontal',
+              toView: segmentedRadioGroup(SUBSCRIPTION_KIND_LABELS, h),
             },
-            h
-          ),
+            toParentMessage: (message) => Message.GotSubscriptionKindRadioGroupMessage({ message }),
+          }),
         ]
       ),
       Kit.suggestions(typesListId, EventTypes.EVENT_TYPES, h),
@@ -489,121 +508,130 @@ export const eventsSection = (state: SubscriptionsState, h: HtmlBuilder<Message>
         Option.getOrElse(Record.get(state.applied.eventFields, active), () => [])
       )
 
-      return h.div(
-        [h.Class('flex flex-col gap-2')],
-        [
-          h.div(
-            [h.Class('flex items-center justify-between gap-2')],
-            [
-              h.div(
-                [
-                  h.Role('tablist'),
-                  h.AriaLabel('Event types'),
-                  h.Class('flex min-w-0 grow gap-1 overflow-x-auto'),
-                ],
-                Array.map(Record.keys(events), (type) =>
-                  h.keyed('button')(
-                    type,
-                    [
-                      h.Type('button'),
-                      h.Role('tab'),
-                      h.AriaSelected(type === active),
-                      h.OnClick(Message.SelectedEventType({ type })),
-                      h.Class(
-                        type === active
-                          ? 'shrink-0 border-b-2 border-sky-600 px-3 py-2 text-sm font-semibold text-sky-700 dark:border-sky-400 dark:text-sky-300'
-                          : 'shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
-                      ),
-                    ],
-                    [`${type} (${rowsOf(events, type).length})`]
-                  )
-                )
-              ),
-              h.div(
-                [h.Class('flex shrink-0 gap-1')],
-                [
-                  pauseButton,
-                  Kit.iconButton(
-                    {
-                      label: 'Clear',
-                      iconPath: ICON_SWEEP,
-                      onClick: Message.ClickedClearEvents(),
-                    },
-                    h
-                  ),
-                  Kit.iconButton(
-                    {
-                      label: 'Copy as JSON',
-                      iconPath: ICON_COPY,
-                      onClick: Message.ClickedCopyEvents(),
-                    },
-                    h
-                  ),
-                ]
-              ),
-            ]
-          ),
-          h.div(
-            [
-              h.Role('tabpanel'),
-              h.Class(`h-72 overflow-auto rounded-md border ${Kit.DIVIDER_CLASS}`),
-            ],
-            [
-              h.table(
-                [h.Class('w-full border-collapse text-left text-xs')],
-                [
-                  h.thead(
-                    [h.Class('sticky top-0 bg-zinc-100 dark:bg-zinc-800')],
-                    [
-                      h.tr(
-                        [],
-                        Array.map(columns, (column) =>
-                          h.keyed('th')(
-                            column,
-                            [
-                              h.Scope('col'),
-                              h.Class('px-2 py-1.5 font-semibold whitespace-nowrap'),
-                            ],
-                            [column]
-                          )
-                        )
-                      ),
-                    ]
-                  ),
-                  h.tbody(
-                    [],
-                    Array.map(rendered, ({ key, event }) =>
-                      h.keyed('tr')(
-                        key,
-                        [
-                          h.Class(
-                            `border-t ${Kit.DIVIDER_CLASS} hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
-                          ),
-                        ],
-                        Array.map(columns, (column) =>
-                          h.keyed('td')(
-                            column,
-                            [h.Class('px-2 py-1 font-mono whitespace-nowrap')],
-                            [Feed.formatCell(event[column])]
-                          )
-                        )
-                      )
+      const tabsView = ({ tablist, tabs, activeIndex }: Tabs.RenderInfo<string>): Html =>
+        h.div(
+          [h.Class('flex flex-col gap-2')],
+          [
+            h.div(
+              [h.Class('flex items-center justify-between gap-2')],
+              [
+                h.div(
+                  [...tablist, h.Class('flex min-w-0 grow gap-1 overflow-x-auto')],
+                  Array.map(tabs, (tab) =>
+                    h.keyed('button')(
+                      tab.value,
+                      [
+                        ...tab.tab,
+                        h.Class(
+                          'shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium data-[selected]:border-sky-600 data-[selected]:font-semibold data-[selected]:text-sky-700 dark:data-[selected]:border-sky-400 dark:data-[selected]:text-sky-300 not-data-[selected]:text-zinc-600 not-data-[selected]:hover:text-zinc-900 dark:not-data-[selected]:text-zinc-400 dark:not-data-[selected]:hover:text-zinc-100'
+                        ),
+                      ],
+                      [`${tab.value} (${rowsOf(events, tab.value).length})`]
                     )
-                  ),
-                ]
-              ),
-            ]
-          ),
-          rows.length > MAX_RENDERED_ROWS
-            ? h.p(
-                [h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)],
-                [
-                  `Showing the first ${MAX_RENDERED_ROWS} of ${rows.length} rows; Copy as JSON includes all of them.`,
-                ]
-              )
-            : h.empty,
-        ]
-      )
+                  )
+                ),
+                h.div(
+                  [h.Class('flex shrink-0 gap-1')],
+                  [
+                    pauseButton,
+                    Kit.iconButton(
+                      {
+                        label: 'Clear',
+                        iconPath: ICON_SWEEP,
+                        onClick: Message.ClickedClearEvents(),
+                      },
+                      h
+                    ),
+                    Kit.iconButton(
+                      {
+                        label: 'Copy as JSON',
+                        iconPath: ICON_COPY,
+                        onClick: Message.ClickedCopyEvents(),
+                      },
+                      h
+                    ),
+                  ]
+                ),
+              ]
+            ),
+            ...Array.map(
+              Array.filter(tabs, (tab) => tab.index === activeIndex),
+              (tab) =>
+                h.div(
+                  [
+                    ...tab.panel,
+                    h.Class(`h-72 overflow-auto rounded-md border ${Kit.DIVIDER_CLASS}`),
+                  ],
+                  [
+                    h.table(
+                      [h.Class('w-full border-collapse text-left text-xs')],
+                      [
+                        h.thead(
+                          [h.Class('sticky top-0 bg-zinc-100 dark:bg-zinc-800')],
+                          [
+                            h.tr(
+                              [],
+                              Array.map(columns, (column) =>
+                                h.keyed('th')(
+                                  column,
+                                  [
+                                    h.Scope('col'),
+                                    h.Class('px-2 py-1.5 font-semibold whitespace-nowrap'),
+                                  ],
+                                  [column]
+                                )
+                              )
+                            ),
+                          ]
+                        ),
+                        h.tbody(
+                          [],
+                          Array.map(rendered, ({ key, event }) =>
+                            h.keyed('tr')(
+                              key,
+                              [
+                                h.Class(
+                                  `border-t ${Kit.DIVIDER_CLASS} hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
+                                ),
+                              ],
+                              Array.map(columns, (column) =>
+                                h.keyed('td')(
+                                  column,
+                                  [h.Class('px-2 py-1 font-mono whitespace-nowrap')],
+                                  [Feed.formatCell(event[column])]
+                                )
+                              )
+                            )
+                          )
+                        ),
+                      ]
+                    ),
+                  ]
+                )
+            ),
+            rows.length > MAX_RENDERED_ROWS
+              ? h.p(
+                  [h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)],
+                  [
+                    `Showing the first ${MAX_RENDERED_ROWS} of ${rows.length} rows; Copy as JSON includes all of them.`,
+                  ]
+                )
+              : h.empty,
+          ]
+        )
+
+      return h.submodel({
+        slotId: state.eventTypeTabs.id,
+        model: state.eventTypeTabs,
+        view: EventTypeTabs.view,
+        viewInputs: {
+          tabs: Record.keys(events),
+          selectedValue: active,
+          ariaLabel: 'Event types',
+          toView: tabsView,
+        },
+        toParentMessage: (message) => Message.GotEventTypeTabsMessage({ message }),
+      })
     },
   })
 }

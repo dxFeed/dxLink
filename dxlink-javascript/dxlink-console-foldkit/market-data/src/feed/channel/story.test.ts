@@ -3,6 +3,7 @@ import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
+import { RadioGroup, Tabs } from '@foldkit/ui'
 
 import {
   AddSubscription,
@@ -47,8 +48,27 @@ const errorMessagesOf = (next: Model) => next.errorLog.errors.map((error) => err
 const order = (source: string) =>
   Feed.FeedSubscription.Indexed({ type: 'Order', symbol: 'AAPL', source })
 
+const SUBSCRIPTION_KINDS: ReadonlyArray<Feed.SubscriptionKind> = [
+  'Regular',
+  'Indexed',
+  'TimeSeries',
+]
+
+/** The subscription-kind control reporting that `kind` was chosen, focus Command settled. */
+const selectSubscriptionKind = (kind: Feed.SubscriptionKind) => [
+  message(
+    Message.GotSubscriptionKindRadioGroupMessage({
+      message: RadioGroup.Message.SelectedOption({
+        index: SUBSCRIPTION_KINDS.indexOf(kind),
+        value: kind,
+      }),
+    })
+  ),
+  Command.resolve(RadioGroup.FocusOption, RadioGroup.Message.CompletedFocusOption()),
+]
+
 const submitOrder = (source: string) => [
-  message(Message.SelectedSubscriptionKind({ kind: 'Indexed' })),
+  ...selectSubscriptionKind('Indexed'),
   message(Message.UpdatedSubscriptionType({ value: 'Order' })),
   message(Message.UpdatedSubscriptionSymbol({ value: ' AAPL ' })),
   message(Message.UpdatedSubscriptionSource({ value: source })),
@@ -298,7 +318,7 @@ describe('subscriptions', () => {
     story(
       update,
       given(subscriptionsModel),
-      message(Message.SelectedSubscriptionKind({ kind: 'Indexed' })),
+      ...selectSubscriptionKind('Indexed'),
       message(Message.UpdatedSubscriptionSymbol({ value: 'AAPL' })),
       message(Message.SubmittedSubscription()),
       Command.expectNone()
@@ -338,7 +358,7 @@ describe('subscriptions', () => {
     story(
       update,
       given(subscriptionsModel),
-      message(Message.SelectedSubscriptionKind({ kind: 'TimeSeries' })),
+      ...selectSubscriptionKind('TimeSeries'),
       message(Message.UpdatedSubscriptionType({ value: 'DailyCandle' })),
       message(Message.UpdatedSubscriptionSymbol({ value: 'AAPL{=d}' })),
       message(Message.UpdatedSubscriptionFromTime({ value: '12ab3' })),
@@ -541,7 +561,13 @@ describe('events', () => {
       model((next) => {
         expect(Option.flatMap(stateOf(next), activeEventType)).toEqual(Option.some('Quote'))
       }),
-      message(Message.SelectedEventType({ type: 'Trade' })),
+      message(
+        Message.GotEventTypeTabsMessage({
+          message: Tabs.Message.SelectedTab({ index: 1, value: 'Trade' }),
+        })
+      ),
+      Command.expectExact(Tabs.FocusTab({ id: 'feed-1-event-types', index: 1 })),
+      Command.resolve(Tabs.FocusTab, Tabs.Message.CompletedFocusTab()),
       model((next) => {
         expect(Option.flatMap(stateOf(next), activeEventType)).toEqual(Option.some('Trade'))
       }),

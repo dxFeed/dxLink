@@ -2,6 +2,7 @@ import { Array } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
 import { Kit } from '@dxfeed/dxlink-console-foldkit-core'
+import { RadioGroup } from '@foldkit/ui'
 
 export const ICON_PLUS = 'M12 4.5v15m7.5-7.5h-15'
 export const ICON_SWEEP =
@@ -14,40 +15,36 @@ export const ICON_COPY =
 export const ICON_CANDLES =
   'M7.5 3v3m0 9v6m0-15a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 7.5 15m0-9A1.5 1.5 0 0 1 9 7.5v6A1.5 1.5 0 0 1 7.5 15m9-12v6m0 6v6m0-12a1.5 1.5 0 0 0-1.5 1.5v3a1.5 1.5 0 0 0 1.5 1.5m0-6a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5'
 
-/** An exclusive choice among a few options, drawn as joined buttons. */
-export const segmented = <Message, Value extends string>(
-  config: Readonly<{
-    label: string
-    value: Value
-    options: ReadonlyArray<Readonly<{ value: Value; label: string }>>
-    onSelect: (value: Value) => Message
-  }>,
-  h: HtmlBuilder<Message>
-): Html =>
-  h.div(
-    [
-      h.Role('radiogroup'),
-      h.AriaLabel(config.label),
-      h.Class('inline-flex overflow-hidden rounded-md border border-zinc-300 dark:border-zinc-700'),
-    ],
-    Array.map(config.options, (option) =>
-      h.keyed('button')(
-        option.value,
-        [
-          h.Type('button'),
-          h.Role('radio'),
-          h.AriaChecked(option.value === config.value),
-          h.OnClick(config.onSelect(option.value)),
-          h.Class(
-            option.value === config.value
-              ? 'border-r border-zinc-300 bg-zinc-200 px-3 py-1.5 text-xs font-semibold last:border-r-0 dark:border-zinc-700 dark:bg-zinc-700'
-              : 'border-r border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 last:border-r-0 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800'
-          ),
-        ],
-        [option.label]
+/**
+ * The layout of a radio group drawn as joined buttons, one per option, each captioned by its
+ * entry in `labels`.
+ */
+export const segmentedRadioGroup =
+  <Message, Value extends string>(
+    labels: Readonly<Record<Value, string>>,
+    h: HtmlBuilder<Message>
+  ) =>
+  ({ group, options }: RadioGroup.RenderInfo<Value>): Html =>
+    h.div(
+      [
+        ...group,
+        h.Class(
+          'inline-flex overflow-hidden rounded-md border border-zinc-300 dark:border-zinc-700'
+        ),
+      ],
+      Array.map(options, (option) =>
+        h.keyed('button')(
+          option.value,
+          [
+            ...option.option,
+            h.Class(
+              'border-r border-zinc-300 px-3 py-1.5 text-xs font-medium last:border-r-0 dark:border-zinc-700 data-[checked]:bg-zinc-200 data-[checked]:font-semibold dark:data-[checked]:bg-zinc-700 not-data-[checked]:text-zinc-600 not-data-[checked]:hover:bg-zinc-100 dark:not-data-[checked]:text-zinc-300 dark:not-data-[checked]:hover:bg-zinc-800'
+            ),
+          ],
+          [h.span([...option.label], [labels[option.value]])]
+        )
       )
     )
-  )
 
 /** An external documentation link, sized by the text around it. */
 export const docLink = <Message>(href: string, text: string, h: HtmlBuilder<Message>): Html =>

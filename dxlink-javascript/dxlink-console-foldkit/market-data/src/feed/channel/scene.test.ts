@@ -8,6 +8,7 @@ import {
   expect,
   expectAll,
   given,
+  keydown,
   label,
   nth,
   role,
@@ -18,6 +19,7 @@ import {
 import { describe, test } from 'vitest'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
+import { RadioGroup, Tabs } from '@foldkit/ui'
 
 import {
   AddSubscription,
@@ -63,6 +65,15 @@ const quote = (bidPrice: number) => ({
 })
 
 const acknowledgeChartMount = Mount.resolve(MountChart, Message.SucceededMountChart())
+
+const resolveFocusOption = Command.resolve(
+  RadioGroup.FocusOption,
+  RadioGroup.Message.CompletedFocusOption()
+)
+
+const resolveFocusTab = Command.resolve(Tabs.FocusTab, Tabs.Message.CompletedFocusTab())
+
+const trade = (price: number) => ({ eventType: 'Trade', eventSymbol: 'AAPL', price })
 
 const columnHeaders = all.role('columnheader')
 
@@ -174,6 +185,7 @@ describe('subscriptions view', () => {
       given(subscriptionsModel),
       expect(label('Order source')).toBeAbsent(),
       click(role('radio', { name: 'Indexed' })),
+      resolveFocusOption,
       type(label('Symbol'), 'AAPL'),
       expect(role('button', { name: 'Add' })).toBeDisabled(),
       type(label('Order source'), 'NTV'),
@@ -225,6 +237,81 @@ describe('subscriptions view', () => {
       expect(nth(columnHeaders, 4)).toHaveText('sequence'),
       expect(nth(all.role('cell'), 2)).toHaveText('200'),
       expect(nth(all.role('cell'), 3)).toHaveText('100')
+    )
+  })
+
+  test('the subscription kind follows a click and the arrow keys', () => {
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      expect(role('radio', { name: 'Regular', checked: true })).toExist(),
+      click(role('radio', { name: 'Time series' })),
+      Command.expectExact(RadioGroup.FocusOption({ id: 'feed-1-subscription-kind', index: 2 })),
+      resolveFocusOption,
+      expect(role('radio', { name: 'Time series', checked: true })).toExist(),
+      expect(role('radio', { name: 'Regular', checked: false })).toExist(),
+      expect(label('From time')).toExist(),
+      keydown(role('radio', { name: 'Time series' }), 'ArrowLeft'),
+      resolveFocusOption,
+      expect(role('radio', { name: 'Indexed', checked: true })).toExist(),
+      expect(label('Order source')).toExist(),
+      expect(label('From time')).toBeAbsent()
+    )
+  })
+
+  test('each event type with rows has a tab, and the selected one shows its rows', () => {
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      Subscription.emit(Message.ReceivedEvents({ events: [quote(100), trade(55)] })),
+      expectAll(all.role('tab')).toHaveCount(2),
+      expect(nth(all.role('tab'), 0)).toHaveText('Quote (1)'),
+      expect(nth(all.role('tab'), 1)).toHaveText('Trade (1)'),
+      expect(role('tab', { name: 'Quote (1)', selected: true })).toExist(),
+      expect(role('tabpanel', { name: 'Quote (1)' })).toExist(),
+      expect(role('cell', { name: '100' })).toExist(),
+      click(role('tab', { name: 'Trade (1)' })),
+      Command.expectExact(Tabs.FocusTab({ id: 'feed-1-event-types', index: 1 })),
+      resolveFocusTab,
+      expect(role('tab', { name: 'Trade (1)', selected: true })).toExist(),
+      expect(role('tab', { name: 'Quote (1)', selected: false })).toExist(),
+      expect(role('tabpanel', { name: 'Trade (1)' })).toExist(),
+      expect(role('cell', { name: '55' })).toExist(),
+      expect(role('cell', { name: '100' })).toBeAbsent()
+    )
+  })
+
+  test('the arrow keys move the selected event type along the tabs and wrap around', () => {
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      Subscription.emit(Message.ReceivedEvents({ events: [quote(100), trade(55)] })),
+      keydown(role('tab', { name: 'Quote (1)' }), 'ArrowRight'),
+      Command.expectExact(Tabs.FocusTab({ id: 'feed-1-event-types', index: 1 })),
+      resolveFocusTab,
+      expect(role('tab', { name: 'Trade (1)', selected: true })).toExist(),
+      expect(role('cell', { name: '55' })).toExist(),
+      keydown(role('tab', { name: 'Trade (1)' }), 'ArrowRight'),
+      resolveFocusTab,
+      expect(role('tab', { name: 'Quote (1)', selected: true })).toExist(),
+      expect(role('cell', { name: '100' })).toExist()
+    )
+  })
+
+  test('when the selected event type has no rows left, the first remaining type is shown', () => {
+    scene(
+      { update, view },
+      given(subscriptionsModel),
+      Subscription.emit(Message.ReceivedEvents({ events: [quote(100), trade(55)] })),
+      click(role('tab', { name: 'Trade (1)' })),
+      resolveFocusTab,
+      click(role('button', { name: 'Pause' })),
+      click(role('button', { name: 'Clear' })),
+      Subscription.emit(Message.ReceivedEvents({ events: [quote(101)] })),
+      click(role('button', { name: 'Resume' })),
+      expectAll(all.role('tab')).toHaveCount(1),
+      expect(role('tab', { name: 'Quote (1)', selected: true })).toExist(),
+      expect(role('cell', { name: '101' })).toExist()
     )
   })
 

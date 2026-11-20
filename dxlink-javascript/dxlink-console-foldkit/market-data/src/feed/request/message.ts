@@ -1,10 +1,10 @@
 import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
-import { Feed } from '../domain'
+import { RadioGroup } from '@foldkit/ui'
 
 export const Message = defineMessageUnion({
-  SelectedView: { view: Feed.FeedView },
+  GotViewRadioGroupMessage: { message: RadioGroup.Message },
   UpdatedFeed: { value: Schema.String },
   UpdatedSpace: { value: Schema.String },
   ToggledFeedSection: { isOpen: Schema.Boolean },

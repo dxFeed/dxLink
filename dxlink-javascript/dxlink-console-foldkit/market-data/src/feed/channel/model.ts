@@ -3,6 +3,7 @@ import { defineTaggedUnion } from 'foldkit/schema'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
 import { ErrorLog } from '@dxfeed/dxlink-console-foldkit-core'
+import { RadioGroup, Tabs } from '@foldkit/ui'
 
 import { Feed } from '../domain'
 
@@ -52,6 +53,8 @@ export type EventsTable = typeof EventsTable.Type
 
 export const SubscriptionsState = Schema.Struct({
   form: SubscriptionForm,
+  /** Keyboard-focus state of the control that chooses the form's subscription kind. */
+  subscriptionKindRadioGroup: RadioGroup.Model,
   configuration: ConfigurationForm,
   /** The subscriptions the feed accepted, in the order they were added. */
   subscriptions: Schema.Array(Feed.FeedSubscription),
@@ -61,8 +64,16 @@ export const SubscriptionsState = Schema.Struct({
   table: EventsTable,
   /** The selected event-type tab; `None` follows the first type received. */
   maybeActiveType: Schema.Option(Schema.String),
+  /** Keyboard-focus state of the event-type tabs. */
+  eventTypeTabs: Tabs.Model,
 })
 export type SubscriptionsState = typeof SubscriptionsState.Type
+
+/** The control that chooses the kind of subscription the form adds. */
+export const SubscriptionKindRadioGroup = RadioGroup.create<Feed.SubscriptionKind>()
+
+/** The tabs of the events table, one per event type that has rows. */
+export const EventTypeTabs = Tabs.create<string>()
 
 export const CandleSubscription = Schema.Struct({
   symbol: Schema.String,

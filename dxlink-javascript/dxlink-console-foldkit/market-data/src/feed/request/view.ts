@@ -1,10 +1,19 @@
+import { Option } from 'effect'
 import { Submodel } from 'foldkit'
 
 import { Kit } from '@dxfeed/dxlink-console-foldkit-core'
 
-import { segmented } from '../viewKit'
+import type { Feed } from '../domain'
+import { segmentedRadioGroup } from '../viewKit'
 import { Message } from './message'
-import type { Model } from './model'
+import { type Model, ViewRadioGroup } from './model'
+
+const FEED_VIEWS: ReadonlyArray<Feed.FeedView> = ['Subscriptions', 'Chart']
+
+const FEED_VIEW_LABELS: Readonly<Record<Feed.FeedView, string>> = {
+  Subscriptions: 'Subscriptions',
+  Chart: 'Candle chart',
+}
 
 /** Feed channel request form: which view to open, and the optional feed parameters. */
 export const view = Submodel.defineView<Model, Message>((model, h) =>
@@ -18,18 +27,19 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
           h.div(
             [],
             [
-              segmented(
-                {
-                  label: 'View',
-                  value: model.view,
-                  options: [
-                    { value: 'Subscriptions', label: 'Subscriptions' },
-                    { value: 'Chart', label: 'Candle chart' },
-                  ],
-                  onSelect: (selected) => Message.SelectedView({ view: selected }),
+              h.submodel({
+                slotId: model.viewRadioGroup.id,
+                model: model.viewRadioGroup,
+                view: ViewRadioGroup.view,
+                viewInputs: {
+                  options: FEED_VIEWS,
+                  selectedValue: Option.some(model.view),
+                  ariaLabel: 'View',
+                  orientation: 'Horizontal',
+                  toView: segmentedRadioGroup(FEED_VIEW_LABELS, h),
                 },
-                h
-              ),
+                toParentMessage: (message) => Message.GotViewRadioGroupMessage({ message }),
+              }),
             ]
           ),
         ]

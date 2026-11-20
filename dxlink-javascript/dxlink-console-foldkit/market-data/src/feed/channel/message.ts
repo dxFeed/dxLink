@@ -2,6 +2,7 @@ import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { ReportedError } from '@dxfeed/dxlink-console-foldkit-core'
+import { RadioGroup, Tabs } from '@foldkit/ui'
 
 import { Feed } from '../domain'
 import { AppliedConfig, ChannelState } from './model'
@@ -16,7 +17,7 @@ export const Message = defineMessageUnion({
   ChangedChannelState: { channelState: ChannelState },
   ReportedChannelError: { error: ReportedError },
 
-  SelectedSubscriptionKind: { kind: Feed.SubscriptionKind },
+  GotSubscriptionKindRadioGroupMessage: { message: RadioGroup.Message },
   UpdatedSubscriptionType: { value: Schema.String },
   UpdatedSubscriptionSymbol: { value: Schema.String },
   UpdatedSubscriptionSource: { value: Schema.String },
@@ -44,7 +45,7 @@ export const Message = defineMessageUnion({
   ChangedAppliedConfig: { applied: AppliedConfig },
 
   ReceivedEvents: { events: Schema.Array(Feed.FeedEvent) },
-  SelectedEventType: { type: Schema.String },
+  GotEventTypeTabsMessage: { message: Tabs.Message },
   ClickedTogglePause: {},
   ClickedClearEvents: {},
   ClickedCopyEvents: {},

@@ -1,6 +1,8 @@
 import { Option } from 'effect'
-import { given, message, model, story } from 'foldkit/story'
+import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
+
+import { RadioGroup } from '@foldkit/ui'
 
 import { Message } from './message'
 import { init, toConfig, update } from './update'
@@ -10,7 +12,13 @@ describe('request', () => {
     story(
       update,
       given(init().model),
-      message(Message.SelectedView({ view: 'Chart' })),
+      message(
+        Message.GotViewRadioGroupMessage({
+          message: RadioGroup.Message.SelectedOption({ index: 1, value: 'Chart' }),
+        })
+      ),
+      Command.expectExact(RadioGroup.FocusOption({ id: 'feed-request-view', index: 1 })),
+      Command.resolve(RadioGroup.FocusOption, RadioGroup.Message.CompletedFocusOption()),
       message(Message.UpdatedFeed({ value: ' delayed ' })),
       model((request) => {
         expect(toConfig(request)).toEqual(

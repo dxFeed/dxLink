@@ -1,5 +1,5 @@
 import { Array, Match, Option, Record, Schema, pipe } from 'effect'
-import type { Update } from 'foldkit'
+import { Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 
 import { DXLinkChannelState } from '@dxfeed/dxlink-api'
@@ -9,6 +9,7 @@ import {
   emptyErrorLog,
   prependError,
 } from '@dxfeed/dxlink-console-foldkit-core'
+import { RadioGroup, Tabs } from '@foldkit/ui'
 
 import { Feed } from '../domain'
 import type { FeedServices } from '../live/service'
@@ -27,11 +28,13 @@ import {
   type ChartState,
   type ConfigurationForm,
   DataFormatChoice,
+  EventTypeTabs,
   EventsTable,
   Lifecycle,
   type Model,
   type OpenedChannel,
   type SubscriptionForm,
+  SubscriptionKindRadioGroup,
   type SubscriptionsState,
   View,
 } from './model'
@@ -46,8 +49,9 @@ const toNumber = (draft: string): number => {
 
 type UpdateReturn = Update.Return<Model, Message, FeedServices>
 
-const initialSubscriptionsState = (): SubscriptionsState => ({
+const initialSubscriptionsState = (channelId: string): SubscriptionsState => ({
   form: { kind: 'Regular', type: 'Quote', symbol: '', source: '', fromTime: '0' },
+  subscriptionKindRadioGroup: RadioGroup.init({ id: `feed-${channelId}-subscription-kind` }),
   configuration: {
     aggregationPeriod: '',
     dataFormat: '',
@@ -63,6 +67,7 @@ const initialSubscriptionsState = (): SubscriptionsState => ({
   },
   table: EventsTable.Live({ events: {} }),
   maybeActiveType: Option.none(),
+  eventTypeTabs: Tabs.init({ id: `feed-${channelId}-event-types` }),
 })
 
 const initialChartState = (): ChartState => ({
@@ -88,7 +93,7 @@ export const init = ({
     view:
       config.view === 'Chart'
         ? View.Chart({ state: initialChartState() })
-        : View.Subscriptions({ state: initialSubscriptionsState() }),
+        : View.Subscriptions({ state: initialSubscriptionsState(channelId) }),
   },
 })
 
@@ -241,6 +246,55 @@ export const rowsOf = (
 
 const isDataFormatChoice = Schema.is(DataFormatChoice)
 
+// SUBMODELS
+
+const foldSubscriptionKindRadioGroupOutMessage = RadioGroup.OutMessage.match<
+  Update.Step<Model, Message>,
+  RadioGroup.OutMessage<Feed.SubscriptionKind>
+>({
+  Selected:
+    ({ value }) =>
+    (model) => ({
+      model: mapForm(model, (form) => modifyFields(form, { kind: () => value })),
+    }),
+})
+
+const foldSubscriptionKindRadioGroup = Update.foldChild({
+  update: SubscriptionKindRadioGroup.update,
+  read: (model: Model) =>
+    Option.map(maybeSubscriptions(model), (state) => state.subscriptionKindRadioGroup),
+  write: (model, nextSubscriptionKindRadioGroup) =>
+    mapSubscriptions(model, (state) =>
+      modifyFields(state, { subscriptionKindRadioGroup: () => nextSubscriptionKindRadioGroup })
+    ),
+  toParentMessage: (message) => Message.GotSubscriptionKindRadioGroupMessage({ message }),
+  foldOutMessage: foldSubscriptionKindRadioGroupOutMessage,
+})
+
+const foldEventTypeTabsOutMessage = Tabs.OutMessage.match<
+  Update.Step<Model, Message>,
+  Tabs.OutMessage<string>
+>({
+  Selected:
+    ({ value }) =>
+    (model) => ({
+      model: mapSubscriptions(model, (state) =>
+        modifyFields(state, { maybeActiveType: () => Option.some(value) })
+      ),
+    }),
+})
+
+const foldEventTypeTabs = Update.foldChild({
+  update: EventTypeTabs.update,
+  read: (model: Model) => Option.map(maybeSubscriptions(model), (state) => state.eventTypeTabs),
+  write: (model, nextEventTypeTabs) =>
+    mapSubscriptions(model, (state) =>
+      modifyFields(state, { eventTypeTabs: () => nextEventTypeTabs })
+    ),
+  toParentMessage: (message) => Message.GotEventTypeTabsMessage({ message }),
+  foldOutMessage: foldEventTypeTabsOutMessage,
+})
+
 // UPDATE
 
 export const update = (model: Model, message: Message) =>
@@ -287,10 +341,8 @@ export const update = (model: Model, message: Message) =>
 
     ReportedChannelError: ({ error }) => ({ model: withError(model, error) }),
 
-    SelectedSubscriptionKind: ({ kind }) =>
-      whenOpened(model, () => ({
-        model: mapForm(model, (form) => modifyFields(form, { kind: () => kind })),
-      })),
+    GotSubscriptionKindRadioGroupMessage: ({ message }) =>
+      whenOpened(model, () => foldSubscriptionKindRadioGroup(model, message)),
 
     UpdatedSubscriptionType: ({ value }) =>
       whenOpened(model, () => ({
@@ -494,11 +546,7 @@ export const update = (model: Model, message: Message) =>
       ),
     }),
 
-    SelectedEventType: ({ type }) => ({
-      model: mapSubscriptions(model, (state) =>
-        modifyFields(state, { maybeActiveType: () => Option.some(type) })
-      ),
-    }),
+    GotEventTypeTabsMessage: ({ message }) => foldEventTypeTabs(model, message),
 
     ClickedTogglePause: () => ({
       model: mapTable(model, (table) =>
