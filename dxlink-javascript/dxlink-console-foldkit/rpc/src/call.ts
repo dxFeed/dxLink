@@ -5,8 +5,20 @@ import type { DescMethod, DescService, Message } from '@bufbuild/protobuf'
 import { type DXLinkClient, DXLinkLogLevel } from '@dxfeed/dxlink-api'
 import { createDXLinkDynamicService } from '@dxfeed/dxlink-protobuf-es'
 
-import { formatMessage, stringifyJson } from './descriptors'
-import type { CallEvent, CallHandle } from './service'
+import { Descriptors } from './domain'
+import type { CallHandle } from './service'
+
+/** What a live call reports on its own, before it is stamped with a time. */
+export type CallEvent =
+  | Readonly<{ _tag: 'Response'; json: string }>
+  | Readonly<{ _tag: 'Ended' }>
+  | Readonly<{ _tag: 'Failed'; type: string; message: string }>
+
+/** Why a call could not be made or continued, in the shape of a protocol error. */
+export type CallFailure = Readonly<{ type: string; message: string }>
+
+/** A failure the console found on its own side, which has no protocol error type. */
+export const unknownFailure = (message: string): CallFailure => ({ type: 'UNKNOWN', message })
 
 /**
  * A call's failure as a protocol error.
@@ -16,26 +28,23 @@ import type { CallEvent, CallHandle } from './service'
  * server already has a type and a message and is forwarded as it is; anything else — a
  * decode failure, say — is reported as UNKNOWN.
  */
-export const describeCallFailure = (error: unknown): Readonly<{ type: string; message: string }> =>
+export const describeCallFailure = (error: unknown): CallFailure =>
   Predicate.hasProperty(error, 'type') &&
   Predicate.isString(error.type) &&
   Predicate.hasProperty(error, 'message') &&
   Predicate.isString(error.message)
     ? { type: error.type, message: error.message }
-    : {
-        type: 'UNKNOWN',
-        message: error instanceof Error ? error.message : String(error),
-      }
+    : unknownFailure(error instanceof Error ? error.message : String(error))
 
 /** A message as the protobuf-JSON text that crosses the wire. */
 export const formatWireJson = (method: DescMethod, message: Message): string =>
-  stringifyJson(formatMessage(method.input, message))
+  Descriptors.stringifyJson(Descriptors.formatMessage(method.input, message))
 
 /**
  * Bind a service descriptor to the connection and call one method of it.
  *
  * Each call opens its own channel; cancelling the call releases it. Everything the call
- * reports afterwards goes to `emit`. Throws when the call cannot be made at all.
+ * reports afterwards goes to `onEvent`. Throws when the call cannot be made at all.
  *
  * A bidirectional call takes a stream of requests, and the transport subscribes to it only
  * once the channel is opened. A `ReplaySubject` holds what was sent before that — and
@@ -46,7 +55,7 @@ export const startCall = (
   service: DescService,
   method: DescMethod,
   request: Message,
-  emit: (event: CallEvent) => void
+  onEvent: (event: CallEvent) => void
 ): CallHandle => {
   const bound = createDXLinkDynamicService(client, service, {
     // NOTE: a descriptor chosen at runtime may declare methods the wire cannot carry; the
@@ -77,19 +86,19 @@ export const startCall = (
   const subscription = responses.subscribe({
     next: (response) => {
       try {
-        emit({
+        onEvent({
           _tag: 'Response',
-          json: stringifyJson(formatMessage(method.output, response)),
+          json: Descriptors.stringifyJson(Descriptors.formatMessage(method.output, response)),
         })
       } catch (error) {
-        emit({ _tag: 'Failed', ...describeCallFailure(error) })
+        onEvent({ _tag: 'Failed', ...describeCallFailure(error) })
       }
     },
     error: (error: unknown) => {
-      emit({ _tag: 'Failed', ...describeCallFailure(error) })
+      onEvent({ _tag: 'Failed', ...describeCallFailure(error) })
     },
     complete: () => {
-      emit({ _tag: 'Ended' })
+      onEvent({ _tag: 'Ended' })
     },
   })
 

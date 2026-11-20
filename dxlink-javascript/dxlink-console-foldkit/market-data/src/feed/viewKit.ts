@@ -71,27 +71,3 @@ export const withHelp = <Message>(
     [h.Class('flex min-w-0 flex-col gap-1')],
     [field, h.p([h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)], help)]
   )
-
-/** A collapsible outlined section; open or closed is the element's own state. */
-export const accordion = <Message>(
-  title: string,
-  body: ReadonlyArray<Html>,
-  h: HtmlBuilder<Message>
-): Html =>
-  h.details(
-    [h.Class(`group rounded-lg border ${Kit.DIVIDER_CLASS}`)],
-    [
-      h.summary(
-        [
-          h.Class(
-            'flex cursor-pointer list-none items-center justify-between px-4 py-3 font-semibold [&::-webkit-details-marker]:hidden'
-          ),
-        ],
-        [
-          title,
-          Kit.icon(Kit.ICON_CHEVRON_DOWN, h, 'size-5 transition-transform group-open:rotate-180'),
-        ]
-      ),
-      h.div([h.Class('px-4 pb-4')], body),
-    ]
-  )

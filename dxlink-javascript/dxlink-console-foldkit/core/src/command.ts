@@ -2,7 +2,7 @@ import { Effect, Redacted, Schema } from 'effect'
 import { Command, Dom } from 'foldkit'
 
 import { DxLinkClient } from './client'
-import { reportError } from './error'
+import { reportError } from './domain/error'
 import { Message } from './message'
 
 export const channelElementId = (channelId: string): string => `dxlink-channel-${channelId}`

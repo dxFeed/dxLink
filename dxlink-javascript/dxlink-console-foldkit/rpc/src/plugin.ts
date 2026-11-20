@@ -31,10 +31,10 @@ const ICON_SWAP_HORIZONTAL =
 export const rpcChannelPlugin = (
   options: RpcChannelPluginOptions = {}
 ): RegisteredChannelPlugin<RpcServices> => {
-  const request = Request.makeRequest({
+  const requestOptions: Request.RequestOptions = {
     descriptorSetUrl: options.descriptorSetUrl ?? '',
     isUrlLocked: options.locked ?? false,
-  })
+  }
 
   return defineChannelPlugin<
     Request.Model,
@@ -52,10 +52,12 @@ export const rpcChannelPlugin = (
     // services' forms are a handful of fields.
     dialogWidth: 'Wide',
     request: {
-      init: request.init,
-      update: request.update,
-      view: request.view,
+      init: Request.makeInit(requestOptions),
+      update: Request.makeUpdate(requestOptions),
+      view: Request.makeView(requestOptions),
       toConfig: Request.toConfig,
+      Model: Request.Model,
+      Message: Request.Message,
       isModel: Request.isModel,
       isMessage: Request.isMessage,
     },
@@ -65,10 +67,12 @@ export const rpcChannelPlugin = (
       view: Channel.view,
       summarize: Channel.summarize,
       close: Channel.close,
+      connect: Channel.connect,
+      Model: Channel.Model,
+      Message: Channel.Message,
       clearErrors: Channel.clearErrors,
       isModel: Channel.isModel,
       isMessage: Channel.isMessage,
     },
-    events: Channel.events,
   })
 }

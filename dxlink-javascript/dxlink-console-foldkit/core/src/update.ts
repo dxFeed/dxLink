@@ -8,8 +8,8 @@ import { Dialog } from '@foldkit/ui'
 import type { RegisteredChannelPlugin } from './channel/plugin'
 import type { DxLinkClientService } from './client'
 import { ReconnectClient, ScrollToChannel, SetAuthToken, StampAcquireFailure } from './command'
-import type { ConsoleConfig } from './config'
-import { clearErrors, emptyErrorLog, prependError } from './error'
+import type { ConsoleConfig } from './domain/config'
+import { clearErrors, emptyErrorLog, prependError } from './domain/error'
 import { Message } from './message'
 import {
   ChannelCard,
@@ -97,7 +97,6 @@ const toRequestMessage =
 
 export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>) => {
   type UpdateReturn = Update.Return<Model, Message, Services | DxLinkClientService>
-  type Commands = Update.Commands<Message, Services | DxLinkClientService>
 
   const foldRequestDialogOutMessage = Dialog.OutMessage.match<Update.Step<Model, Message>>({
     Opened: () => (model) => ({ model }),
@@ -137,42 +136,23 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
   })
 
   /**
-   * Close one channel through its plugin. The card stays, marked closed; a channel that is
-   * already closed, or whose plugin is not registered, is left as it is.
+   * Close one channel's card. The card stays, marked closed, and its plugin says how a closed
+   * channel reads; the live channel behind it is released by the Subscription that runs open
+   * cards. A card that is already closed, or whose plugin is not registered, is left as it is.
    */
-  const closeChannel = (
-    channel: ChannelEntry
-  ): Readonly<{ channel: ChannelEntry; commands?: Commands }> =>
+  const closeChannel = (channel: ChannelEntry): ChannelEntry =>
     pipe(
       findPlugin(plugins, channel.kind),
       Option.filter(() => channel.card._tag === 'Open'),
       Option.match({
-        onNone: () => ({ channel }),
-        onSome: (plugin) => {
-          const channelClose = plugin.close(channel.model)
-
-          return {
-            channel: modifyFields(channel, {
-              card: () => ChannelCard.Closed(),
-              model: () => channelClose.model,
-            }),
-            commands: Command.mapMessages(
-              channelClose.commands ?? [],
-              toChannelMessage(channel.id)
-            ),
-          }
-        },
+        onNone: () => channel,
+        onSome: (plugin) =>
+          modifyFields(channel, {
+            card: () => ChannelCard.Closed(),
+            model: plugin.close,
+          }),
       })
     )
-
-  /**
-   * End the current session's channels: every open one is closed through its plugin and the
-   * cards are dropped, so the next session starts with none.
-   */
-  const dropChannels = (model: Model): Readonly<{ model: Model; commands: Commands }> => ({
-    model: modifyFields(model, { channels: () => [] }),
-    commands: Array.flatMap(model.channels, (channel) => closeChannel(channel).commands ?? []),
-  })
 
   const init = (config: ConsoleConfig): UpdateReturn => {
     const requestInits = Array.map(plugins, (plugin) => ({
@@ -192,6 +172,7 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
         session: Session.Idle(),
         lastSessionId: 0,
         errorLog: emptyErrorLog(),
+        isErrorListOpen: false,
         authToken: Redacted.make(''),
         channels: [],
         nextChannelId: 1,
@@ -215,36 +196,30 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
         }),
       }),
 
+      // NOTE: a session takes its cards with it. Dropping them is also what releases the live
+      // channels, which exist only for open cards of the open session.
       ClickedConnect: () => {
-        const channelsDrop = dropChannels(model)
         const sessionId = model.lastSessionId + 1
 
         return {
-          model: modifyFields(channelsDrop.model, {
-            session: () =>
-              Session.Opening({
-                sessionId,
-                params: toClientParams(model.form),
-              }),
+          model: modifyFields(model, {
+            session: () => Session.Opening({ sessionId, params: toClientParams(model.form) }),
             lastSessionId: () => sessionId,
             errorLog: () => emptyErrorLog(),
+            isErrorListOpen: () => false,
+            channels: () => [],
           }),
-          commands: channelsDrop.commands,
         }
       },
 
       ClickedReconnect: () => ({ model, commands: [ReconnectClient()] }),
 
-      ClickedDisconnect: () => {
-        const channelsDrop = dropChannels(model)
-
-        return {
-          model: modifyFields(channelsDrop.model, {
-            session: () => Session.Idle(),
-          }),
-          commands: channelsDrop.commands,
-        }
-      },
+      ClickedDisconnect: () => ({
+        model: modifyFields(model, {
+          session: () => Session.Idle(),
+          channels: () => [],
+        }),
+      }),
 
       // NOTE: a client built for an earlier session can report in after the Model has moved
       // on, so only the acquisition of the session being opened is acted on.
@@ -317,7 +292,7 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
       }),
 
       ClickedClearConnectionErrors: () => ({
-        model: modifyFields(model, { errorLog: clearErrors }),
+        model: modifyFields(model, { errorLog: clearErrors, isErrorListOpen: () => false }),
       }),
 
       SucceededReconnectClient: () => ({ model }),
@@ -398,7 +373,7 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
                   channels: Array.append({
                     id: channelId,
                     kind: plugin.kind,
-                    card: ChannelCard.Open({ isExpanded: true }),
+                    card: ChannelCard.Open({ isExpanded: true, isErrorListOpen: false }),
                     model: channelInit.model,
                   }),
                   nextChannelId: (nextChannelId) => nextChannelId + 1,
@@ -452,7 +427,8 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
               ? modifyFields(channel, {
                   card: (card) =>
                     ChannelCard.match(card, {
-                      Open: ({ isExpanded }) => ChannelCard.Open({ isExpanded: !isExpanded }),
+                      Open: ({ isExpanded, isErrorListOpen }) =>
+                        ChannelCard.Open({ isExpanded: !isExpanded, isErrorListOpen }),
                       Closed: () => card,
                     }),
                 })
@@ -461,18 +437,34 @@ export const makeUpdate = <Services>(plugins: ReadonlyArray<RegisteredChannelPlu
         }),
       }),
 
-      ClickedCloseChannel: ({ channelId }) =>
-        Option.match(findChannel(model, channelId), {
-          onNone: (): UpdateReturn => ({ model }),
-          onSome: (channel) => {
-            const channelClose = closeChannel(channel)
-            const nextModel = writeChannel(model, channelClose.channel)
-
-            return channelClose.commands === undefined
-              ? { model: nextModel }
-              : { model: nextModel, commands: channelClose.commands }
-          },
+      ClickedCloseChannel: ({ channelId }) => ({
+        model: modifyFields(model, {
+          channels: Array.map((channel) =>
+            channel.id === channelId ? closeChannel(channel) : channel
+          ),
         }),
+      }),
+
+      ToggledChannelErrorList: ({ channelId, isOpen }) => ({
+        model: modifyFields(model, {
+          channels: Array.map((channel) =>
+            channel.id === channelId
+              ? modifyFields(channel, {
+                  card: (card) =>
+                    ChannelCard.match(card, {
+                      Open: ({ isExpanded }) =>
+                        ChannelCard.Open({ isExpanded, isErrorListOpen: isOpen }),
+                      Closed: () => card,
+                    }),
+                })
+              : channel
+          ),
+        }),
+      }),
+
+      ToggledConnectionErrorList: ({ isOpen }) => ({
+        model: modifyFields(model, { isErrorListOpen: () => isOpen }),
+      }),
 
       ClickedClearChannelErrors: ({ channelId }) => ({
         model: modifyFields(model, {

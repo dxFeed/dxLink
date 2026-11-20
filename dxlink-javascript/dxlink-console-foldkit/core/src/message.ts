@@ -5,7 +5,7 @@ import { Dialog } from '@foldkit/ui'
 
 import * as ErasedChannel from './channel/erasedChannel'
 import * as ErasedRequest from './channel/erasedRequest'
-import { ReportedError } from './error'
+import { ReportedError } from './domain/error'
 import { AuthState, ClientStatus, ConnectionField } from './model'
 
 export const Message = defineMessageUnion({
@@ -21,6 +21,7 @@ export const Message = defineMessageUnion({
   ChangedAuthState: { auth: AuthState },
   ReportedConnectionError: { error: ReportedError },
   ClickedClearConnectionErrors: {},
+  ToggledConnectionErrorList: { isOpen: Schema.Boolean },
   SucceededReconnectClient: {},
   FailedReconnectClient: { error: ReportedError },
   UpdatedAuthToken: { value: Schema.Redacted(Schema.String) },
@@ -38,6 +39,7 @@ export const Message = defineMessageUnion({
   ClickedToggleChannel: { channelId: Schema.String },
   ClickedCloseChannel: { channelId: Schema.String },
   ClickedClearChannelErrors: { channelId: Schema.String },
+  ToggledChannelErrorList: { channelId: Schema.String, isOpen: Schema.Boolean },
   CompletedScrollToChannel: {},
 })
 export type Message = typeof Message.Type

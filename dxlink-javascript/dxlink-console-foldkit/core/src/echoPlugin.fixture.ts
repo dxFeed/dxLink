@@ -1,4 +1,4 @@
-import { Option, Schema, Stream } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { Submodel } from 'foldkit'
 import { defineMessageUnion } from 'foldkit/message'
 
@@ -41,6 +41,8 @@ export const echoPlugin = defineChannelPlugin<
     }),
     view: Submodel.defineView<EchoRequest, EchoMessage>((_request, h) => h.div([])),
     toConfig: (request) => Option.liftPredicate(request.text.trim(), (text) => text !== ''),
+    Model: EchoRequest,
+    Message: EchoMessage,
     isModel: Schema.is(EchoRequest),
     isMessage: Schema.is(EchoMessage),
   },
@@ -59,10 +61,12 @@ export const echoPlugin = defineChannelPlugin<
       parameters: {},
       errors: [],
     }),
-    close: (channel) => ({ model: { ...channel, isClosed: true } }),
+    close: (channel) => ({ ...channel, isClosed: true }),
+    connect: () => Effect.void,
     clearErrors: (channel) => channel,
+    Model: EchoChannel,
+    Message: EchoMessage,
     isModel: Schema.is(EchoChannel),
     isMessage: Schema.is(EchoMessage),
   },
-  events: Stream.empty,
 })

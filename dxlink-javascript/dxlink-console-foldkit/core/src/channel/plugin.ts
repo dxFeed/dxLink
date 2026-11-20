@@ -1,7 +1,7 @@
-import { Option, type Stream } from 'effect'
+import { Effect, Option, type Schema, type Scope } from 'effect'
 import { Submodel, type Update } from 'foldkit'
 
-import type { TimestampedError } from '../error'
+import type { TimestampedError } from '../domain/error'
 
 /** How a status chip is coloured. */
 export type Tone = 'Neutral' | 'Success' | 'Warning' | 'Danger'
@@ -32,11 +32,23 @@ export type ChannelSummary = Readonly<{
   errors: ReadonlyArray<TimestampedError>
 }>
 
-/** A Message for one open channel, as a plugin's event Stream addresses it. */
-export type ChannelEvent<Message> = Readonly<{
-  channelId: string
-  message: Message
-}>
+/**
+ * The live side of one channel.
+ *
+ * A scoped Effect that opens the channel's dxLink object for the Model it is given — the
+ * channel as it was when its card appeared — registers what it must release with
+ * `Effect.acquireRelease`, and reports everything that happens through `emit`: the result of
+ * opening, state changes, data, errors. It never fails; a failure to open is a Message.
+ *
+ * The console runs it in a scope of its own and closes that scope when the card is closed or
+ * the session ends, so releasing is the Effect's finalizers and nothing else. `emit` is
+ * synchronous because dxLink listeners are plain callbacks; Messages emitted after the scope
+ * closed are dropped.
+ */
+export type ChannelConnect<Channel, ChannelMessage, Services = never> = (
+  channel: Channel,
+  emit: (message: ChannelMessage) => void
+) => Effect.Effect<void, never, Scope.Scope | Services>
 
 /**
  * One channel service, as the channels area sees it.
@@ -45,16 +57,17 @@ export type ChannelEvent<Message> = Readonly<{
  * plugin, holds one request per plugin, asks the plugin to turn that request into a channel,
  * and then delegates the channel's Messages and view back to it.
  *
- * A plugin is two Submodels and a Stream:
+ * A plugin is two Submodels:
  *
  *  - `request` — the form shown in the request dialog. One instance per plugin, created when
  *    the console starts and kept between dialog opens so several similar channels are quick
  *    to create.
  *  - `channel` — one open channel. Created from the request's config, and never removed while
  *    its session lasts: a closed channel stays on screen as a record.
- *  - `events` — every Message the plugin's live channels produce on their own, each addressed
- *    to the channel it belongs to. The plugin owns the live dxLink objects behind it (see
- *    {@link makeChannelHandles}); nothing live is ever stored in a Model.
+ *
+ * The channel's live dxLink object is not the plugin's to open or close. `channel.connect`
+ * describes it as a scoped Effect, and the console runs that Effect for exactly as long as the
+ * Model holds the channel's card open in the current session; see {@link ChannelConnect}.
  *
  * The plugin reaches the connection through `DxLinkClient.get` inside its Commands. That and
  * this contract are the whole host API.
@@ -94,6 +107,8 @@ export type ChannelPlugin<
      * "Open channel" is enabled exactly when this is `Some`.
      */
     toConfig: (request: Request) => Option.Option<Config>
+    Model: Schema.Schema<Request>
+    Message: Schema.Schema<RequestMessage>
     isModel: (value: unknown) => value is Request
     isMessage: (value: unknown) => value is RequestMessage
   }>
@@ -110,15 +125,17 @@ export type ChannelPlugin<
     view: Submodel.View<Channel, ChannelMessage>
     summarize: (channel: Channel) => ChannelSummary
     /**
-     * Release what the channel holds. Runs once, when the user closes the card or the session
-     * it belongs to ends; the Model it returns is the record that stays on screen.
+     * The channel as it reads once the user has closed its card. A pure transition: the live
+     * object behind it is released by the console, which stops running `connect`.
      */
-    close: Update.Step<Channel, ChannelMessage, Services>
+    close: (channel: Channel) => Channel
+    connect: ChannelConnect<Channel, ChannelMessage, Services>
+    Model: Schema.Schema<Channel>
+    Message: Schema.Schema<ChannelMessage>
     clearErrors: (channel: Channel) => Channel
     isModel: (value: unknown) => value is Channel
     isMessage: (value: unknown) => value is ChannelMessage
   }>
-  events: Stream.Stream<ChannelEvent<ChannelMessage>, never, Services>
 }>
 
 /**
@@ -146,9 +163,13 @@ export type RegisteredChannelPlugin<Services = never> = Readonly<{
   updateChannel: (channel: unknown, message: unknown) => Update.Return<unknown, unknown, Services>
   channelView: Submodel.View<unknown, unknown>
   summarize: (channel: unknown) => Option.Option<ChannelSummary>
-  close: Update.Step<unknown, unknown, Services>
+  close: (channel: unknown) => unknown
   clearErrors: (channel: unknown) => unknown
-  events: Stream.Stream<ChannelEvent<unknown>, never, Services>
+  connect: ChannelConnect<unknown, unknown, Services>
+  requestModel: Schema.Schema<unknown>
+  requestMessage: Schema.Schema<unknown>
+  channelModel: Schema.Schema<unknown>
+  channelMessage: Schema.Schema<unknown>
 }>
 
 /**
@@ -212,8 +233,12 @@ export const defineChannelPlugin = <
     ),
     summarize: (model) =>
       channel.isModel(model) ? Option.some(channel.summarize(model)) : Option.none(),
-    close: (model) => (channel.isModel(model) ? channel.close(model) : { model }),
+    close: (model) => (channel.isModel(model) ? channel.close(model) : model),
     clearErrors: (model) => (channel.isModel(model) ? channel.clearErrors(model) : model),
-    events: plugin.events,
+    connect: (model, emit) => (channel.isModel(model) ? channel.connect(model, emit) : Effect.void),
+    requestModel: request.Model,
+    requestMessage: request.Message,
+    channelModel: channel.Model,
+    channelMessage: channel.Message,
   }
 }

@@ -21,15 +21,16 @@ request form. It holds plain data only — what can be rendered, compared and re
 DevTools. A dxLink object is none of those things, so no client, feed or call is ever a Model
 field. Each lives where Foldkit keeps things with a lifetime:
 
-| Live object                       | Home                                                                  | Lifetime                             |
-| --------------------------------- | --------------------------------------------------------------------- | ------------------------------------ |
-| `DXLinkWebSocketClient`           | ManagedResource `DxLinkClient` (`core/src/client`)                    | while the Model holds a session      |
-| a channel's feed / DOM / RPC call | the plugin's `ChannelHandles` service (a Resource)                    | from its Open Command to its Close   |
-| a loaded protobuf registry (RPC)  | a store in the RPC plugin's Layer, addressed by an id the Model keeps | the most recently loaded few         |
-| a candle chart and what it drew   | a per-channel sink, attached to its element by a Mount                | from the channel's Open to its Close |
+| Live object                       | Home                                                                                                              | Lifetime                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `DXLinkWebSocketClient`           | ManagedResource `DxLinkClient` (`core/src/client.ts`)                                                             | while the Model holds a session                                   |
+| a channel's feed / DOM / RPC call | the scope core runs the plugin's `connect` in; findable by Commands through the plugin's `ChannelHandles` service | while the Model holds the channel's card open in the open session |
+| a loaded protobuf registry (RPC)  | a store in the RPC plugin's Layer, addressed by an id the Model keeps                                             | the most recently loaded few                                      |
+| a candle chart and what it drew   | a per-channel sink created in the channel's scope, attached to its element by a Mount                             | the same as its channel                                           |
 
-Everything those objects report comes back as Messages: the client through a Subscription that
-follows the open session, the channels through each plugin's event Stream.
+Nothing in `update` opens or closes any of them. The Model says what should exist — a session,
+an open card — and the runtime makes it so: the client through its ManagedResource, the channels
+through one Subscription (§4). Everything those objects report comes back as Messages.
 
 ## 2. Session and gating
 
@@ -66,12 +67,12 @@ dxlink-javascript/dxlink-console-foldkit/
     console.ts               # makeConsole — the console for a set of plugins
     model.ts · message.ts    # the console's Model and Messages
     update.ts · command.ts   # init/update and the Commands they return
-    subscription.ts          # client listeners + the plugins' event Streams
+    subscription.ts          # client listeners + the Stream that runs the live channels
     resource.ts · client.ts  # the DxLinkClient ManagedResource
-    channel/                 # plugin.ts (contract) · handles.ts · parameters.ts · erased*.ts
+    channel/                 # plugin.ts (contract) · handles.ts · erased*.ts
+    domain/                  # config (profile) · error (error log) · parameters — pure, with tests
     view/                    # connection panel · auth panel · channels area · channel card · errors
     kit.ts                   # the console's look, as view helpers shared with the plugins
-    config.ts · error.ts     # configuration profile · error log
 
   market-data/ @dxfeed/dxlink-console-foldkit-market-data   dxcharts-lite
     src/index.ts             # both plugins; the /feed and /dom subpaths expose one at a time
@@ -126,13 +127,29 @@ a plugin does not recognise is left alone rather than trusted. Config never cros
 identity `h.submodel` boundary, which is what lets a view typed for its own Messages render
 inside a builder typed for `unknown` ones.
 
-**Live channels.** A plugin keeps its dxLink objects in a `ChannelHandles` service
-(`makeChannelHandles`), addressed by the id of the channel's card. An Open Command reads the
-client with `DxLinkClient.get`, creates the object, wires its listeners to `handles.emit`, and
-`put`s it; later Commands look it up; closing `take`s it. `handles.events` is the plugin's event
-Stream, and the plugin shapes it — batching high-frequency data so `update` and the view run a
-few times a second rather than once per event, and stamping errors with the time they were
-observed. The service is built by a Layer the app passes to the runtime as `resources`.
+**Live channels.** A plugin describes the live side of a channel as `channel.connect`: a scoped
+Effect that acquires the dxLink object with `Effect.acquireRelease`, wires its listeners, and
+reports everything through an `emit` callback — the result of opening, state, data, errors. The
+plugin shapes what it emits, batching high-frequency data so `update` and the view run a few
+times a second rather than once per event, and stamping errors with the time they were observed.
+
+Core runs those Effects. One Subscription lives as long as the session and keeps the connected
+channels in step with the open cards in the Model: a card that appears is connected in a scope
+of its own, a card that is closed has its scope closed, and when the session ends every scope
+closes with the Stream. Foldkit restarts a Subscription when its dependencies change, which here
+would reconnect every channel whenever one was added, so the Stream is kept alive for the
+session and reads the current cards itself (Foldkit's `keepAliveEquivalence` with
+`readDependencies`), on a short interval. Closing a card is therefore a pure Model transition,
+and there is no path that ends a session but forgets its channels.
+
+Commands that act on an open channel — add a subscription, configure, send — find its object in
+the plugin's `ChannelHandles` service, where `connect` registers it for as long as it is
+connected. The service is built by a Layer the app passes to the runtime as `resources`.
+
+**The Model Schema is built from the plugins.** Core's own code treats a channel's Model as
+opaque, but the Schema `makeConsole` returns for the runtime is a union of the registered
+plugins' Models, so a Model that is restored after a reload or inspected in the DevTools is
+checked all the way down.
 
 **Two filters, doing different jobs.** The registered plugins say which services exist in this
 build, and the profile's channel kinds (§5) say which of those this deployment offers. The
@@ -141,7 +158,7 @@ second filters add-buttons only — an already-open channel keeps rendering.
 ## 5. Configuration profile
 
 What a deployment can decide about a console before anyone opens it lives in one
-`ConsoleConfig` (`core/src/config.ts`): the WebSocket URL, the keepalive timings, which channel
+`ConsoleConfig` (`core/src/domain/config.ts`): the WebSocket URL, the keepalive timings, which channel
 services are on offer, and which of those values the user may not change. Anything one channel
 service needs is that plugin's option instead — the RPC descriptor-set URL is resolved in
 `app/src/consoleConfig.ts` and handed to `rpcChannelPlugin()`.

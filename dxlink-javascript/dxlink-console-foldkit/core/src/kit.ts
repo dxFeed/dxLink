@@ -1,7 +1,7 @@
 import { Array, Match, Option } from 'effect'
 import type { Attribute, Html, HtmlBuilder } from 'foldkit/html'
 
-import { Button, Checkbox, Input, Select, Textarea } from '@foldkit/ui'
+import { Button, Checkbox, Disclosure, Input, Select, Textarea } from '@foldkit/ui'
 
 import type { Tone } from './channel/plugin'
 
@@ -447,4 +447,55 @@ export const jsonBlock = <Message>(text: string, h: HtmlBuilder<Message>): Html 
       ),
     ],
     [text]
+  )
+
+/**
+ * A titled section that can be collapsed. The caller's Model owns whether it is open; the
+ * content stays in the page while collapsed, hidden and inert.
+ */
+export const accordion = <Message>(
+  config: Readonly<{
+    /** Unique on the page: it ties the heading button to the section it discloses. */
+    id: string
+    title: string
+    isOpen: boolean
+    onToggle: (isOpen: boolean) => Message
+    content: Html
+  }>,
+  h: HtmlBuilder<Message>
+): Html =>
+  Disclosure.view(
+    {
+      id: config.id,
+      isOpen: config.isOpen,
+      onToggle: config.onToggle,
+      toView: (attributes) =>
+        h.div(
+          [h.Class(`rounded-lg border ${DIVIDER_CLASS}`)],
+          [
+            h.button(
+              [
+                ...attributes.button,
+                h.Class(
+                  'flex w-full items-center justify-between gap-2 px-4 py-3 text-left font-semibold'
+                ),
+              ],
+              [
+                config.title,
+                icon(
+                  ICON_CHEVRON_DOWN,
+                  h,
+                  config.isOpen
+                    ? 'size-5 rotate-180 transition-transform'
+                    : 'size-5 transition-transform'
+                ),
+              ]
+            ),
+            attributes.animatePanel(
+              h.div([...attributes.panel], [h.div([h.Class('px-4 pb-4')], [config.content])])
+            ),
+          ]
+        ),
+    },
+    h
   )

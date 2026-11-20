@@ -12,7 +12,7 @@ export { Model } from './model'
 // The channel-plugin contract.
 export { defineChannelPlugin } from './channel/plugin'
 export type {
-  ChannelEvent,
+  ChannelConnect,
   ChannelPlugin,
   ChannelStatus,
   ChannelSummary,
@@ -23,7 +23,7 @@ export type {
 // The host API a plugin reaches the connection and its own live channels through.
 export { DxLinkClient } from './client'
 export type { DxLinkClientService } from './client'
-export { describeChannelParameters } from './channel/parameters'
+export { describeChannelParameters } from './domain/parameters'
 export { makeChannelHandles } from './channel/handles'
 export type { ChannelHandles } from './channel/handles'
 
@@ -38,7 +38,7 @@ export {
   formatLocalTime,
   prependError,
   reportError,
-} from './error'
+} from './domain/error'
 
 // The console's look, shared so a channel reads as part of the same surface.
 export * as Kit from './kit'
@@ -52,5 +52,5 @@ export {
   builtinConsoleConfig,
   isConsoleConfigLock,
   resolveConsoleConfig,
-} from './config'
-export type { ConsoleConfigInput, ConsoleConfigSources } from './config'
+} from './domain/config'
+export type { ConsoleConfigInput, ConsoleConfigSources } from './domain/config'

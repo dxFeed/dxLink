@@ -1,16 +1,17 @@
-import { Option, Redacted } from 'effect'
+import { Option, Redacted, Schema } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
 
 import { ReconnectClient, ScrollToChannel, SetAuthToken, StampAcquireFailure } from './command'
-import { builtinConsoleConfig } from './config'
-import { emptyErrorLog } from './error'
+import { builtinConsoleConfig } from './domain/config'
+import { emptyErrorLog } from './domain/error'
 import { Message } from './message'
 import { ChannelCard, type Model, Session } from './model'
 import { makeUpdate } from './update'
 
+import { makeConsole } from './console'
 import { EchoMessage, echoPlugin } from './echoPlugin.fixture'
 
 const { init, update } = makeUpdate([echoPlugin])
@@ -214,6 +215,35 @@ describe('connection', () => {
   })
 })
 
+describe('model schema', () => {
+  const Console = makeConsole([echoPlugin])
+
+  test('accepts a channel whose Model is one of the registered plugins', () => {
+    expect(
+      Schema.is(Console.Model)({
+        ...authorizedModel,
+        channels: [
+          {
+            id: '1',
+            kind: 'echo',
+            card: ChannelCard.Closed(),
+            model: { channelId: '1', text: 'hello', isClosed: true },
+          },
+        ],
+      })
+    ).toBe(true)
+  })
+
+  test('rejects a channel whose Model no registered plugin describes', () => {
+    expect(
+      Schema.is(Console.Model)({
+        ...authorizedModel,
+        channels: [{ id: '1', kind: 'echo', card: ChannelCard.Closed(), model: { nope: true } }],
+      })
+    ).toBe(false)
+  })
+})
+
 describe('channels', () => {
   const requestMessage = (value: string) =>
     Message.GotRequestMessage({
@@ -270,7 +300,9 @@ describe('channels', () => {
       Command.resolve(ScrollToChannel, Message.CompletedScrollToChannel()),
       message(Message.ClickedToggleChannel({ channelId: '1' })),
       model((next) => {
-        expect(next.channels[0]?.card).toEqual(ChannelCard.Open({ isExpanded: false }))
+        expect(next.channels[0]?.card).toEqual(
+          ChannelCard.Open({ isExpanded: false, isErrorListOpen: false })
+        )
       }),
       message(Message.ClickedCloseChannel({ channelId: '1' })),
       message(Message.ClickedToggleChannel({ channelId: '1' })),

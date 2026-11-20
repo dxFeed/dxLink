@@ -45,6 +45,10 @@ export const channelCard = <Services>(
     Open: (card) => card.isExpanded,
     Closed: () => false,
   })
+  const isErrorListOpen = ChannelCard.match(channel.card, {
+    Open: (card) => card.isErrorListOpen,
+    Closed: () => false,
+  })
 
   return h.section(
     [
@@ -85,7 +89,11 @@ export const channelCard = <Services>(
                 [
                   errorCenter(
                     {
+                      id: `${channelElementId(channel.id)}-errors`,
                       errors: summary.errors,
+                      isOpen: isErrorListOpen,
+                      onToggle: (isOpen) =>
+                        Message.ToggledChannelErrorList({ channelId: channel.id, isOpen }),
                       onClear: Message.ClickedClearChannelErrors({
                         channelId: channel.id,
                       }),

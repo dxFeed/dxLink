@@ -121,28 +121,21 @@ export const resolveMethod = ({
     return { service, method }
   })
 
-/** What a live call reports on its own, before it is stamped with a time. */
-export type CallEvent =
-  | Readonly<{ _tag: 'Response'; json: string }>
-  | Readonly<{ _tag: 'Ended' }>
-  | Readonly<{ _tag: 'Failed'; type: string; message: string }>
-
 /** One live call. */
 export type CallHandle = Readonly<{
   /** The method being called; later requests of a bidirectional call are parsed against it. */
   method: DescMethod
   /** Send another request. `None` unless the method is bidirectional. */
   maybeSend: Option.Option<(message: Message) => void>
-  /** Cancel the call, which releases its channel. */
+  /** Cancel the call, which releases its channel. May throw; the call is released regardless. */
   stop: () => void
 }>
 
-export class RpcHandles extends Context.Service<
-  RpcHandles,
-  ChannelHandles<CallHandle, CallEvent>
->()('@dxfeed/dxlink-console-foldkit-rpc/RpcHandles') {}
+export class RpcHandles extends Context.Service<RpcHandles, ChannelHandles<CallHandle>>()(
+  '@dxfeed/dxlink-console-foldkit-rpc/RpcHandles'
+) {}
 
-/** Everything the RPC plugin's Commands and event Stream require. */
+/** Everything the RPC plugin's Commands and its channels' live side require. */
 export type RpcServices = RpcRegistry | RpcHandles | DxLinkClientService
 
 /**
@@ -151,5 +144,5 @@ export type RpcServices = RpcRegistry | RpcHandles | DxLinkClientService
  */
 export const rpcLayer: Layer.Layer<RpcRegistry | RpcHandles> = Layer.mergeAll(
   Layer.sync(RpcRegistry, makeRegistryStore),
-  Layer.effect(RpcHandles, makeChannelHandles<CallHandle, CallEvent>())
+  Layer.effect(RpcHandles, makeChannelHandles<CallHandle>())
 )

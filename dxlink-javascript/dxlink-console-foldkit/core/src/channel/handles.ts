@@ -1,35 +1,27 @@
-import { Effect, MutableHashMap, Option, PubSub, Stream } from 'effect'
-
-import type { ChannelEvent } from './plugin'
+import { Effect, MutableHashMap, type Option } from 'effect'
 
 /**
- * The live objects behind a plugin's open channels, and the Messages they produce.
+ * The live objects behind a plugin's open channels, as its Commands find them.
  *
  * A Model holds only what can be rendered and replayed, so the dxLink object of a channel —
- * a feed, a call — lives here instead, addressed by the id of the channel's card. Commands
- * `put` it when the channel opens, look it up to act on it, and `take` it to close; its
- * listeners `emit` whatever happens in between, and `events` is the plugin's event Stream.
+ * a feed, a call — is kept here instead, addressed by the id of the channel's card. The
+ * channel's `connect` Effect `put`s it once it is open and `take`s it in the finalizer that
+ * closes it; a Command looks it up with `get` to act on it, and finds `None` when the channel
+ * is not connected.
  *
- * A plugin builds one of these in an app-lifetime Layer (the runtime's `resources`), so every
- * Command and the event Stream see the same instance.
+ * A plugin builds one of these in an app-lifetime Layer (the runtime's `resources`), so
+ * `connect` and every Command see the same instance.
  */
-export type ChannelHandles<Handle, Message> = Readonly<{
+export type ChannelHandles<Handle> = Readonly<{
   put: (channelId: string, handle: Handle) => Effect.Effect<void>
   get: (channelId: string) => Effect.Effect<Option.Option<Handle>>
-  /** Remove a handle and return it. `None` when it was already taken — closing is idempotent. */
+  /** Remove a handle and return it. `None` when it was already taken. */
   take: (channelId: string) => Effect.Effect<Option.Option<Handle>>
-  /** Synchronous on purpose: dxLink listeners are plain callbacks. */
-  emit: (channelId: string, message: Message) => void
-  /** Messages emitted after the Stream is opened; earlier ones are not replayed. */
-  events: Stream.Stream<ChannelEvent<Message>>
 }>
 
-export const makeChannelHandles = <Handle, Message>(): Effect.Effect<
-  ChannelHandles<Handle, Message>
-> =>
-  Effect.gen(function* () {
+export const makeChannelHandles = <Handle>(): Effect.Effect<ChannelHandles<Handle>> =>
+  Effect.sync(() => {
     const handles = MutableHashMap.empty<string, Handle>()
-    const pubsub = yield* PubSub.unbounded<ChannelEvent<Message>>()
 
     return {
       put: (channelId, handle) =>
@@ -44,9 +36,5 @@ export const makeChannelHandles = <Handle, Message>(): Effect.Effect<
 
           return maybeHandle
         }),
-      emit: (channelId, message) => {
-        PubSub.publishUnsafe(pubsub, { channelId, message })
-      },
-      events: Stream.fromPubSub(pubsub),
     }
   })

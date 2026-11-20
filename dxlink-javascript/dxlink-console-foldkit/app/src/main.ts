@@ -263,7 +263,13 @@ export const makeApp = <Services>(plugins: ReadonlyArray<RegisteredChannelPlugin
     toParentMessage: toConsoleMessage,
   })
 
-  return { init, update, view, subscriptions, managedResources }
+  /**
+   * The Schema the runtime is given: the Model above, with the console's part narrowed to the
+   * registered plugins' own Models.
+   */
+  const AppModel: Schema.Schema<Model> = Schema.Struct({ ...Model.fields, console: Console.Model })
+
+  return { Model: AppModel, init, update, view, subscriptions, managedResources }
 }
 
 export type AppInit = Runtime.ApplicationInit<Model, Message, Flags>

@@ -3,10 +3,7 @@ import { Schema } from 'effect'
 import { defineChannelPlugin } from '@dxfeed/dxlink-console-foldkit-core'
 
 import * as Channel from './channel'
-import { events } from './events'
-import { Message as ChannelMessage } from './message'
 import * as Request from './request'
-import { view } from './view'
 
 /** A four-column grid, read as a ladder. */
 const ICON_PATH =
@@ -23,18 +20,22 @@ export const domChannelPlugin = defineChannelPlugin({
     update: Request.update,
     view: Request.view,
     toConfig: Request.toConfig,
+    Model: Request.Model,
+    Message: Request.Message,
     isModel: Request.isModel,
     isMessage: Schema.is(Request.Message),
   },
   channel: {
     init: Channel.init,
     update: Channel.update,
-    view,
+    view: Channel.view,
     summarize: Channel.summarize,
     close: Channel.close,
+    connect: Channel.connect,
+    Model: Channel.Model,
+    Message: Channel.Message,
     clearErrors: Channel.clearErrors,
     isModel: Channel.isModel,
-    isMessage: Schema.is(ChannelMessage),
+    isMessage: Schema.is(Channel.Message),
   },
-  events,
 })

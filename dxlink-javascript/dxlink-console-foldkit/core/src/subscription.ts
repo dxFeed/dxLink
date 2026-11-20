@@ -1,4 +1,17 @@
-import { Array, Effect, Option, Queue, Schema, Stream } from 'effect'
+import {
+  Array,
+  Duration,
+  Effect,
+  Equal,
+  Equivalence,
+  Exit,
+  MutableHashMap,
+  Option,
+  Queue,
+  Schema,
+  Scope,
+  Stream,
+} from 'effect'
 import { Subscription } from 'foldkit'
 
 import {
@@ -9,9 +22,10 @@ import {
   type DXLinkError,
 } from '@dxfeed/dxlink-api'
 
+import * as ErasedChannel from './channel/erasedChannel'
 import type { RegisteredChannelPlugin } from './channel/plugin'
 import { type DxLinkClientService, DxLinkSession } from './client'
-import { reportError } from './error'
+import { reportError } from './domain/error'
 import { Message } from './message'
 import type { ClientStatus, ConnectionDetails, Model } from './model'
 
@@ -108,9 +122,109 @@ const streamMissingClient: Stream.Stream<ClientMessage> = Stream.fromEffect(
 const maybeOpenSessionId = (model: Model): Option.Option<number> =>
   model.session._tag === 'Open' ? Option.some(model.session.sessionId) : Option.none()
 
+/** One channel whose card is open: what `connect` needs, and the address its Messages carry. */
+const OpenChannel = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.String,
+  model: ErasedChannel.Model,
+})
+export type OpenChannel = typeof OpenChannel.Type
+
+const openChannelsOf = (model: Model): ReadonlyArray<OpenChannel> =>
+  model.session._tag === 'Open'
+    ? Array.getSomes(
+        Array.map(model.channels, (channel) =>
+          channel.card._tag === 'Open'
+            ? Option.some({ id: channel.id, kind: channel.kind, model: channel.model })
+            : Option.none()
+        )
+      )
+    : []
+
+/** How often the open cards in the Model are compared with the channels that are connected. */
+const RECONCILE_INTERVAL = Duration.millis(50)
+
 /**
- * Both Streams follow the open session: one listens to the client, the other carries what the
- * plugins' live channels produce. A new session restarts them; a reconnect does not.
+ * Keep the live channels in step with the Model for as long as one session lasts.
+ *
+ * Every open card is connected through its plugin in a scope of its own; a card that is closed
+ * has its scope closed, and so has every card when the Stream ends with its session. The set of
+ * cards changes without restarting the Stream — restarting would reconnect every channel — so
+ * the Stream reads the current cards itself, on an interval.
+ *
+ * A channel is connected with its Model as first seen here. What it reports afterwards reaches
+ * that Model as Messages, not through this Stream.
+ */
+export const streamChannels = <Services>(
+  plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>,
+  readOpenChannels: () => ReadonlyArray<OpenChannel>
+): Stream.Stream<Message, never, Services> =>
+  Stream.callback<Message, never, Services>((queue) =>
+    Effect.gen(function* () {
+      const connected = MutableHashMap.empty<string, Scope.Closeable>()
+
+      yield* Effect.addFinalizer(() =>
+        Effect.forEach(MutableHashMap.values(connected), (scope) => Scope.close(scope, Exit.void), {
+          discard: true,
+        })
+      )
+
+      const disconnect = (channelId: string, scope: Scope.Closeable) =>
+        Effect.sync(() => MutableHashMap.remove(connected, channelId)).pipe(
+          Effect.andThen(Scope.close(scope, Exit.void))
+        )
+
+      const connect = (channel: OpenChannel, plugin: RegisteredChannelPlugin<Services>) =>
+        Effect.gen(function* () {
+          const scope = yield* Scope.make()
+          MutableHashMap.set(connected, channel.id, scope)
+
+          yield* Effect.forkIn(
+            Scope.provide(
+              plugin.connect(channel.model, (message) => {
+                Queue.offerUnsafe(
+                  queue,
+                  Message.GotChannelMessage({ channelId: channel.id, message })
+                )
+              }),
+              scope
+            ),
+            scope
+          )
+        })
+
+      const reconcile = Effect.gen(function* () {
+        const wanted = readOpenChannels()
+
+        yield* Effect.forEach(
+          Array.fromIterable(connected),
+          ([channelId, scope]) =>
+            Array.some(wanted, (channel) => channel.id === channelId)
+              ? Effect.void
+              : disconnect(channelId, scope),
+          { discard: true }
+        )
+
+        yield* Effect.forEach(
+          wanted,
+          (channel) =>
+            MutableHashMap.has(connected, channel.id)
+              ? Effect.void
+              : Option.match(
+                  Array.findFirst(plugins, (plugin) => plugin.kind === channel.kind),
+                  { onNone: () => Effect.void, onSome: (plugin) => connect(channel, plugin) }
+                ),
+          { discard: true }
+        )
+      })
+
+      return yield* Effect.forever(reconcile.pipe(Effect.andThen(Effect.sleep(RECONCILE_INTERVAL))))
+    })
+  )
+
+/**
+ * Both Streams follow the open session: one listens to the client, the other runs the live
+ * channels of the open cards. A new session restarts them; a reconnect does not.
  */
 export const makeSubscriptions = <Services>(
   plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>
@@ -140,23 +254,23 @@ export const makeSubscriptions = <Services>(
       }
     ),
     channels: entry(
-      { maybeSessionId: Schema.Option(Schema.Finite) },
+      {
+        maybeSessionId: Schema.Option(Schema.Finite),
+        channels: Schema.Array(OpenChannel),
+      },
       {
         modelToDependencies: (model) => ({
           maybeSessionId: maybeOpenSessionId(model),
+          channels: openChannelsOf(model),
         }),
-        dependenciesToStream: ({ maybeSessionId }) =>
+        // NOTE: only the session decides the Stream's lifetime. The cards are read live.
+        keepAliveEquivalence: Equivalence.make((self, that) =>
+          Equal.equals(self.maybeSessionId, that.maybeSessionId)
+        ),
+        dependenciesToStream: ({ maybeSessionId }, readDependencies) =>
           Option.match(maybeSessionId, {
             onNone: () => Stream.empty,
-            onSome: () =>
-              Stream.mergeAll(
-                Array.map(plugins, (plugin) => plugin.events),
-                { concurrency: 'unbounded' }
-              ).pipe(
-                Stream.map(({ channelId, message }) =>
-                  Message.GotChannelMessage({ channelId, message })
-                )
-              ),
+            onSome: () => streamChannels(plugins, () => readDependencies().channels),
           }),
       }
     ),

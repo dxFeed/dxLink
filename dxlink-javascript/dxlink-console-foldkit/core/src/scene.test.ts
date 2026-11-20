@@ -5,7 +5,7 @@ import { describe, test } from 'vitest'
 
 import { DXLinkAuthState, DXLinkConnectionState } from '@dxfeed/dxlink-api'
 
-import { builtinConsoleConfig } from './config'
+import { builtinConsoleConfig } from './domain/config'
 import { echoPlugin } from './echoPlugin.fixture'
 import { ChannelCard, type Model, Session } from './model'
 import { makeUpdate } from './update'
@@ -141,7 +141,7 @@ describe('channels area', () => {
             {
               id: '1',
               kind: 'echo',
-              card: ChannelCard.Open({ isExpanded: true }),
+              card: ChannelCard.Open({ isExpanded: true, isErrorListOpen: false }),
               model: { channelId: '1', text: 'hello there', isClosed: false },
             },
           ],

@@ -6,8 +6,8 @@ import { Dialog } from '@foldkit/ui'
 
 import * as ErasedChannel from './channel/erasedChannel'
 import * as ErasedRequest from './channel/erasedRequest'
-import { ConsoleConfig } from './config'
-import { ErrorLog } from './error'
+import { ConsoleConfig } from './domain/config'
+import { ErrorLog } from './domain/error'
 
 export const ConnectionState = Schema.Enum(DXLinkConnectionState)
 export const AuthState = Schema.Enum(DXLinkAuthState)
@@ -89,7 +89,7 @@ export type ConnectionForm = typeof ConnectionForm.Type
  * closed card has no expansion to remember. A collapsed card keeps its body, hidden.
  */
 export const ChannelCard = defineTaggedUnion({
-  Open: { isExpanded: Schema.Boolean },
+  Open: { isExpanded: Schema.Boolean, isErrorListOpen: Schema.Boolean },
   Closed: {},
 })
 export type ChannelCard = typeof ChannelCard.Type
@@ -116,6 +116,8 @@ export const Model = Schema.Struct({
   session: Session,
   lastSessionId: Schema.Finite,
   errorLog: ErrorLog,
+  /** Whether the connection's error list is disclosed. */
+  isErrorListOpen: Schema.Boolean,
   authToken: Schema.Redacted(Schema.String),
   channels: Schema.Array(ChannelEntry),
   nextChannelId: Schema.Finite,
