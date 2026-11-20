@@ -1,4 +1,4 @@
-import { Array, Schema } from 'effect'
+import { Array, Match, Option, Schema } from 'effect'
 
 import type { RegisteredChannelPlugin } from './channel/plugin'
 import { Message } from './message'
@@ -34,6 +34,44 @@ const makeModel = <Services>(
   })
 
 /**
+ * The console's Messages for a set of plugins.
+ *
+ * As with the Model, the console's own code treats a plugin's Message as opaque, and the
+ * Schema handed to the runtime does not: a Message addressed to a channel has to be one some
+ * registered plugin declares, and one addressed to a request has to be that plugin's own.
+ */
+const makeMessage = <Services>(
+  plugins: ReadonlyArray<RegisteredChannelPlugin<Services>>
+): Schema.Schema<Message> => {
+  const isChannelMessage = Schema.is(
+    Schema.Union(Array.map(plugins, (plugin) => plugin.channelMessage))
+  )
+  const isRequestMessageOf = (pluginId: string, value: unknown): boolean =>
+    Option.exists(
+      Array.findFirst(plugins, (plugin) => plugin.kind === pluginId),
+      (plugin) => Schema.is(plugin.requestMessage)(value)
+    )
+
+  return Message.pipe(
+    Schema.check(
+      Schema.makeFilter(
+        (message) =>
+          Match.value(message).pipe(
+            Match.tag('GotChannelMessage', ({ message: channelMessage }) =>
+              isChannelMessage(channelMessage)
+            ),
+            Match.tag('GotRequestMessage', ({ pluginId, message: requestMessage }) =>
+              isRequestMessageOf(pluginId, requestMessage)
+            ),
+            Match.orElse(() => true)
+          ),
+        { description: 'a Message whose plugin payload a registered plugin declares' }
+      )
+    )
+  )
+}
+
+/**
  * Build the console for a set of channel services.
  *
  * The plugin list is an argument, never a default: which services exist is a composition
@@ -49,7 +87,7 @@ export const makeConsole = <Services>(
 
   return {
     Model: makeModel(plugins),
-    Message,
+    Message: makeMessage(plugins),
     init,
     update,
     view: makeView(plugins),

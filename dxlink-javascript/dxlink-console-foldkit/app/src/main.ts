@@ -269,7 +269,32 @@ export const makeApp = <Services>(plugins: ReadonlyArray<RegisteredChannelPlugin
    */
   const AppModel: Schema.Schema<Model> = Schema.Struct({ ...Model.fields, console: Console.Model })
 
-  return { Model: AppModel, init, update, view, subscriptions, managedResources }
+  /** The Message Schema the runtime is given, narrowed the same way. */
+  const isConsoleMessage = Schema.is(Console.Message)
+  const AppMessage: Schema.Schema<Message> = Message.pipe(
+    Schema.check(
+      Schema.makeFilter(
+        (message) =>
+          Match.value(message).pipe(
+            Match.tag('GotConsoleMessage', ({ message: consoleMessage }) =>
+              isConsoleMessage(consoleMessage)
+            ),
+            Match.orElse(() => true)
+          ),
+        { description: 'a Message whose console payload the registered plugins declare' }
+      )
+    )
+  )
+
+  return {
+    Model: AppModel,
+    Message: AppMessage,
+    init,
+    update,
+    view,
+    subscriptions,
+    managedResources,
+  }
 }
 
 export type AppInit = Runtime.ApplicationInit<Model, Message, Flags>

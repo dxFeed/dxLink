@@ -4,7 +4,7 @@ import { Runtime } from 'foldkit'
 import { channelsLayer, createAppChannels } from './channels'
 import { resolveAppConsoleConfig, resolveDescriptorSettings } from './consoleConfig'
 import { readInjectedConfig, readSearchConfig } from './consoleConfigSources'
-import { Flags, Message, makeApp, makeFlags } from './main'
+import { Flags, makeApp, makeFlags } from './main'
 
 /**
  * Everything the page itself can tell the console, read once at boot. This is the only place
@@ -46,7 +46,7 @@ const application = Runtime.makeApplication({
   resources: channelsLayer,
   container: document.getElementById('root'),
   devTools: {
-    Message,
+    Message: app.Message,
   },
 })
 

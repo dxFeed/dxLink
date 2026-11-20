@@ -146,10 +146,11 @@ Commands that act on an open channel — add a subscription, configure, send —
 the plugin's `ChannelHandles` service, where `connect` registers it for as long as it is
 connected. The service is built by a Layer the app passes to the runtime as `resources`.
 
-**The Model Schema is built from the plugins.** Core's own code treats a channel's Model as
-opaque, but the Schema `makeConsole` returns for the runtime is a union of the registered
-plugins' Models, so a Model that is restored after a reload or inspected in the DevTools is
-checked all the way down.
+**The runtime's Schemas are built from the plugins.** Core's own code treats a channel's Model
+and Messages as opaque, but the Schemas `makeConsole` returns for the runtime are not: the Model
+Schema is a union of the registered plugins' Models, and the Message Schema accepts a plugin
+payload only if a registered plugin declares it. A Model that is restored after a reload, and a
+Message dispatched from the DevTools, are checked all the way down.
 
 **Two filters, doing different jobs.** The registered plugins say which services exist in this
 build, and the profile's channel kinds (§5) say which of those this deployment offers. The

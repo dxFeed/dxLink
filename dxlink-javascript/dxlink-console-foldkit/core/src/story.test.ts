@@ -244,6 +244,39 @@ describe('model schema', () => {
   })
 })
 
+describe('message schema', () => {
+  const Console = makeConsole([echoPlugin])
+
+  test('accepts a channel Message a registered plugin declares, and rejects any other', () => {
+    expect(
+      Schema.is(Console.Message)(
+        Message.GotChannelMessage({
+          channelId: '1',
+          message: EchoMessage.UpdatedText({ value: 'hi' }),
+        })
+      )
+    ).toBe(true)
+    expect(
+      Schema.is(Console.Message)(Message.GotChannelMessage({ channelId: '1', message: 'hi' }))
+    ).toBe(false)
+  })
+
+  test('a request Message has to belong to the plugin it is addressed to', () => {
+    const message = EchoMessage.UpdatedText({ value: 'hi' })
+
+    expect(
+      Schema.is(Console.Message)(Message.GotRequestMessage({ pluginId: 'echo', message }))
+    ).toBe(true)
+    expect(
+      Schema.is(Console.Message)(Message.GotRequestMessage({ pluginId: 'other', message }))
+    ).toBe(false)
+  })
+
+  test('Messages that carry no plugin payload are unaffected', () => {
+    expect(Schema.is(Console.Message)(Message.ClickedConnect())).toBe(true)
+  })
+})
+
 describe('channels', () => {
   const requestMessage = (value: string) =>
     Message.GotRequestMessage({
