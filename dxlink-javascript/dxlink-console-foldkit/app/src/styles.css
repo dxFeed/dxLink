@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+
+/* The console packages are consumed as source, so their class names are scanned here. */
+@source '../../core/src';
+@source '../../market-data/src';
+@source '../../rpc/src';
+
+/* The page owns light/dark: a `dark` class on an ancestor selects the dark palette. */
+@custom-variant dark (&:where(.dark, .dark *));

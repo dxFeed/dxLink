@@ -21,6 +21,7 @@ dxLink JavaScript API
 ## Packages
 
 - `@dxfeed/dxlink-api` re-exports public API from all dxlink JavaScript protocol packages. The `dxlink-console/*` packages are not re-exported: they are UI libraries built on top of `@dxfeed/dxlink-api`.
+- `dxlink-console-foldkit/*` is the debug console on Foldkit (FEED, DOM, RPC). Its packages are private, linted with `oxlint` rather than ESLint, and follow `dxlink-console-foldkit/FOLDKIT.md`; read `dxlink-console-foldkit/AGENTS.md` before changing them.
 
 ## Development Commands
 

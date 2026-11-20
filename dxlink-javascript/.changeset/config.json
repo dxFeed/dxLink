@@ -17,6 +17,10 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "@dxfeed/dxlink-debug-console"
+    "@dxfeed/dxlink-debug-console",
+    "@dxfeed/dxlink-console-foldkit-core",
+    "@dxfeed/dxlink-console-foldkit-market-data",
+    "@dxfeed/dxlink-console-foldkit-rpc",
+    "@dxfeed/dxlink-debug-console-foldkit"
   ]
 }
