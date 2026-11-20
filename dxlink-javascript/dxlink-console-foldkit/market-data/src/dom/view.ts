@@ -2,7 +2,7 @@ import { Array, Option } from 'effect'
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 
-import { Kit } from '@dxfeed/dxlink-console-foldkit-core'
+import { Kit, formatLocalTime } from '@dxfeed/dxlink-console-foldkit-core'
 
 import type { Model } from './channel'
 import type { AppliedConfig, DomSnapshot } from './handles'
@@ -23,7 +23,8 @@ const sizeCell = (maybeOrder: Option.Option<LadderOrder>, h: HtmlBuilder<Message
     [
       Option.match(maybeOrder, {
         onNone: () => '',
-        onSome: (order) => formatNumber(order.size),
+        onSome: (order) =>
+          Option.match(order.maybeSize, { onNone: () => '—', onSome: formatNumber }),
       }),
     ]
   )
@@ -266,7 +267,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
                 onSome: (snapshot) =>
                   h.span(
                     [h.Class(`text-xs ${Kit.MUTED_TEXT_CLASS}`)],
-                    [`Last update ${new Date(snapshot.time).toLocaleTimeString()}`]
+                    [`Last update ${formatLocalTime(snapshot.time)}`]
                   ),
               }),
             ]

@@ -6,7 +6,7 @@ import { DXLinkChannelState } from '@dxfeed/dxlink-api'
 import type { RegisteredChannelPlugin } from '@dxfeed/dxlink-console-foldkit-core'
 
 import * as Channel from './channel'
-import { CloseDomChannel, ConfigureDomChannel, OpenDomChannel } from './command'
+import { CloseDomChannel, ConfigureDomChannel, OpenDomChannel, toOrders } from './command'
 import type { AppliedConfig, DomServices } from './handles'
 import { Message } from './message'
 import { domChannelPlugin } from './plugin'
@@ -149,34 +149,42 @@ describe('channel', () => {
       given(openedModel),
       message(
         Message.ReceivedSnapshot({
-          snapshot: { time: 1, bids: [{ price: 1, size: 1 }], asks: [] },
+          snapshot: { time: 1, bids: [{ price: 1, maybeSize: Option.some(1) }], asks: [] },
         })
       ),
       message(
         Message.ReceivedSnapshot({
-          snapshot: { time: 2, bids: [], asks: [{ price: 2, size: 2 }] },
+          snapshot: { time: 2, bids: [], asks: [{ price: 2, maybeSize: Option.some(2) }] },
         })
       ),
       model((next) => {
         expect(next.maybeSnapshot).toEqual(
-          Option.some({ time: 2, bids: [], asks: [{ price: 2, size: 2 }] })
+          Option.some({ time: 2, bids: [], asks: [{ price: 2, maybeSize: Option.some(2) }] })
         )
       })
     )
   })
 
-  test('a snapshot with a size that is not a number is still a Message', () => {
+  test('a level without a finite price is left out, and one without a size keeps its place', () => {
     expect(
-      Schema.is(Message)(
-        Message.ReceivedSnapshot({
-          snapshot: {
-            time: 1,
-            bids: [{ price: 1, size: Number.NaN }],
-            asks: [],
-          },
-        })
-      )
-    ).toBe(true)
+      toOrders([
+        { price: Number.NaN, size: 1 },
+        { price: 1, size: Number.NaN },
+        { price: 2, size: 3 },
+      ])
+    ).toEqual([
+      { price: 1, maybeSize: Option.none() },
+      { price: 2, maybeSize: Option.some(3) },
+    ])
+  })
+
+  test('a number that is not finite is not a Message', () => {
+    expect(
+      Schema.is(Message)({
+        _tag: 'ReceivedSnapshot',
+        snapshot: { time: Number.NaN, bids: [], asks: [] },
+      })
+    ).toBe(false)
   })
 
   test('errors are logged newest first and can be cleared', () => {

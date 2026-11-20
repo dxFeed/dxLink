@@ -16,7 +16,7 @@ export type RequestMessage = typeof RequestMessage.Type
 export const Message = defineMessageUnion({
   SucceededOpenChannel: {
     channelState: ChannelState,
-    protocolChannelId: Schema.Number,
+    protocolChannelId: Schema.Finite,
     parameters: Schema.Record(Schema.String, Schema.String),
   },
   FailedOpenChannel: { error: ReportedError },
@@ -38,9 +38,9 @@ export const Message = defineMessageUnion({
 
   UpdatedAggregationPeriod: { value: Schema.String },
   SelectedDataFormat: { value: Schema.String },
-  UpdatedFieldRowType: { rowId: Schema.Number, value: Schema.String },
-  UpdatedFieldRowFields: { rowId: Schema.Number, value: Schema.String },
-  ClickedRemoveFieldRow: { rowId: Schema.Number },
+  UpdatedFieldRowType: { rowId: Schema.Finite, value: Schema.String },
+  UpdatedFieldRowFields: { rowId: Schema.Finite, value: Schema.String },
+  ClickedRemoveFieldRow: { rowId: Schema.Finite },
   ClickedAddFieldRow: {},
   ClickedApplyConfiguration: {},
   CompletedConfigureFeed: {},
@@ -58,7 +58,7 @@ export const Message = defineMessageUnion({
   SubmittedCandleSubscription: {},
   CompletedSetCandleSubscription: {},
   CompletedMountChart: {},
-  ReceivedCandles: { candleCount: Schema.Number },
+  ReceivedCandles: { candleCount: Schema.Finite },
   FailedDrawCandles: { reason: Schema.String },
 })
 export type Message = typeof Message.Type

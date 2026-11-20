@@ -39,7 +39,8 @@ every Message with the Model before and after it.
 pnpm turbo run build lint test typecheck --filter './dxlink-console-foldkit/*'
 ```
 
-`lint` is `oxlint` with the `@foldkit/oxlint-plugin` rules; `test` is Vitest with Foldkit's
+`lint` is `oxlint` with the `@foldkit/oxlint-plugin` rules, followed by the Effect language
+service's `recommended` diagnostics (`@effect/tsgo`) with warnings treated as errors; `test` is Vitest with Foldkit's
 Story and Scene helpers, which drive `update` and the rendered view without a browser.
 Formatting is the repository's Prettier (`pnpm run format`).
 

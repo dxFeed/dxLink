@@ -10,15 +10,16 @@ import {
 
 export const ChannelState = Schema.Enum(DXLinkChannelState)
 
+/** One price level. A level the server sent without a usable size keeps its place. */
 export const DomOrder = Schema.Struct({
-  price: Schema.Number,
-  size: Schema.Number,
+  price: Schema.Finite,
+  maybeSize: Schema.Option(Schema.Finite),
 })
 export type DomOrder = typeof DomOrder.Type
 
 /** A full replacement of the book, as of `time` (Unix milliseconds). */
 export const DomSnapshot = Schema.Struct({
-  time: Schema.Number,
+  time: Schema.Finite,
   bids: Schema.Array(DomOrder),
   asks: Schema.Array(DomOrder),
 })
@@ -29,8 +30,8 @@ export type DomSnapshot = typeof DomSnapshot.Type
  * answered — before that the client holds no value for them.
  */
 export const AppliedConfig = Schema.Struct({
-  maybeAggregationPeriod: Schema.Option(Schema.Number),
-  maybeDepthLimit: Schema.Option(Schema.Number),
+  maybeAggregationPeriod: Schema.Option(Schema.Finite),
+  maybeDepthLimit: Schema.Option(Schema.Finite),
   dataFormat: Schema.String,
   orderFields: Schema.Array(Schema.String),
 })

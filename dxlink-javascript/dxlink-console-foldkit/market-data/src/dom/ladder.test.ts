@@ -42,36 +42,36 @@ describe('toLadderRows', () => {
   test('puts the best levels first: highest bid beside lowest ask', () => {
     const rows = toLadderRows(
       [
-        { price: 99, size: 1 },
-        { price: 100, size: 2 },
+        { price: 99, maybeSize: Option.some(1) },
+        { price: 100, maybeSize: Option.some(2) },
       ],
       [
-        { price: 102, size: 3 },
-        { price: 101, size: 4 },
+        { price: 102, maybeSize: Option.some(3) },
+        { price: 101, maybeSize: Option.some(4) },
       ]
     )
 
     expect(rows).toEqual([
       {
         level: 1,
-        maybeBid: Option.some({ price: 100, size: 2 }),
-        maybeAsk: Option.some({ price: 101, size: 4 }),
+        maybeBid: Option.some({ price: 100, maybeSize: Option.some(2) }),
+        maybeAsk: Option.some({ price: 101, maybeSize: Option.some(4) }),
       },
       {
         level: 2,
-        maybeBid: Option.some({ price: 99, size: 1 }),
-        maybeAsk: Option.some({ price: 102, size: 3 }),
+        maybeBid: Option.some({ price: 99, maybeSize: Option.some(1) }),
+        maybeAsk: Option.some({ price: 102, maybeSize: Option.some(3) }),
       },
     ])
   })
 
   test('the shorter side runs out', () => {
-    const rows = toLadderRows([{ price: 100, size: 2 }], [])
+    const rows = toLadderRows([{ price: 100, maybeSize: Option.some(2) }], [])
 
     expect(rows).toEqual([
       {
         level: 1,
-        maybeBid: Option.some({ price: 100, size: 2 }),
+        maybeBid: Option.some({ price: 100, maybeSize: Option.some(2) }),
         maybeAsk: Option.none(),
       },
     ])

@@ -1,4 +1,4 @@
-import { Array, Clock, Effect, Schema } from 'effect'
+import { Array, Clock, DateTime, Effect, Schema } from 'effect'
 
 /**
  * A protocol error as it left the dxLink client, stamped with the time it arrived.
@@ -19,7 +19,7 @@ export type ReportedError = typeof ReportedError.Type
  * `id` is its identity in a keyed list: errors are prepended, so a position is not stable.
  */
 export const TimestampedError = Schema.Struct({
-  id: Schema.Number,
+  id: Schema.Finite,
   type: Schema.String,
   message: Schema.String,
   time: Schema.String,
@@ -42,7 +42,7 @@ export const MAX_ERRORS = 200
  */
 export const ErrorLog = Schema.Struct({
   errors: Schema.Array(TimestampedError),
-  nextId: Schema.Number,
+  nextId: Schema.Finite,
 })
 export type ErrorLog = typeof ErrorLog.Type
 
@@ -60,6 +60,14 @@ export const clearErrors = (log: ErrorLog): ErrorLog => ({
   nextId: log.nextId,
 })
 
+/** A moment (Unix milliseconds) as a local time of day, the way every log in the console shows one. */
+export const formatLocalTime = (millis: number): string =>
+  DateTime.formatLocal(DateTime.makeUnsafe(millis), {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+
 /** Stamp an error with the local time it is observed at. */
 export const reportError = (
   error: Readonly<{ type: string; message: string }>
@@ -67,5 +75,5 @@ export const reportError = (
   Effect.map(Clock.currentTimeMillis, (millis) => ({
     type: error.type,
     message: error.message,
-    time: new Date(millis).toLocaleTimeString(),
+    time: formatLocalTime(millis),
   }))

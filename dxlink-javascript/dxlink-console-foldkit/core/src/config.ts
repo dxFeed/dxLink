@@ -2,9 +2,9 @@ import { Array, Option, Schema } from 'effect'
 
 /** Connection keepalive timings, in seconds. */
 export const KeepaliveConfig = Schema.Struct({
-  interval: Schema.Number,
-  timeout: Schema.Number,
-  acceptTimeout: Schema.Number,
+  interval: Schema.Finite,
+  timeout: Schema.Finite,
+  acceptTimeout: Schema.Finite,
 })
 export type KeepaliveConfig = typeof KeepaliveConfig.Type
 

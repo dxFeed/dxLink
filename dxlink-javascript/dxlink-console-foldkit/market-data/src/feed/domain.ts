@@ -33,7 +33,7 @@ export const FeedSubscription = Schema.Struct({
   type: Schema.String,
   symbol: Schema.String,
   source: Schema.String,
-  fromTime: Schema.Number,
+  fromTime: Schema.Finite,
 })
 export type FeedSubscription = typeof FeedSubscription.Type
 
@@ -180,7 +180,7 @@ export const buildColumns = (
 
 /** One row of the accept-event-fields editor. `id` is its identity in the keyed list. */
 export const EventFieldRow = Schema.Struct({
-  id: Schema.Number,
+  id: Schema.Finite,
   type: Schema.String,
   fields: Schema.String,
 })

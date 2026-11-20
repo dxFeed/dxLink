@@ -7,7 +7,7 @@ import { AppliedConfig, ChannelState, DomSnapshot } from './handles'
 
 export const Message = defineMessageUnion({
   SucceededOpenDomChannel: {
-    protocolChannelId: Schema.Number,
+    protocolChannelId: Schema.Finite,
     parameters: Schema.Record(Schema.String, Schema.String),
     channelState: ChannelState,
     applied: AppliedConfig,

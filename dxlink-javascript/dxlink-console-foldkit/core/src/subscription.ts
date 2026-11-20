@@ -103,7 +103,7 @@ export const makeSubscriptions = <Services>(
 ) =>
   Subscription.make<Model, Message, Services | DxLinkClientService>()((entry) => ({
     client: entry(
-      { maybeSessionId: Schema.Option(Schema.Number) },
+      { maybeSessionId: Schema.Option(Schema.Finite) },
       {
         modelToDependencies: (model) => ({
           maybeSessionId: maybeOpenSessionId(model),
@@ -122,7 +122,7 @@ export const makeSubscriptions = <Services>(
       }
     ),
     channels: entry(
-      { maybeSessionId: Schema.Option(Schema.Number) },
+      { maybeSessionId: Schema.Option(Schema.Finite) },
       {
         modelToDependencies: (model) => ({
           maybeSessionId: maybeOpenSessionId(model),

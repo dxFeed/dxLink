@@ -65,6 +65,7 @@ export {
   TimestampedError,
   clearErrors,
   emptyErrorLog,
+  formatLocalTime,
   prependError,
   reportError,
 } from './error'

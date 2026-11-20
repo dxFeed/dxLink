@@ -15,7 +15,7 @@ export const ReconnectClient = Command.define('ReconnectClient', {
 
       return Message.CompletedReconnectClient()
     }),
-    Effect.catch(() => Effect.succeed(Message.CompletedReconnectClient()))
+    Effect.orElseSucceed(() => Message.CompletedReconnectClient())
   ),
 })
 
@@ -29,7 +29,7 @@ export const SetAuthToken = Command.define('SetAuthToken', {
 
         return Message.CompletedSetAuthToken()
       }),
-      Effect.catch(() => Effect.succeed(Message.CompletedSetAuthToken()))
+      Effect.orElseSucceed(() => Message.CompletedSetAuthToken())
     ),
 })
 
@@ -50,6 +50,6 @@ export const ScrollToChannel = Command.define('ScrollToChannel', {
       block: 'start',
     }).pipe(
       Effect.as(Message.CompletedScrollToChannel()),
-      Effect.catch(() => Effect.succeed(Message.CompletedScrollToChannel()))
+      Effect.orElseSucceed(() => Message.CompletedScrollToChannel())
     ),
 })

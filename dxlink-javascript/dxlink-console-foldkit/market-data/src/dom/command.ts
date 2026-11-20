@@ -1,4 +1,4 @@
-import { Array, Effect, Option, Schema } from 'effect'
+import { Array, Effect, Option, Schema, pipe } from 'effect'
 import { Command } from 'foldkit'
 
 import {
@@ -15,7 +15,7 @@ import {
   reportError,
 } from '@dxfeed/dxlink-console-foldkit-core'
 
-import { type AppliedConfig, DomEvent, DomHandles } from './handles'
+import { type AppliedConfig, DomEvent, DomHandles, type DomOrder } from './handles'
 import { Message } from './message'
 
 /** NaN is how the client says "the server has not told me yet". */
@@ -29,10 +29,13 @@ export const toAppliedConfig = (config: DepthOfMarketConfig): AppliedConfig => (
   orderFields: config.orderFields,
 })
 
-const toOrder = (order: DepthOfMarketOrder) => ({
-  price: order.price,
-  size: order.size,
-})
+/** A level without a finite price cannot be placed in the ladder, so it is left out. */
+export const toOrders = (orders: ReadonlyArray<DepthOfMarketOrder>): ReadonlyArray<DomOrder> =>
+  pipe(
+    orders,
+    Array.filter((order) => Number.isFinite(order.price)),
+    Array.map((order) => ({ price: order.price, maybeSize: toMaybeNumber(order.size) }))
+  )
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : globalThis.String(error)
@@ -79,8 +82,8 @@ export const OpenDomChannel = Command.define('OpenDomChannel', {
               DomEvent.Snapshot({
                 snapshot: {
                   time,
-                  bids: Array.map(bids, toOrder),
-                  asks: Array.map(asks, toOrder),
+                  bids: toOrders(bids),
+                  asks: toOrders(asks),
                 },
               })
             )
@@ -139,8 +142,8 @@ export const OpenDomChannel = Command.define('OpenDomChannel', {
 export const ConfigureDomChannel = Command.define('ConfigureDomChannel', {
   args: {
     channelId: Schema.String,
-    maybeAggregationPeriod: Schema.Option(Schema.Number),
-    maybeDepthLimit: Schema.Option(Schema.Number),
+    maybeAggregationPeriod: Schema.Option(Schema.Finite),
+    maybeDepthLimit: Schema.Option(Schema.Finite),
     maybeOrderFields: Schema.Option(Schema.Array(Schema.String)),
   },
   messages: [Message.CompletedConfigureDomChannel],

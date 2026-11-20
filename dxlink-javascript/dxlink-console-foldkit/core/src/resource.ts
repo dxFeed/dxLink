@@ -8,7 +8,7 @@ import { Message } from './message'
 import { ClientParams, type Model, Session } from './model'
 
 const ClientRequirements = Schema.Struct({
-  sessionId: Schema.Number,
+  sessionId: Schema.Finite,
   params: ClientParams,
 })
 type ClientRequirements = typeof ClientRequirements.Type

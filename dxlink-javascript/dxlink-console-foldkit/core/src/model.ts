@@ -16,16 +16,16 @@ export const AuthState = Schema.Enum(DXLinkAuthState)
 export const ConnectionDetails = Schema.Struct({
   clientVersion: Schema.String,
   maybeServerVersion: Schema.Option(Schema.String),
-  maybeServerKeepaliveTimeout: Schema.Option(Schema.Number),
+  maybeServerKeepaliveTimeout: Schema.Option(Schema.Finite),
 })
 export type ConnectionDetails = typeof ConnectionDetails.Type
 
 /** Everything a client is built from. A session's parameters never change. */
 export const ClientParams = Schema.Struct({
   url: Schema.String,
-  keepaliveInterval: Schema.Number,
-  keepaliveTimeout: Schema.Number,
-  acceptKeepaliveTimeout: Schema.Number,
+  keepaliveInterval: Schema.Finite,
+  keepaliveTimeout: Schema.Finite,
+  acceptKeepaliveTimeout: Schema.Finite,
 })
 export type ClientParams = typeof ClientParams.Type
 
@@ -51,9 +51,9 @@ export type ClientStatus = typeof ClientStatus.Type
 export const Session = defineTaggedUnion({
   Idle: {},
   /** The client is being built; nothing is listening to it yet. */
-  Opening: { sessionId: Schema.Number, params: ClientParams },
+  Opening: { sessionId: Schema.Finite, params: ClientParams },
   Open: {
-    sessionId: Schema.Number,
+    sessionId: Schema.Finite,
     params: ClientParams,
     status: ClientStatus,
     /**
@@ -105,11 +105,11 @@ export const Model = Schema.Struct({
   config: ConsoleConfig,
   form: ConnectionForm,
   session: Session,
-  lastSessionId: Schema.Number,
+  lastSessionId: Schema.Finite,
   errorLog: ErrorLog,
   authToken: Schema.Redacted(Schema.String),
   channels: Schema.Array(ChannelEntry),
-  nextChannelId: Schema.Number,
+  nextChannelId: Schema.Finite,
   /** One request per registered plugin, keyed by kind. Opaque for the same reason as a channel. */
   requests: Schema.Record(Schema.String, ErasedRequest.Model),
   /** The plugin whose request the dialog is showing. */

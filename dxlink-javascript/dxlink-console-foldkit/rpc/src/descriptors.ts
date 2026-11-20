@@ -1,4 +1,6 @@
 import { Array, Data, Effect, Option, Order, Predicate, pipe } from 'effect'
+import { HttpClient, HttpClientRequest } from 'effect/http'
+import { Http } from 'foldkit'
 
 import {
   type DescField,
@@ -168,30 +170,34 @@ const BINARY_ACCEPT = 'application/protobuf, application/x-protobuf, application
  */
 export const fetchDescriptorSet = (url: string): Effect.Effect<FileRegistry, DescriptorSetError> =>
   Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: (signal) => fetch(url, { headers: { Accept: BINARY_ACCEPT }, signal }),
-      catch: (cause) =>
-        new DescriptorSetError({
-          message:
-            'the endpoint must be reachable, and one on another origin must allow cross-origin ' +
-            'requests including the Accept header',
-          cause,
-        }),
-    })
+    const client = yield* HttpClient.HttpClient
+    const response = yield* client
+      .execute(
+        HttpClientRequest.get(url).pipe(HttpClientRequest.setHeader('Accept', BINARY_ACCEPT))
+      )
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new DescriptorSetError({
+              message:
+                'the endpoint must be reachable, and one on another origin must allow cross-origin ' +
+                'requests including the Accept header',
+              cause,
+            })
+        )
+      )
 
-    if (!response.ok) {
-      return yield* new DescriptorSetError({
-        message: `${response.status} ${response.statusText}`,
-      })
+    if (response.status < 200 || response.status >= 300) {
+      return yield* new DescriptorSetError({ message: `HTTP ${response.status}` })
     }
 
-    const buffer = yield* Effect.tryPromise({
-      try: () => response.arrayBuffer(),
-      catch: (cause) => new DescriptorSetError({ message: describeFailure(cause), cause }),
-    })
+    const buffer = yield* Effect.mapError(
+      response.arrayBuffer,
+      (cause) => new DescriptorSetError({ message: describeFailure(cause), cause })
+    )
 
     return yield* decodeRegistry(new Uint8Array(buffer))
-  })
+  }).pipe(Effect.provide(Http.layer))
 
 /** Every service in a registry, ordered by fully qualified name. */
 export const listServices = (registry: FileRegistry): ReadonlyArray<DescService> =>

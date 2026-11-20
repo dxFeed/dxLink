@@ -36,7 +36,7 @@ export const ChannelState = Schema.Enum(DXLinkChannelState)
 /** The configuration the server reports back, which may differ from the one requested. */
 export const AppliedConfig = Schema.Struct({
   /** `None` while the server has not defined one. */
-  maybeAggregationPeriod: Schema.Option(Schema.Number),
+  maybeAggregationPeriod: Schema.Option(Schema.Finite),
   dataFormat: Schema.String,
   /** Negotiated field order per event type. */
   eventFields: Schema.Record(Schema.String, Schema.Array(Schema.String)),
@@ -61,7 +61,7 @@ export const ConfigurationForm = Schema.Struct({
   aggregationPeriod: Schema.String,
   dataFormat: DataFormatChoice,
   rows: Schema.Array(EventFieldRow),
-  nextRowId: Schema.Number,
+  nextRowId: Schema.Finite,
 })
 export type ConfigurationForm = typeof ConfigurationForm.Type
 
@@ -83,7 +83,7 @@ export type SubscriptionsState = typeof SubscriptionsState.Type
 
 export const CandleSubscription = Schema.Struct({
   symbol: Schema.String,
-  fromTime: Schema.Number,
+  fromTime: Schema.Finite,
 })
 export type CandleSubscription = typeof CandleSubscription.Type
 
@@ -91,7 +91,7 @@ export const ChartState = Schema.Struct({
   symbol: Schema.String,
   fromTime: Schema.String,
   maybeSubscription: Schema.Option(CandleSubscription),
-  candleCount: Schema.Number,
+  candleCount: Schema.Finite,
   maybeChartError: Schema.Option(Schema.String),
 })
 export type ChartState = typeof ChartState.Type
@@ -110,7 +110,7 @@ export const Model = Schema.Struct({
   channelId: Schema.String,
   channelState: ChannelState,
   /** Protocol channel id; `None` until the channel is opened. */
-  maybeProtocolChannelId: Schema.Option(Schema.Number),
+  maybeProtocolChannelId: Schema.Option(Schema.Finite),
   /** Parameters the channel was actually opened with. */
   parameters: Schema.Record(Schema.String, Schema.String),
   errorLog: ErrorLog,

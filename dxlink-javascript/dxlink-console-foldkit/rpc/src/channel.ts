@@ -14,6 +14,7 @@ import {
   ReportedError,
   clearErrors as clearErrorLog,
   emptyErrorLog,
+  formatLocalTime,
   prependError,
   reportError,
 } from '@dxfeed/dxlink-console-foldkit-core'
@@ -39,7 +40,7 @@ export type StampedJson = typeof StampedJson.Type
 
 /** One message exchanged on the call. `id` is its identity in a keyed list. */
 export const MessageEntry = Schema.Struct({
-  id: Schema.Number,
+  id: Schema.Finite,
   time: Schema.String,
   json: Schema.String,
 })
@@ -61,7 +62,7 @@ export const Model = Schema.Struct({
   requests: Schema.Array(MessageEntry),
   /** Responses received, newest first. */
   responses: Schema.Array(MessageEntry),
-  nextEntryId: Schema.Number,
+  nextEntryId: Schema.Finite,
   errorLog: ErrorLog,
   /** The next request of a bidirectional call, as it is being edited. */
   sendJson: Schema.String,
@@ -97,11 +98,9 @@ const isReceivedResponses = Schema.is(Message.ReceivedResponses)
 
 // COMMAND
 
-const formatTime = (millis: number): string => new Date(millis).toLocaleTimeString()
-
 const stamp = (json: string): Effect.Effect<StampedJson> =>
   Effect.map(Clock.currentTimeMillis, (millis) => ({
-    time: formatTime(millis),
+    time: formatLocalTime(millis),
     json,
   }))
 
@@ -316,7 +315,9 @@ export const events: Stream.Stream<ChannelEvent<Message>, never, RpcServices> = 
 ).pipe(
   Stream.groupedWithin(EVENT_WINDOW_SIZE, EVENT_WINDOW),
   Stream.mapEffect((window) =>
-    Effect.map(Clock.currentTimeMillis, (millis) => toChannelMessages(window, formatTime(millis)))
+    Effect.map(Clock.currentTimeMillis, (millis) =>
+      toChannelMessages(window, formatLocalTime(millis))
+    )
   ),
   Stream.flattenIterable
 )

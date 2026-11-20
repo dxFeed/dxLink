@@ -1,7 +1,7 @@
 import { Array, Option, Order, pipe } from 'effect'
 
 /** One price level of one side of the book. */
-export type LadderOrder = Readonly<{ price: number; size: number }>
+export type LadderOrder = Readonly<{ price: number; maybeSize: Option.Option<number> }>
 
 /**
  * One row of the combined ladder: the bid and the ask of the same rank.

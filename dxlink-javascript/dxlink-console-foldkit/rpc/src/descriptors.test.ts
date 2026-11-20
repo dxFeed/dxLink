@@ -1,5 +1,6 @@
-import { Effect } from 'effect'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Cause, Effect } from 'effect'
+import { FetchHttpClient } from 'effect/http'
+import { describe, expect, it, vi } from 'vitest'
 
 import { clone, toBinary } from '@bufbuild/protobuf'
 import { FileDescriptorSetSchema } from '@bufbuild/protobuf/wkt'
@@ -195,21 +196,20 @@ describe('summarizeRegistry', () => {
 })
 
 describe('fetchDescriptorSet', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
+  /** Run the fetch against a stand-in for the browser's `fetch`. */
+  const runWith = <A, E>(fetchStub: typeof fetch, effect: Effect.Effect<A, E>) =>
+    Effect.runPromise(Effect.provideService(effect, FetchHttpClient.Fetch, fetchStub))
 
   it('asks for the binary representation, and for nothing that matches JSON', async () => {
     // dxLink's schema endpoint negotiates on Accept and treats a wildcard as a vote for
     // JSON, so a request that carries one gets the larger representation back.
     const fetchMock = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValue(new Response(binaryDescriptorSet(), { status: 200 }))
-    vi.stubGlobal('fetch', fetchMock)
 
-    await Effect.runPromise(fetchDescriptorSet('/proto/docs'))
+    await runWith(fetchMock, fetchDescriptorSet('/proto/docs'))
 
-    const accept = String(fetchMock.mock.calls[0]?.[1]?.headers?.Accept)
+    const accept = String(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('accept'))
     expect(accept).toContain('application/protobuf')
     expect(accept).not.toContain('*')
     expect(accept).not.toContain('json')
@@ -218,43 +218,41 @@ describe('fetchDescriptorSet', () => {
   it('reads whichever representation the endpoint actually serves', async () => {
     // The Accept header is a request, not a guarantee: an endpoint that only speaks
     // protobuf-JSON still has to work.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(jsonDescriptorSet(), { status: 200 }))
+    const registry = await runWith(
+      vi.fn<typeof fetch>().mockResolvedValue(new Response(jsonDescriptorSet(), { status: 200 })),
+      fetchDescriptorSet('/proto/docs')
     )
-
-    const registry = await Effect.runPromise(fetchDescriptorSet('/proto/docs'))
 
     expect(listServices(registry).map((service) => service.typeName)).toEqual(SERVICE_NAMES)
   })
 
   it('reports the status when the endpoint refuses', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 404, statusText: 'Not Found' }))
+    const error = await runWith(
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 404, statusText: 'Not Found' })),
+      Effect.flip(fetchDescriptorSet('/proto/docs'))
     )
-
-    const error = await Effect.runPromise(Effect.flip(fetchDescriptorSet('/proto/docs')))
 
     expect(error.message).toContain('404')
   })
 
   it('explains an opaque network failure, keeping the original as the cause', async () => {
     const cause = new TypeError('Failed to fetch')
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(cause))
-
-    const error = await Effect.runPromise(
+    const error = await runWith(
+      vi.fn<typeof fetch>().mockRejectedValue(cause),
       Effect.flip(fetchDescriptorSet('http://elsewhere/proto/docs'))
     )
 
     expect(error.message).toMatch(/cross-origin/)
-    expect(error.cause).toBe(cause)
+    expect(Cause.pretty(Cause.fail(error.cause))).toContain('Failed to fetch')
   })
 
   it('reports bytes that are not a descriptor set', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"file":', { status: 200 })))
-
-    const error = await Effect.runPromise(Effect.flip(fetchDescriptorSet('/proto/docs')))
+    const error = await runWith(
+      vi.fn<typeof fetch>().mockResolvedValue(new Response('{"file":', { status: 200 })),
+      Effect.flip(fetchDescriptorSet('/proto/docs'))
+    )
 
     expect(error._tag).toBe('DescriptorSetError')
   })

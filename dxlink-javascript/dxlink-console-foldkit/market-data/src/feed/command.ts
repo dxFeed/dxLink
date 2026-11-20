@@ -261,7 +261,7 @@ export const CopyEvents = Command.define('CopyEvents', {
   execute: ({ text }) =>
     Effect.tryPromise(() => navigator.clipboard.writeText(text)).pipe(
       Effect.as(Message.CompletedCopyEvents()),
-      Effect.catch(() => Effect.succeed(Message.CompletedCopyEvents()))
+      Effect.orElseSucceed(() => Message.CompletedCopyEvents())
     ),
 })
 

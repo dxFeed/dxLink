@@ -36,7 +36,7 @@ export const Model = Schema.TaggedStruct(TAG, {
   config: DomConfig,
   channelState: ChannelState,
   /** The protocol's own channel id. `None` until the channel is opened. */
-  maybeProtocolChannelId: Schema.Option(Schema.Number),
+  maybeProtocolChannelId: Schema.Option(Schema.Finite),
   /** The parameters the channel was actually opened with. Empty until it is opened. */
   parameters: Schema.Record(Schema.String, Schema.String),
   maybeApplied: Schema.Option(AppliedConfig),

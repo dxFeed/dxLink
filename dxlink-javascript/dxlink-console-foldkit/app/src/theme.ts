@@ -20,7 +20,7 @@ export const loadThemeMode: Effect.Effect<Option.Option<ThemeMode>> = Effect.gen
 
   return Option.filter(Option.fromNullishOr(stored), Schema.is(ThemeMode))
 }).pipe(
-  Effect.catch(() => Effect.succeed(Option.none())),
+  Effect.orElseSucceed(() => Option.none<ThemeMode>()),
   Effect.provide(BrowserKeyValueStore.layerLocalStorage)
 )
 
@@ -28,10 +28,7 @@ export const saveThemeMode = (mode: ThemeMode): Effect.Effect<void> =>
   Effect.gen(function* () {
     const store = yield* KeyValueStore.KeyValueStore
     yield* store.set(THEME_STORAGE_KEY, mode)
-  }).pipe(
-    Effect.catch(() => Effect.void),
-    Effect.provide(BrowserKeyValueStore.layerLocalStorage)
-  )
+  }).pipe(Effect.ignore, Effect.provide(BrowserKeyValueStore.layerLocalStorage))
 
 export const isDark = (mode: ThemeMode, prefersDark: boolean): boolean =>
   mode === 'Dark' || (mode === 'System' && prefersDark)
